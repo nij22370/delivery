@@ -7,6 +7,7 @@ export interface IUser extends Document {
   role: "poster" | "driver" | "admin";
   oauthProvider?: string | null;
   oauthId?: string | null;
+  refreshTokenHash?: string | null;
   createdAt: Date;
 }
 
@@ -23,6 +24,7 @@ const userSchema = new Schema<IUser>(
     },
     oauthProvider: { type: String, default: null },
     oauthId: { type: String, default: null },
+    refreshTokenHash: { type: String, default: null },
   },
   { timestamps: true }
 );

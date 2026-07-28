@@ -17,6 +17,9 @@ export const metadata: Metadata = {
   description: "Empowering the Future of Logistics",
 };
 
+import Header from "@/components/layout/Header";
+import Footer from "@/components/layout/Footer";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -35,7 +38,13 @@ export default function RootLayout({
           }
         `}</style>
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col bg-surface-white text-on-surface">
+        <Header />
+        <main className="flex-1 flex flex-col w-full h-full">
+          {children}
+        </main>
+        <Footer />
+      </body>
     </html>
   );
 }
