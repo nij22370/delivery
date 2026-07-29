@@ -36,6 +36,34 @@ export function verifyRefreshToken(token: string): JwtRefreshPayload {
   return jwt.verify(token, getRefreshSecret()) as JwtRefreshPayload;
 }
 
+export function verifyAccessToken(token: string): JwtAccessPayload {
+  return jwt.verify(token, getAccessSecret()) as JwtAccessPayload;
+}
+
 export function hashToken(token: string): string {
   return crypto.createHash(HASH_ALGORITHM).update(token).digest("hex");
+}
+
+export function withAuth(
+  handler: (req: import("next/server").NextRequest, user: JwtAccessPayload) => Promise<import("next/server").NextResponse> | import("next/server").NextResponse
+) {
+  return async (req: import("next/server").NextRequest) => {
+    try {
+      const token = req.cookies.get("accessToken")?.value;
+      if (!token) {
+        return new Response(JSON.stringify({ message: "Unauthorized" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const user = verifyAccessToken(token);
+      return await handler(req, user);
+    } catch (error) {
+      return new Response(JSON.stringify({ message: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  };
 }

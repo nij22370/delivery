@@ -58,10 +58,28 @@ export async function POST(req: NextRequest) {
     user.refreshTokenHash = hashToken(refreshToken);
     await user.save();
 
-    return NextResponse.json(
-      { accessToken, refreshToken },
+    const response = NextResponse.json(
+      { message: "Login successful" },
       { status: 200 }
     );
+
+    response.cookies.set("accessToken", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 15 * 60, // 15 minutes
+      path: "/",
+    });
+
+    response.cookies.set("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60, // 7 days
+      path: "/",
+    });
+
+    return response;
   } catch (error: unknown) {
     console.error("Login error:", error);
     return NextResponse.json(
