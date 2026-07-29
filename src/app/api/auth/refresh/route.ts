@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import connectDB from "@/lib/db";
 import User from "@/models/User";
 import { signAccessToken, signRefreshToken, verifyRefreshToken, hashToken } from "@/lib/auth";
@@ -7,26 +6,17 @@ import { signAccessToken, signRefreshToken, verifyRefreshToken, hashToken } from
 // ── Constants ────────────────────────────────────────────────────────────────
 const INVALID_TOKEN_MESSAGE = "Invalid or expired refresh token";
 
-const refreshSchema = z.object({
-  refreshToken: z.string().min(1, "Refresh token is required"),
-});
 
 // ── Handler ──────────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
     await connectDB();
 
-    const body = await req.json();
+    const refreshToken = req.cookies.get("refreshToken")?.value;
 
-    const validationResult = refreshSchema.safeParse(body);
-    if (!validationResult.success) {
-      return NextResponse.json(
-        { message: "Invalid input", errors: validationResult.error.flatten().fieldErrors },
-        { status: 400 }
-      );
+    if (!refreshToken) {
+      return NextResponse.json({ message: INVALID_TOKEN_MESSAGE }, { status: 401 });
     }
-
-    const { refreshToken } = validationResult.data;
 
     // Step 1 — Verify signature and expiry. Throws if invalid or expired.
     let payload: { userId: string };
@@ -53,10 +43,28 @@ export async function POST(req: NextRequest) {
     user.refreshTokenHash = hashToken(newRefreshToken);
     await user.save();
 
-    return NextResponse.json(
-      { accessToken: newAccessToken, refreshToken: newRefreshToken },
+    const response = NextResponse.json(
+      { message: "Token refreshed successfully" },
       { status: 200 }
     );
+
+    response.cookies.set("accessToken", newAccessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 15 * 60,
+      path: "/",
+    });
+
+    response.cookies.set("refreshToken", newRefreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60,
+      path: "/",
+    });
+
+    return response;
   } catch (error: unknown) {
     console.error("Token refresh error:", error);
     return NextResponse.json(
