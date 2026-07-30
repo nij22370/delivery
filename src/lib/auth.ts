@@ -1,3 +1,4 @@
+import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import type { JwtAccessPayload, JwtRefreshPayload } from "@/types/auth";
@@ -45,25 +46,34 @@ export function hashToken(token: string): string {
 }
 
 export function withAuth(
-  handler: (req: import("next/server").NextRequest, user: JwtAccessPayload) => Promise<import("next/server").NextResponse> | import("next/server").NextResponse
+  handler: (req: NextRequest, user: JwtAccessPayload) => Promise<NextResponse> | NextResponse
 ) {
-  return async (req: import("next/server").NextRequest) => {
+  return async (req: NextRequest) => {
     try {
       const token = req.cookies.get("accessToken")?.value;
       if (!token) {
-        return new Response(JSON.stringify({ message: "Unauthorized" }), {
-          status: 401,
-          headers: { "Content-Type": "application/json" },
-        });
+        return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
       }
 
       const user = verifyAccessToken(token);
       return await handler(req, user);
     } catch (error) {
-      return new Response(JSON.stringify({ message: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
+  };
+}
+
+type UserRole = JwtAccessPayload["role"];
+
+export function withRole(allowedRoles: UserRole[]) {
+  return function (
+    handler: (req: NextRequest, user: JwtAccessPayload) => Promise<NextResponse> | NextResponse
+  ) {
+    return withAuth(async (req, user) => {
+      if (!allowedRoles.includes(user.role)) {
+        return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+      }
+      return handler(req, user);
+    });
   };
 }

@@ -7,6 +7,7 @@ import * as z from "zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { signIn } from "next-auth/react";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const LOGIN_ENDPOINT = "/api/auth/login";
@@ -100,6 +101,10 @@ export default function LoginPage() {
     },
     [router]
   );
+
+  const handleGoogleSignIn = useCallback(() => {
+    signIn("google", { callbackUrl: POST_LOGIN_REDIRECT });
+  }, []);
 
   const submitButtonClassName = [
     "w-full h-12 rounded-lg text-sm font-bold transition-all duration-200",
@@ -273,6 +278,7 @@ export default function LoginPage() {
             {/* Google Sign-In */}
             <button
               type="button"
+              onClick={handleGoogleSignIn}
               className="w-full h-12 bg-surface-white border border-outline-variant text-on-surface text-sm font-semibold rounded-lg hover:bg-surface-container-low active:scale-[0.98] transition-all flex items-center justify-center gap-3 cursor-pointer"
             >
               <GoogleIcon />

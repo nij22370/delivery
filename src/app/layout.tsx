@@ -19,6 +19,7 @@ export const metadata: Metadata = {
 
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import AuthProvider from "@/components/providers/AuthProvider";
 
 export default function RootLayout({
   children,
@@ -39,11 +40,13 @@ export default function RootLayout({
         `}</style>
       </head>
       <body className="min-h-full flex flex-col bg-surface-white text-on-surface">
-        <Header />
-        <main className="flex-1 flex flex-col w-full h-full">
-          {children}
-        </main>
-        <Footer />
+        <AuthProvider>
+          <Header />
+          <main className="flex-1 flex flex-col w-full h-full">
+            {children}
+          </main>
+          <Footer />
+        </AuthProvider>
       </body>
     </html>
   );
