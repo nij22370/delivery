@@ -70,3 +70,80 @@ Splitting those messages enables a **user enumeration attack**. An attacker subm
 ### Learning Prompt: Why rotate refresh tokens on every use?
 Refresh tokens are long-lived. If an attacker silently copies one (XSS, log leak, network interception), they can abuse it for its full 7-day lifetime without detection. **Rotation collapses that window to a single request.** The first party to use the token wins; the second party gets a 401. This converts a silent long-term compromise into an immediately detectable event.
 
+---
+
+## Day 6 — Auth Middleware
+
+### New Files
+- `src/lib/auth.ts` — Added `withAuth` higher-order function (HOF).
+
+### Architectural Decisions
+- **Middleware Implementation**: `withAuth` wraps any Next.js Route Handler, automatically verifying the JWT in the `accessToken` cookie. If valid, it passes the decoded `JwtAccessPayload` to the inner handler. If invalid or missing, it automatically returns a standard `401 Unauthorized` response.
+- **Cookie vs Header Storage**: Decided to use `HttpOnly` cookies rather than an `Authorization: Bearer <token>` header for token delivery.
+
+### Learning Prompt: HttpOnly Cookie vs. Authorization Header in Next.js
+**HttpOnly Cookies:**
+- *Pros:* Automatically sent with every request by the browser. Immune to XSS (Cross-Site Scripting) because JavaScript cannot read them. Native support in Next.js Server Components and Server Actions.
+- *Cons:* Susceptible to CSRF (Cross-Site Request Forgery), though Next.js and `SameSite=Lax` provide strong defaults against this.
+
+**Authorization Header:**
+- *Pros:* Immune to CSRF. Truly stateless and works seamlessly across different domains/mobile apps.
+- *Cons:* Must be stored in memory or `localStorage` on the client, making it highly vulnerable to XSS. Difficult to use seamlessly with Next.js Server Components because the token must be manually passed from the client to the server on every initial page load.
+
+**Conclusion:** For a Next.js App Router application, `HttpOnly` cookies are vastly superior due to the need for Server Components to access auth state without client-side hydration delays.
+
+---
+
+## Day 7 — `/api/me` & Logout
+
+### New Files
+- `src/app/api/auth/me/route.ts` — Retrieves the authenticated user's profile.
+- `src/app/api/auth/logout/route.ts` — Invalidates the session.
+
+### Architectural Decisions
+- **Profile Retrieval (`/me`)**: Wraps the route with `withAuth`. Uses the `userId` from the verified JWT payload to fetch the full User document from MongoDB (excluding the password and token hashes).
+- **Logout Logic**: 
+  1. Revokes the `refreshTokenHash` in MongoDB to prevent future rotations.
+  2. Clears the `accessToken` and `refreshToken` cookies by sending `Set-Cookie` headers with `Max-Age=0`.
+- **JWT Stateless Tradeoff**: Because the `accessToken` is a stateless JWT, the logout route *cannot* instantly invalidate it globally. If an attacker possesses the raw token, it remains technically valid until its 15-minute expiration hits. This is the accepted tradeoff of stateless JWTs, mitigated by the short TTL.
+
+---
+
+## Day 8 — Role-Based Access Control (RBAC)
+
+### New Files
+- `src/lib/auth.ts` — Added `withRole(allowedRoles)` HOF.
+
+### Architectural Decisions
+- **Composition over Inheritance**: `withRole` is designed as a composable wrapper around `withAuth`. It doesn't duplicate the authentication logic; it simply takes the `JwtAccessPayload` provided by `withAuth` and checks the role. This separates Authentication (who are you?) from Authorization (are you allowed?).
+
+### Learning Prompt: 401 vs 403 Scenarios
+- **401 Unauthorized**: "I don't know who you are. Authenticate first."
+  1. No session cookie is present.
+  2. The JWT is expired.
+  3. The JWT signature is invalid or tampered with.
+- **403 Forbidden**: "I know who you are. You just can't do this."
+  1. A `poster` user tries to access a route wrapped in `withRole(["driver"])`.
+  2. A `driver` tries to access an `admin` dashboard route.
+  3. An authenticated user tries to delete a document owned by another user.
+
+---
+
+## Day 9 — Google OAuth via Auth.js
+
+### New Files
+- `src/app/api/auth/[...nextauth]/route.ts` — NextAuth handler
+- `src/components/providers/AuthProvider.tsx` — SessionProvider wrapper
+
+### Architectural Decisions
+- **Hybrid Auth Strategy (Temporary)**: We currently have two parallel authentication systems. Our custom JWT logic manages the credential flow, while Auth.js issues its own session cookie for Google logins. 
+- **Upserting Users**: Inside the Auth.js `signIn` callback, we intercept the login to check MongoDB for an existing user by email. If they don't exist, we create them with `oauthProvider: "google"`. If they do exist (via prior credential signup), we gracefully link their `oauthId`.
+
+### Learning Prompt: What does Auth.js do behind the scenes?
+When a user clicks "Sign in with Google":
+1. Auth.js redirects them to Google's OAuth consent screen with our `clientId` and `redirect_uri`.
+2. Google authenticates the user and redirects back to our server (`/api/auth/callback/google`) with a short-lived `code`.
+3. Auth.js takes that `code` and makes a secure, server-to-server call to Google to exchange it for an `access_token` and an `id_token`.
+4. Auth.js decodes the `id_token` (which is a JWT) to extract the user's profile data (`name`, `email`, `sub`/`oauthId`).
+5. Our custom `signIn` callback fires, allowing us to sync this data with MongoDB.
+6. Finally, Auth.js serializes the session state and sets its own HttpOnly session cookie on the browser.
