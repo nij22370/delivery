@@ -5,14 +5,17 @@ import { signAccessToken, signRefreshToken, verifyRefreshToken, hashToken } from
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const INVALID_TOKEN_MESSAGE = "Invalid or expired refresh token";
-
+const ACCESS_TOKEN_COOKIE = "accessToken";
+const REFRESH_TOKEN_COOKIE = "refreshToken";
+const ACCESS_TOKEN_MAX_AGE = 15 * 60;
+const REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60;
 
 // ── Handler ──────────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
     await connectDB();
 
-    const refreshToken = req.cookies.get("refreshToken")?.value;
+    const refreshToken = req.cookies.get(REFRESH_TOKEN_COOKIE)?.value;
 
     if (!refreshToken) {
       return NextResponse.json({ message: INVALID_TOKEN_MESSAGE }, { status: 401 });
@@ -48,19 +51,19 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     );
 
-    response.cookies.set("accessToken", newAccessToken, {
+    response.cookies.set(ACCESS_TOKEN_COOKIE, newAccessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 15 * 60,
+      maxAge: ACCESS_TOKEN_MAX_AGE,
       path: "/",
     });
 
-    response.cookies.set("refreshToken", newRefreshToken, {
+    response.cookies.set(REFRESH_TOKEN_COOKIE, newRefreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60,
+      maxAge: REFRESH_TOKEN_MAX_AGE,
       path: "/",
     });
 

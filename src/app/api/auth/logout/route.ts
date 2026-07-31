@@ -3,6 +3,9 @@ import { withAuth } from "@/lib/auth";
 import connectDB from "@/lib/db";
 import User from "@/models/User";
 
+const ACCESS_TOKEN_COOKIE = "accessToken";
+const REFRESH_TOKEN_COOKIE = "refreshToken";
+
 export const POST = withAuth(async (req: NextRequest, payload) => {
   try {
     await connectDB();
@@ -20,12 +23,12 @@ export const POST = withAuth(async (req: NextRequest, payload) => {
     );
 
     // Clear both cookies by setting maxAge to 0
-    response.cookies.set("accessToken", "", {
+    response.cookies.set(ACCESS_TOKEN_COOKIE, "", {
       maxAge: 0,
       path: "/",
     });
     
-    response.cookies.set("refreshToken", "", {
+    response.cookies.set(REFRESH_TOKEN_COOKIE, "", {
       maxAge: 0,
       path: "/",
     });

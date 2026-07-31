@@ -14,6 +14,10 @@ const DUMMY_PASSWORD_HASH =
   "$2b$10$dummyhashforpreventingtimingattackonuserenumerationfake";
 
 const INVALID_CREDENTIALS_MESSAGE = "Invalid credentials";
+const ACCESS_TOKEN_COOKIE = "accessToken";
+const REFRESH_TOKEN_COOKIE = "refreshToken";
+const ACCESS_TOKEN_MAX_AGE = 15 * 60; // 15 minutes
+const REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60; // 7 days
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email format"),
@@ -63,19 +67,19 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     );
 
-    response.cookies.set("accessToken", accessToken, {
+    response.cookies.set(ACCESS_TOKEN_COOKIE, accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 15 * 60, // 15 minutes
+      maxAge: ACCESS_TOKEN_MAX_AGE,
       path: "/",
     });
 
-    response.cookies.set("refreshToken", refreshToken, {
+    response.cookies.set(REFRESH_TOKEN_COOKIE, refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60, // 7 days
+      maxAge: REFRESH_TOKEN_MAX_AGE,
       path: "/",
     });
 

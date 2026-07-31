@@ -56,6 +56,12 @@ In a Next.js development environment, Hot Module Replacement (HMR) causes files 
 ### Learning Prompt: Why is "email not found" vs "wrong password" a security problem?
 Splitting those messages enables a **user enumeration attack**. An attacker submits a list of candidate emails. `"email not found"` confirms the address is not registered; `"wrong password"` confirms it is. With 10,000 emails an attacker can map the entire registered user base, then target those accounts with credential stuffing or phishing. A single generic error removes that information leak.
 
+### Learning Prompt: Why not just use rate limiting to stop the timing attack?
+Rate limiting is necessary to stop brute force guessing, but it does not stop user enumeration:
+1. **Distributed Attacks (Botnets)**: Attackers can send 1 request from 10,000 different IPs. IP-based rate limiters won't block them.
+2. **"Low and Slow" Attacks**: Even at 1 request per minute (perfectly bypassing strict rate limits), the timing difference (5ms vs 300ms) is massive. An attacker can still map out your users slowly over time.
+3. **Defense in Depth**: We use rate limiting to stop password brute forcing, AND we use the dummy hash to prevent the system from leaking who has an account in the first place.
+4. **Why isn't the dummy hash in `.env`?** It's not a cryptographic secret. Its only job is to provide the `$2b$10$` prefix so the server wastes 300ms doing dummy math. It can never be used to log in, because the code always returns a 401 Unauthorized if the user isn't found, regardless of the hash math.
 ---
 
 ## Day 5 — Refresh Token Rotation
@@ -147,3 +153,30 @@ When a user clicks "Sign in with Google":
 4. Auth.js decodes the `id_token` (which is a JWT) to extract the user's profile data (`name`, `email`, `sub`/`oauthId`).
 5. Our custom `signIn` callback fires, allowing us to sync this data with MongoDB.
 6. Finally, Auth.js serializes the session state and sets its own HttpOnly session cookie on the browser.
+
+---
+
+## Day 10 — Session Unification
+
+### Modified Files
+- `src/app/api/auth/[...nextauth]/route.ts` — Updated the `signIn` callback to issue our own custom JWTs.
+
+### Architectural Decisions
+- **Standardizing on Custom JWT**: Instead of having the frontend and API routes deal with two different session formats (Auth.js session vs our JWT session), we chose unification.
+- During the Auth.js `signIn` callback, immediately after creating/finding the Google user in MongoDB, we use `cookies()` from `next/headers` to issue our custom `accessToken` and `refreshToken` directly.
+- NextAuth still issues its native session cookie, but our application ignores it and relies entirely on our custom tokens. This ensures our `withAuth` and `withRole` middleware works flawlessly for all users, regardless of how they logged in.
+
+---
+
+## Day 11 — Phase 1 Review
+
+### Architectural Decisions
+- Verified that all authentication flows (Register, Credential Login, Google Login, Protected Routes, Refresh, Logout) behave as expected.
+
+### Learning Prompt: JWT Tokens and RBAC Review
+1. **Why do we need both an access token and a refresh token?**
+   An access token is stateless and cannot be easily revoked without database lookups on every request. Therefore, it is given a very short lifespan (15 minutes). The refresh token is long-lived (7 days) but is stateful (its hash is stored in the DB). When the access token expires, the client uses the refresh token to get a new one. This is the exact moment the server checks the DB to ensure the user's session is still valid.
+2. **Why rotate the refresh token on every use?**
+   If a long-lived refresh token is stolen, an attacker could maintain access for 7 days. By rotating the token on every use (issuing a new one and updating the hash in the DB), it becomes single-use. If an attacker uses the stolen token, the legitimate user's next request will fail (due to a hash mismatch), immediately alerting the user of the compromise.
+3. **How does our RBAC work?**
+   Authentication (Who are you?) is separated from Authorization (What can you do?). `withAuth` verifies the token and establishes identity. `withRole` wraps `withAuth` and checks the decoded payload against allowed roles. It returns `401 Unauthorized` for missing authentication, and `403 Forbidden` for missing authorization.
