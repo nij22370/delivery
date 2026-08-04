@@ -39,7 +39,7 @@ export default function RootLayout({
           }
         `}</style>
       </head>
-      <body className="min-h-full flex flex-col bg-surface-white text-on-surface">
+      <body className="min-h-full flex flex-col bg-surface-white text-on-surface" suppressHydrationWarning>
         <AuthProvider>
           <Header />
           <main className="flex-1 flex flex-col w-full h-full">

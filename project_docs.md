@@ -180,3 +180,83 @@ When a user clicks "Sign in with Google":
    If a long-lived refresh token is stolen, an attacker could maintain access for 7 days. By rotating the token on every use (issuing a new one and updating the hash in the DB), it becomes single-use. If an attacker uses the stolen token, the legitimate user's next request will fail (due to a hash mismatch), immediately alerting the user of the compromise.
 3. **How does our RBAC work?**
    Authentication (Who are you?) is separated from Authorization (What can you do?). `withAuth` verifies the token and establishes identity. `withRole` wraps `withAuth` and checks the decoded payload against allowed roles. It returns `401 Unauthorized` for missing authentication, and `403 Forbidden` for missing authorization.
+
+---
+
+## Days 12–13 — Job Schema + Create Endpoint
+
+### New Files
+- `src/types/job.ts` — Zod schemas and TypeScript types for jobs.
+- `src/models/Job.ts` — Mongoose Job model.
+- `src/app/api/jobs/route.ts` — `POST /api/jobs` and `GET /api/jobs` handlers.
+
+### Type Architecture — "Define Once" Pattern
+`src/types/job.ts` is the **single source of truth** for all job validation. It exports:
+- `jobCreationSchema` — full schema used by `POST /api/jobs` on the server.
+- `jobLocationSchema` — `.pick()` slice used by the form's Step 1.
+- `jobVehicleSchema` — `.pick()` slice used by the form's Step 2.
+- `JOB_STATUS` / `JOB_VEHICLE_TYPE` — constants imported by the Mongoose model, API routes, and UI.
+
+No schema is ever duplicated. Both the API route and each form step import from the same file.
+
+### Job Model Fields
+| Field | Type | Notes |
+|---|---|---|
+| `posterId` | `ObjectId` ref `User` | Set from JWT — never trusted from body |
+| `driverId` | `ObjectId` ref `User` | Nullable; set when job is accepted |
+| `status` | enum | `posted \| accepted \| in_transit \| delivered \| cancelled` — indexed |
+| `pickupAddress` | `string` | Plain text |
+| `dropoffAddress` | `string` | Plain text |
+| `vehicleType` | enum | `bicycle \| motorcycle \| car \| van \| truck` |
+| `packageDescription` | `string?` | Optional |
+| `offeredPrice` | `number` | Integer cents (e.g., $12.99 → `1299`) to avoid float precision issues |
+| `createdAt` / `updatedAt` | Date | Auto via `{ timestamps: true }` |
+
+### POST /api/jobs
+- Protected by `withRole(["poster"])` — drivers get `403`, unauthenticated gets `401`.
+- `posterId` set from `user.userId` in the JWT payload — a client cannot forge this.
+- `status` hardcoded to `"posted"` — a client cannot override it.
+- Validates body with `jobCreationSchema.safeParse()` — returns field-level errors on `400`.
+
+### Architectural Decision: offeredPrice as Integer Cents
+Storing currency as float causes silent precision errors in JavaScript (`0.1 + 0.2 !== 0.3`). Storing as integer cents (`1299`) makes arithmetic exact. The API accepts cents directly; the form (Day 16) converts from a decimal input before submitting.
+
+---
+
+## Day 14 — List/Filter Jobs Endpoint
+
+### GET /api/jobs
+- Protected by `withAuth` (any authenticated role).
+- **Role-scoped results** derived from the JWT, not query params:
+  - **Poster**: only sees their own jobs (`posterId = user.userId`).
+  - **Driver**: defaults to `status: "posted"` (open jobs to accept). Passing `?driverId=me` switches to their own accepted jobs. A driver cannot see another driver's in-progress jobs.
+  - **Admin**: no baseline scope; sees all jobs.
+- Query params `?status`, `?vehicleType`, `?page`, `?limit` layer on top of role scoping, never override it.
+- Returns `{ jobs, total, page, totalPages }`. Out-of-range page returns `jobs: []` (no crash).
+- `PAGE_SIZE = 10` enforced from day one.
+
+### Learning Prompt: When does a MongoDB index actually matter at small scale?
+Adding `index: true` to `status` is correct even at < 1,000 documents because: (1) adding an index to an empty collection is instant — adding it to 10M documents requires a blocking rebuild; (2) it builds the habit of annotating high-selectivity fields from the start; (3) MongoDB M0 free tier has limited index slots, teaching intentional index design.
+
+---
+
+## Day 15 — Job Posting Form (Steps 1–2)
+
+### New Files
+- `src/app/post-job/page.tsx` — Multi-step job posting form. Steps 1 & 2 built; Step 3 is a placeholder pending Day 16.
+- `design-reference/job-posting-form/` — Stitch design assets for all 3 steps (screenshots + annotated HTML reference).
+
+### Form Architecture
+- **Step state**: local `useState` in the page component. No Zustand — overkill for 2 steps.
+- **Step 1** (`StepLocations`): `zodResolver(jobLocationSchema)` — validates `pickupAddress` + `dropoffAddress`. Blocks "Next" on invalid input.
+- **Step 2** (`StepVehicle`): `zodResolver(jobVehicleSchema)` — validates `vehicleType`. Vehicle selection calls `setValue` to drive RHF state, keeping radio-card selection governed by form validation rather than raw `useState`.
+
+### Leaflet Map Preview Integration
+- `src/components/MapPreview.tsx` — A static `react-leaflet` preview for Step 1.
+- Receives `pickupAddress` and `dropoffAddress` via props and debounces them internally.
+- Calls Nominatim Geocoding API to resolve coordinates, drops pins for each.
+- When both are resolved, calls OSRM Directions API to draw a route polyline.
+- Handles empty/partially filled states gracefully. Bounds auto-fit to the pins. 
+
+### Learning Prompt: Clean multi-step form validation against a schema slice
+Pattern: `const sliceSchema = fullSchema.pick({ field1: true, field2: true })`, then `useForm({ resolver: zodResolver(sliceSchema) })`. Each step validates only its own fields. On Day 16, all partials merge into the full `jobCreationSchema` shape before the API call. This avoids schema duplication and false validation failures on fields the user hasn't seen yet.

@@ -52,7 +52,7 @@ export default function Header() {
             Login
           </Link>
           <Link
-            href="/register"
+            href="/post-job"
             className="bg-primary text-on-primary px-5 py-2 rounded-lg text-sm font-semibold hover:bg-primary-container transition-all active:scale-95 cursor-pointer"
           >
             Post a Job
@@ -106,7 +106,7 @@ export default function Header() {
             </Link>
             <div className="pt-3 pb-1">
               <Link
-                href="/register"
+                href="/post-job"
                 onClick={handleCloseMobileMenu}
                 className="w-full flex items-center justify-center bg-primary text-on-primary h-12 rounded-lg text-sm font-semibold hover:bg-primary-container transition-all cursor-pointer"
               >
