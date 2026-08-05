@@ -20,6 +20,7 @@ export const metadata: Metadata = {
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import AuthProvider from "@/components/providers/AuthProvider";
+import QueryProvider from "@/components/providers/QueryProvider";
 
 export default function RootLayout({
   children,
@@ -41,11 +42,13 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col bg-surface-white text-on-surface" suppressHydrationWarning>
         <AuthProvider>
-          <Header />
-          <main className="flex-1 flex flex-col w-full h-full">
-            {children}
-          </main>
-          <Footer />
+          <QueryProvider>
+            <Header />
+            <main className="flex-1 flex flex-col w-full h-full">
+              {children}
+            </main>
+            <Footer />
+          </QueryProvider>
         </AuthProvider>
       </body>
     </html>

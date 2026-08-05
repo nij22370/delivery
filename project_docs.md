@@ -62,6 +62,7 @@ Rate limiting is necessary to stop brute force guessing, but it does not stop us
 2. **"Low and Slow" Attacks**: Even at 1 request per minute (perfectly bypassing strict rate limits), the timing difference (5ms vs 300ms) is massive. An attacker can still map out your users slowly over time.
 3. **Defense in Depth**: We use rate limiting to stop password brute forcing, AND we use the dummy hash to prevent the system from leaking who has an account in the first place.
 4. **Why isn't the dummy hash in `.env`?** It's not a cryptographic secret. Its only job is to provide the `$2b$10$` prefix so the server wastes 300ms doing dummy math. It can never be used to log in, because the code always returns a 401 Unauthorized if the user isn't found, regardless of the hash math.
+
 ---
 
 ## Day 5 — Refresh Token Rotation
@@ -260,3 +261,82 @@ Adding `index: true` to `status` is correct even at < 1,000 documents because: (
 
 ### Learning Prompt: Clean multi-step form validation against a schema slice
 Pattern: `const sliceSchema = fullSchema.pick({ field1: true, field2: true })`, then `useForm({ resolver: zodResolver(sliceSchema) })`. Each step validates only its own fields. On Day 16, all partials merge into the full `jobCreationSchema` shape before the API call. This avoids schema duplication and false validation failures on fields the user hasn't seen yet.
+
+---
+
+## Day 16 — Job Posting Form (Steps 3–4)
+
+### Component Refactoring
+Per standards, extracted multi-step form components into `src/components/post-job/`:
+- `src/components/post-job/ProgressBar.tsx` — Progress indicator with 4 segments
+- `src/components/post-job/FormFieldError.tsx` — Reusable error display
+- `src/components/post-job/VehicleCard.tsx` — Card component for vehicle selection
+- `src/components/post-job/StepLocations.tsx` — Step 1 form (pickup/dropoff)
+- `src/components/post-job/StepVehicle.tsx` — Step 2 form (vehicle type)
+- `src/components/post-job/StepPricing.tsx` — Step 3 form with price suggestion
+- `src/components/post-job/StepReview.tsx` — Step 4 review and submit
+
+### Step 3 — Pricing & Schedule
+- **Price suggestion**: Uses Haversine formula to calculate distance between pickup/dropoff coordinates (geocoded by MapPreview).
+- **Formula**: `$5 base fare + $0.50 per kilometer` (placeholder rates - tune later).
+- **UI**: Pre-filled `offeredPrice` in cents, but editable for user override.
+- **Package description**: Optional textarea for delivery notes.
+
+### Step 4 — Review & Submit
+- **Summary screen**: Displays all entered fields (locations, vehicle, price, notes).
+- **Submission**: TanStack Query mutation to `POST /api/jobs`.
+- **States**: 
+  - Loading: Button disabled with spinner state
+  - Error: Displays error message in red container
+  - Success: Redirects to `/jobs/[id]` via `router.push()`
+
+### Leafet Icon Fix (Day 15 follow-up)
+- Moved marker icons from `node_modules` to `public/images/`
+- Created `src/utils/mapIcons.js` with `DEFAULT_MARKER_ICON` export
+- Updated MapPreview to use the static public asset paths
+
+### Learning Prompt: Why calculate price after geocoding instead of using address strings?
+Geocoding converts addresses to precise coordinates. The Haversine formula calculates the exact "as-the-crow-flies" distance, which is then multiplied by our per-km rate. This is more accurate than estimating by address string length or zip codes. The API is called only when both addresses are resolved, minimizing external calls.
+
+---
+
+## Day 17 — Driver Browse Page (Coming Soon)
+
+### Planned Architecture
+- **Route**: `src/app/jobs/browse/page.tsx`
+- **Data fetching**: `GET /api/jobs?status=posted` via TanStack Query
+- **Filters**: Vehicle type selector that resets pagination to page 1 on change
+- **States**: Loading skeletons, empty state illustration, error state with retry
+- **Role scoping**: Drivers see only `status=posted` jobs; posters are blocked from this view by `GET /api/jobs` role-scoping
+
+---
+
+## Day 18 — Job Detail & Accept Endpoint (Coming Soon)
+
+### Planned API Routes
+- `GET /api/jobs/:id` — Returns full job details (if authorized)
+- `POST /api/jobs/:id/accept` — Atomic `findOneAndUpdate` with `status: "posted"` in filter, returns 409 if already taken
+
+### Planned Page
+- **Route**: `src/app/jobs/[id]/page.tsx`
+- **Contact info gating**: Reveal phone/email only when job status is `accepted` or later
+- **Accept flow**: Button triggers mutation to accept endpoint with pending/disabled states
+
+---
+
+## Design System Notes
+
+### Touch Targets
+All interactive elements in the new post-job form have `h-12` (48px) minimum height per mobile-first standard.
+
+### Color Usage
+- Primary: `#276EF1` (buttons, active states)
+- Surface: `#FFFFFF` (form backgrounds)
+- Outline variant: `#E2E2E2` (borders)
+
+### Spacing
+- Mobile base: 16px padding (`px-4`, `py-4`)
+- Desktop: 32px padding (`md:px-8`, `md:py-8`)
+
+### Icons
+Using Material Symbols Outlined exclusively — no icon library mixing.
