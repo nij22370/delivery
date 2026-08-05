@@ -16,9 +16,11 @@ export interface IJob extends Document {
   dropoffPhone: string;
   // Vehicle (Step 2)
   vehicleType: JobVehicleType;
-  // Pricing (Step 3 — collected Day 16)
+  // Pricing (Step 3)
   packageDescription?: string;
   offeredPrice: number;
+  pickupDate: string;
+  pickupTimeWindow: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -56,6 +58,8 @@ const jobSchema = new Schema<IJob>(
     },
     packageDescription: { type: String, default: null },
     offeredPrice: { type: Number, required: true },
+    pickupDate: { type: String, required: true },
+    pickupTimeWindow: { type: String, required: true },
   },
   { timestamps: true }
 );

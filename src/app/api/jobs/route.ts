@@ -106,6 +106,8 @@ async function handleCreateJob(
       vehicleType,
       packageDescription,
       offeredPrice,
+      pickupDate,
+      pickupTimeWindow,
     } = validationResult.data;
 
     const job = await Job.create({
@@ -121,6 +123,8 @@ async function handleCreateJob(
       vehicleType,
       packageDescription,
       offeredPrice,
+      pickupDate,
+      pickupTimeWindow,
     });
 
     return NextResponse.json({ message: "Job created successfully", job }, { status: 201 });
