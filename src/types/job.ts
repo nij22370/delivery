@@ -44,12 +44,14 @@ export const jobCreationSchema = z.object({
     { error: "Please select a vehicle type" }
   ),
 
-  // ── Step 3 fields (deferred to Day 16) ──
+  // ── Step 3 fields ──
   packageDescription: z.string().max(500).optional(),
   offeredPrice: z
     .number()
     .int("Price must be a whole number of cents")
     .positive("Price must be greater than zero"),
+  pickupDate: z.string().min(1, "Please select a pickup date"),
+  pickupTimeWindow: z.string().min(1, "Please select a time window"),
 });
 
 export type JobCreationInput = z.infer<typeof jobCreationSchema>;
@@ -73,3 +75,12 @@ export const jobVehicleSchema = jobCreationSchema.pick({
 });
 
 export type JobVehicleInput = z.infer<typeof jobVehicleSchema>;
+
+export const jobPricingSchema = jobCreationSchema.pick({
+  packageDescription: true,
+  offeredPrice: true,
+  pickupDate: true,
+  pickupTimeWindow: true,
+});
+
+export type JobPricingInput = z.infer<typeof jobPricingSchema>;
