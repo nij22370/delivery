@@ -7,11 +7,10 @@ import * as z from "zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { useRegister } from "@/api/hooks/auth/authApi";
 
 // ── Constants ───────────────────────────────────────────────────────────────
-const REGISTER_ENDPOINT = "/api/auth/register";
 const POST_REGISTER_REDIRECT = "/login?registered=true";
-const FALLBACK_ERROR_MESSAGE = "Registration failed. Please try again.";
 
 const HERO_IMAGE_URL = "/register.jpg";
 
@@ -58,9 +57,9 @@ function getSubmitButtonContent(
 export default function RegisterPage() {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+
+  const registerMutation = useRegister();
 
   const {
     register,
@@ -76,36 +75,25 @@ export default function RegisterPage() {
   }, []);
 
   const onSubmit = useCallback(
-    async (data: RegisterFormValues) => {
-      setIsSubmitting(true);
+    (data: RegisterFormValues) => {
       setServerError(null);
-      try {
-        const response = await fetch(REGISTER_ENDPOINT, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data),
-        });
-        const responseData = await response.json();
-        if (!response.ok) {
-          throw new Error(responseData.message || FALLBACK_ERROR_MESSAGE);
+      registerMutation.mutate(data, {
+        onSuccess: () => {
+          router.push(POST_REGISTER_REDIRECT);
+        },
+        onError: () => {
+          setServerError("Registration failed. Please try again.");
         }
-        setIsSuccess(true);
-        router.push(POST_REGISTER_REDIRECT);
-      } catch (error: unknown) {
-        const message =
-          error instanceof Error ? error.message : FALLBACK_ERROR_MESSAGE;
-        setServerError(message);
-        setIsSubmitting(false);
-      }
+      });
     },
-    [router]
+    [registerMutation, router]
   );
 
   const submitButtonClassName = [
     "w-full h-12 rounded-lg text-sm font-bold transition-all duration-200",
     "flex items-center justify-center gap-2 text-on-primary",
     "active:scale-[0.98] disabled:opacity-75",
-    isSuccess ? "bg-success-green" : "bg-primary hover:bg-primary-container",
+    registerMutation.isSuccess ? "bg-success-green" : "bg-primary hover:bg-primary-container",
   ].join(" ");
 
   return (
@@ -253,10 +241,10 @@ export default function RegisterPage() {
               <div className="pt-2 space-y-4">
                 <button
                   type="submit"
-                  disabled={isSubmitting || isSuccess}
+                  disabled={registerMutation.isPending || registerMutation.isSuccess}
                   className={submitButtonClassName}
                 >
-                  {getSubmitButtonContent(isSubmitting, isSuccess)}
+                  {getSubmitButtonContent(registerMutation.isPending, registerMutation.isSuccess)}
                 </button>
 
                 <p className="text-center text-sm text-on-surface-variant">

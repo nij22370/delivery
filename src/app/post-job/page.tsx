@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
+import { useJobCreate } from "@/api/hooks/jobs/jobsApi";
 import { type JobCreationInput } from "@/types/job";
 import dynamic from "next/dynamic";
 import ProgressBar from "@/components/post-job/ProgressBar";
