@@ -1,9 +1,8 @@
-"use client";
-
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import api from "../api/api";
 
-const ME_ENDPOINT = "/api/auth/me";
+const ME_ENDPOINT = "/auth/me";
 const LOGIN_PATH = "/login";
 
 interface AuthUser {
@@ -25,16 +24,14 @@ export function useAuthGuard(redirectTo: string = LOGIN_PATH): UseAuthGuardResul
 
   const checkAuth = useCallback(async () => {
     try {
-      const response = await fetch(ME_ENDPOINT);
-      if (!response.ok) {
-        router.replace(`${redirectTo}?redirect=${encodeURIComponent(window.location.pathname)}`);
-        return;
-      }
-      const data: { user: AuthUser } = await response.json();
-      setUser(data.user);
-    } catch {
-      router.replace(redirectTo);
-    } finally {
+      const response = await api.get<{ user: AuthUser }>(ME_ENDPOINT);
+      setUser(response.data.user);
+    } catch (error) {
+      router.replace(
+        `${redirectTo}?redirect=${encodeURIComponent(window.location.pathname)}`
+      );
+    }
+    finally {
       setIsLoading(false);
     }
   }, [router, redirectTo]);

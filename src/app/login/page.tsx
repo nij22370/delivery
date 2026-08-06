@@ -8,11 +8,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { signIn } from "next-auth/react";
+import { useLogin } from "@/api/hooks/auth/authApi";
 
-// ── Constants ────────────────────────────────────────────────────────────────
-const LOGIN_ENDPOINT = "/api/auth/login";
 const POST_LOGIN_REDIRECT = "/dashboard";
-const FALLBACK_ERROR_MESSAGE = "Login failed. Please try again.";
 
 const HERO_IMAGE_URL = "/login.jpg";
 
@@ -60,9 +58,9 @@ function getSubmitButtonContent(
 export default function LoginPage() {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+
+  const loginMutation = useLogin();
 
   const {
     register,
@@ -77,29 +75,20 @@ export default function LoginPage() {
   }, []);
 
   const onSubmit = useCallback(
-    async (data: LoginFormValues) => {
-      setIsSubmitting(true);
+    (data: LoginFormValues) => {
       setServerError(null);
-      try {
-        const response = await fetch(LOGIN_ENDPOINT, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data),
-        });
-        const responseData = await response.json();
-        if (!response.ok) {
-          throw new Error(responseData.message || FALLBACK_ERROR_MESSAGE);
+      loginMutation.mutate(data, {
+        onSuccess: () => {
+          router.push(POST_LOGIN_REDIRECT);
+        },
+        onError: () => {
+          // The hook handles the toast, we can clear this banner if we wanted, 
+          // but we'll leave setServerError if needed, or just let toast do the work.
+          setServerError("Login failed. Please try again.");
         }
-        setIsSuccess(true);
-        router.push(POST_LOGIN_REDIRECT);
-      } catch (error: unknown) {
-        const message =
-          error instanceof Error ? error.message : FALLBACK_ERROR_MESSAGE;
-        setServerError(message);
-        setIsSubmitting(false);
-      }
+      });
     },
-    [router]
+    [loginMutation, router]
   );
 
   const handleGoogleSignIn = useCallback(() => {
@@ -110,7 +99,7 @@ export default function LoginPage() {
     "w-full h-12 rounded-lg text-sm font-bold transition-all duration-200",
     "flex items-center justify-center gap-2",
     "active:scale-[0.98] disabled:opacity-75 cursor-pointer",
-    isSuccess
+    loginMutation.isSuccess
       ? "bg-success-green text-on-primary"
       : "bg-primary text-on-primary hover:bg-primary-container",
   ].join(" ");
@@ -260,10 +249,10 @@ export default function LoginPage() {
             {/* Submit */}
             <button
               type="submit"
-              disabled={isSubmitting || isSuccess}
+              disabled={loginMutation.isPending || loginMutation.isSuccess}
               className={submitButtonClassName}
             >
-              {getSubmitButtonContent(isSubmitting, isSuccess)}
+              {getSubmitButtonContent(loginMutation.isPending, loginMutation.isSuccess)}
             </button>
 
             {/* Divider */}

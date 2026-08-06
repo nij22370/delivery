@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import type { JwtAccessPayload, JwtRefreshPayload } from "@/types/auth";
+import type { JwtAccessPayload, JwtRefreshPayload } from "@/types/auth/auth";
 
 const ACCESS_TOKEN_EXPIRY = "15m";
 const REFRESH_TOKEN_EXPIRY = "7d";

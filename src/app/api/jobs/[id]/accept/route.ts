@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/lib/db";
 import Job from "@/models/Job";
 import { withRole } from "@/lib/auth";
-import type { JwtAccessPayload } from "@/types/auth";
+import type { JwtAccessPayload } from "@/types/auth/auth";
 import { JOB_STATUS } from "@/types/job";
 
 interface RouteContext {

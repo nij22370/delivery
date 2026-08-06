@@ -3,7 +3,7 @@ import connectDB from "@/lib/db";
 import Job from "@/models/Job";
 import { withRole, withAuth } from "@/lib/auth";
 import { jobCreationSchema, JOB_STATUS, JOB_VEHICLE_TYPE } from "@/types/job";
-import type { JwtAccessPayload } from "@/types/auth";
+import type { JwtAccessPayload } from "@/types/auth/auth";
 import type { JobStatus, JobVehicleType } from "@/types/job";
 
 // ── Constants ────────────────────────────────────────────────────────────────
