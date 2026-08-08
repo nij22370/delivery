@@ -7,19 +7,13 @@ import { DRIVER_PROFILE_STATUS, DRIVER_VEHICLE_TYPE } from "@/types/driverProfil
 import type { DriverVehicleType } from "@/types/driverProfile/driverProfile";
 import { toast } from "sonner";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
+import { VEHICLE_ICONS } from "@/lib/constants";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const ACCEPTED_MIME_TYPES = ["image/jpeg", "image/png", "image/svg+xml", "application/pdf"];
 const ACCEPTED_EXTENSIONS = ".jpg,.jpeg,.png,.svg,.pdf";
 const PREVIOUSLY_UPLOADED_FILENAME = "Previously uploaded";
-
-const VEHICLE_ICONS: Record<DriverVehicleType, string> = {
-  bike: "pedal_bike",
-  car: "directions_car",
-  van: "local_shipping",
-  truck: "fire_truck",
-};
 
 type DocumentType = "licence" | "government_id" | "insurance";
 
@@ -312,6 +306,7 @@ export default function DriverVerificationPage() {
   const profile = profileResponse?.profile;
   const isPending = profile?.status === DRIVER_PROFILE_STATUS.PENDING;
   const isApproved = profile?.status === DRIVER_PROFILE_STATUS.APPROVED;
+  const isRejected = profile?.status === DRIVER_PROFILE_STATUS.REJECTED;
   const isLocked = isPending || isApproved;
 
   // undefined = use server value, null = explicitly cleared, file = freshly uploaded.
@@ -447,6 +442,26 @@ export default function DriverVerificationPage() {
             <div>
               <p className="text-sm font-semibold text-primary-container">Your documents are under review</p>
               <p className="text-sm text-on-surface-variant">We are reviewing your submission. This typically takes 1–3 business days. You will be notified once verified.</p>
+            </div>
+          </div>
+        )}
+
+        {isRejected && (
+          <div className="mb-6 flex items-start gap-3 p-4 bg-error-red/10 border border-error-red/30 rounded-lg">
+            <span className="material-symbols-outlined text-error-red text-[22px] mt-0.5 shrink-0">error</span>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-error-red">Your application was rejected</p>
+              <p className="text-sm text-on-surface-variant">
+                {profile?.rejectionReason || "Please review your documents and resubmit."}
+              </p>
+              <button
+                type="button"
+                onClick={handleUnlock}
+                className="mt-3 inline-flex items-center gap-1 px-4 h-12 border border-error-red/50 text-error-red text-sm font-medium rounded-lg hover:bg-error-container/40 transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">edit</span>
+                Update Documents
+              </button>
             </div>
           </div>
         )}

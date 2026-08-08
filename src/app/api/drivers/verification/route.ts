@@ -17,6 +17,7 @@ async function getHandler(req: NextRequest, user: JwtAccessPayload) {
           status: DRIVER_PROFILE_STATUS.UNVERIFIED,
           vehicleType: DRIVER_VEHICLE_TYPE.BIKE,
           backgroundCheck: { authorized: false },
+          rejectionReason: null,
         },
       });
     }
@@ -44,7 +45,15 @@ async function putHandler(req: NextRequest, user: JwtAccessPayload) {
     const data = validationResult.data;
     const setQuery: Record<string, unknown> = {};
 
-    if (data.status) setQuery.status = data.status;
+    if (data.status) {
+      setQuery.status = data.status;
+      if (
+        data.status === DRIVER_PROFILE_STATUS.UNVERIFIED ||
+        data.status === DRIVER_PROFILE_STATUS.PENDING
+      ) {
+        setQuery.rejectionReason = null;
+      }
+    }
     if (data.vehicleType) setQuery.vehicleType = data.vehicleType;
     if (data.licenceDocUrl !== undefined) setQuery.licenceDocUrl = data.licenceDocUrl;
     if (data.governmentIdDocUrl !== undefined) setQuery.governmentIdDocUrl = data.governmentIdDocUrl;

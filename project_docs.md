@@ -430,3 +430,38 @@ All interactive elements in the new post-job form have `h-12` (48px) minimum hei
 
 ### Icons
 Using Material Symbols Outlined exclusively — no icon library mixing.
+
+---
+
+## Days 21–23 — Admin Verification Queue
+
+### New Files
+- `src/types/admin/adminVerification.ts` — AdminTabKey, ApproveRejectStatus (derived from DriverProfileStatus), AdminVerificationProfile (mirrors API response including `updatedAt`), query/response interfaces.
+- `src/app/api/admin/verification/route.ts` — `GET /api/admin/verification`. Protected by `withRole(["admin"])`. Supports `?status` (default `"pending"`), `?search` (User name/email via case-insensitive regex), `?page`, `?limit`. Uses `populate("userId","name email")` then maps name/email onto the profile response. Returns `totalApproved`/`totalPending` counts alongside paginated results.
+- `src/app/api/admin/verification/[id]/route.ts` — `PATCH /api/admin/verification/:id`. Protected by `withRole(["admin"])`. Accepts `{ status: "approved"|"rejected", reason? }`. On approve: sets `verifiedAt = new Date()`, clears `rejectionReason`. On reject: sets `rejectionReason` from payload.
+- `src/api/apis/admin/adminApi.ts` — Plain fetchers: `getVerificationQueue` (GET, structured params), `approveRejectDriver` (PATCH).
+- `src/api/hooks/admin/adminApi.ts` — `useVerificationQueue` (30s staleTime, queue key) and `useApproveRejectDriver` (invalidates queue query on success, toasts).
+- `src/app/admin/verification/page.tsx` — Admin queue UI with role guard, stat cards, tabs with count badge, debounced search, data table (avatar initials, copy-ID, vehicle/status/BG/documents/actions columns), pagination, reject confirmation modal.
+
+### Modified Files
+- `src/models/DriverProfile.ts` — Added `rejectionReason?: string | null` field with `default: null`.
+- `src/types/driverProfile/driverProfile.ts` — Added `rejectionReason?: string | null` to `DriverProfile` response interface.
+- `src/app/driver/verification/page.tsx` — Added rejected-status banner with reason text and "Update Documents" button (resets status to `unverified` via existing `handleUnlock`).
+- `src/app/api/drivers/verification/route.ts` — Added `rejectionReason: null` to the orphan default profile structure.
+
+### New Shared Utilities
+- `src/hooks/useDebouncedValue.ts` — Generic debounce hook (debounces any value by `delayMs`).
+- `src/utils/format.ts` — `getInitials(name)` (2-char max), `formatAppliedDate(createdAt)` (US locale short date + 12h time).
+
+### Architectural Decisions
+- **Derived types from source of truth**: `AdminTabKey` and `ApproveRejectStatus` are `Extract<DriverProfileStatus, ...>` unions. Raw status strings (`"approved"`, `"rejected"`) are never used; all status values reference `DRIVER_PROFILE_STATUS.*` constants.
+- **Status badge map covers all statuses**: `STATUS_BADGE_STYLES` is typed `Record<DriverProfileStatus, string>` with an `unverified` entry, so any new status added to the enum is caught at compile time instead of silently rendering without color.
+- **`rejectionReason` is excluded from the driver PUT validation schema**: drivers cannot self-set rejection reason via their own route. Only the admin PATCH can write it.
+- **Global stat counts (`totalApproved`/`totalPending`) are computed per request**: At early-stage scale the extra two `countDocuments` calls are negligible; a `$facet` aggregation or separate stats endpoint can replace them if the collection grows beyond 100k profiles.
+- **`formatAppliedDate` and `getInitials` live in shared `utils/format.ts`**: Per CLAUDE.md standards, all utility/formatting logic is centralized outside components.
+
+### Learning Prompt: Why exclude rejection reason from the driver's validation schema?
+Separating write permissions at the schema layer enforces a clean privilege boundary. The driver PUT schema controls what drivers can submit; the admin PATCH route has its own Zod schema that includes `status` and `reason`. If `rejectionReason` were in the driver schema, a malicious driver could self-clear the flag to reset their status. By keeping it out, rejection state is only modifiable by an admin, and the driver's only recourse is the explicit "Update Documents" flow which resets to `unverified` — a legitimate self-service path that doesn't bypass the review queue.
+
+### Learning Prompt: Why populate rather than a separate User lookup per profile?
+`DriverProfile.find().populate("userId","name email")` executes a single secondary query that resolves all referenced users in one round-trip, versus N individual `User.findById` calls. This avoids the N+1 pattern while keeping the code clean and the response latency bounded. The `populate` result is then mapped onto the response to extract `name`/`email` as top-level fields, satisfying the flat `AdminVerificationProfile` contract.

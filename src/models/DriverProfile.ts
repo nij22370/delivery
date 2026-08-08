@@ -17,6 +17,7 @@ export interface IDriverProfile extends Document {
     authorized?: boolean;
     authorizedAt?: Date;
   };
+  rejectionReason?: string | null;
   verifiedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -45,10 +46,13 @@ const driverProfileSchema = new Schema<IDriverProfile>(
       authorized: { type: Boolean, default: false },
       authorizedAt: { type: Date },
     },
+    rejectionReason: { type: String, default: null },
     verifiedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
+
+driverProfileSchema.index({ status: 1, createdAt: -1 });
 
 const DriverProfile: Model<IDriverProfile> =
   mongoose.models.DriverProfile ||
