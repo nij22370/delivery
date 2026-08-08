@@ -39,9 +39,18 @@ const DRIVER_VEHICLE_TYPE_OPTIONS: [DriverVehicleType, ...DriverVehicleType[]] =
 export const driverProfileUpdateSchema = z.object({
   status: z.enum(DRIVER_PROFILE_STATUS_OPTIONS).optional(),
   vehicleType: z.enum(DRIVER_VEHICLE_TYPE_OPTIONS).optional(),
-  licenceDocUrl: z.string().url().optional(),
-  governmentIdDocUrl: z.string().url().optional(),
-  insuranceDocUrl: z.string().url().optional(),
+  licenceDocUrl: z.string().url().refine(
+    (url) => url.startsWith("http://") || url.startsWith("https://"),
+    { message: "Only http/https URLs allowed" }
+  ).optional(),
+  governmentIdDocUrl: z.string().url().refine(
+    (url) => url.startsWith("http://") || url.startsWith("https://"),
+    { message: "Only http/https URLs allowed" }
+  ).optional(),
+  insuranceDocUrl: z.string().url().refine(
+    (url) => url.startsWith("http://") || url.startsWith("https://"),
+    { message: "Only http/https URLs allowed" }
+  ).optional(),
   backgroundCheck: z.object({
     authorized: z.boolean().optional(),
     authorizedAt: z.coerce.date().optional(),
@@ -64,6 +73,7 @@ export interface DriverProfile {
     authorized: boolean;
     authorizedAt?: string | null;
   };
+  rejectionReason?: string | null;
   verifiedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
