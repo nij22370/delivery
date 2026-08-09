@@ -75,6 +75,8 @@ export interface DriverProfile {
   };
   rejectionReason?: string | null;
   verifiedAt?: string | null;
+  ratingAvg?: number;
+  ratingCount?: number;
   createdAt?: string;
   updatedAt?: string;
 }
