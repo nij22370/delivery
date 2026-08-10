@@ -10,4 +10,5 @@ export interface DriverPublicUser {
 export interface DriverPublicProfileResponse {
   user: DriverPublicUser;
   profile: DriverProfile | null;
+  totalDeliveries: number;
 }

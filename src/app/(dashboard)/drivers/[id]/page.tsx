@@ -203,7 +203,7 @@ export default function DriverProfilePage({
     );
   }
 
-  const { user: driverUser, profile } = profileData;
+  const { user: driverUser, profile, totalDeliveries } = profileData;
   const reviews = reviewsData?.reviews ?? [];
   const driverName = driverUser.name;
   const ratingAvg = profile?.ratingAvg ?? 0;
@@ -281,7 +281,7 @@ export default function DriverProfilePage({
             <div className="grid grid-cols-2 gap-4 w-full text-left">
               <div>
                 <p className="text-xs text-on-surface-variant mb-1">Total Deliveries</p>
-                <p className="text-lg font-semibold text-on-surface">{ratingCount}</p>
+                <p className="text-lg font-semibold text-on-surface">{totalDeliveries}</p>
               </div>
               <div>
                 <p className="text-xs text-on-surface-variant mb-1">On-Time Rate</p>

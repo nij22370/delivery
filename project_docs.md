@@ -524,3 +524,37 @@ Key points the quiz targets: `$match` before `$group` filters input documents an
 - **Star ratings**: Material Symbols `star` (filled via `fontVariationSettings: "'FILL' 1"`), `star_half`, and outline stars. Active color `warning-amber`; inactive `secondary-fixed-dim`. Rating banner uses `primary-fixed` / `on-primary-fixed` on the profile page.
 - **Star selector touch targets**: each selectable star is `h-12 w-12` with flex centering so the visual 4xl glyph keeps its size while meeting the 48px mobile target.
 - **Driver profile bento grid**: 12-column grid — hero card `md:col-span-4`, rating + reviews stack `md:col-span-8`; collapses to single column on mobile.
+
+---
+
+## Days 27–29 — Real-Time Pusher Infrastructure
+
+### New Files
+- `src/lib/pusher.ts` — Server-side Pusher instance (`pusherServer`). Reads `PUSHER_APP_ID`, `PUSHER_KEY`, `PUSHER_SECRET`, `PUSHER_CLUSTER` from env. Used by all server-trigger helpers.
+- `src/lib/pusherClient.ts` — Client-side Pusher-JS instance (`pusherClient`). Reads `NEXT_PUBLIC_PUSHER_KEY`, `NEXT_PUBLIC_PUSHER_CLUSTER`. Dynamic-imported in the test page to avoid SSR issues.
+- `src/lib/triggerJobEvent.ts` — `triggerJobEvent(jobId, eventName, payload)` helper. Triggers to the private channel `private-job-{jobId}`. Event names are a closed union: `'location-update' | 'new-message' | 'status-change'`. Channel name built from a `PRIVATE_CHANNEL_PREFIX` constant (no magic strings).
+- `src/app/api/pusher/auth/route.ts` — `POST /api/pusher/auth`. Protected by `withAuth()`. Parses `{ socket_id, channel_name }`, extracts `jobId` from the `private-job-` prefix, verifies the authenticated user is `posterId` or `driverId` on that Job, then returns `pusherServer.authorizeChannel(socket_id, channel_name)`. Returns 403 for non-participants, 400 for invalid channel names.
+- `src/app/api/test-pusher/route.ts` — Throwaway `POST /api/test-pusher` (no auth). Triggers `test-event` on `test-channel` with `{ message, timestamp }`. Returns `{ ok: true }`.
+- `src/app/(dashboard)/pusher-test/page.tsx` — Throwaway `'use client'` page at `/pusher-test`. On mount, dynamically imports `pusherClient`, subscribes to `test-channel`, binds `test-event`, appends received messages to state. Button calls `POST /api/test-pusher`. Unsubscribes on unmount. Uses public channel (intentional — no auth for the throwaway test).
+- `src/app/api/jobs/[id]/location/route.ts` — `POST /api/jobs/:id/location`. Protected by `withAuth()`. Validates body `{ lat: z.number(), lng: z.number() }`. Confirms the requester is the job's `driverId` (403 otherwise). Calls `triggerJobEvent(jobId, 'location-update', { lat, lng, timestamp, driverId })`. Returns `{ ok: true }`.
+
+### API Routes Added
+| Method | Route | Auth | Purpose |
+|--------|-------|------|---------|
+| POST | `/api/pusher/auth` | `withAuth()` | Authorize private channel subscription |
+| POST | `/api/test-pusher` | none | Throwaway test trigger |
+| POST | `/api/jobs/:id/location` | `withAuth()` | Driver sends GPS ping → broadcasts to job channel |
+
+### Architectural Decisions
+- **Private channels over public channels for job data**: Job-specific events (location updates, status changes, messages) use `private-job-{jobId}` channels. Private channels require server-side authorization before the client can subscribe, enforced by `/api/pusher/auth`. This prevents unauthorized clients from reading real-time job data. The test page intentionally uses the public `test-channel` — that is a throwaway, not a production pattern.
+- **`triggerJobEvent` centralizes all channel triggers**: Rather than calling `pusherServer.trigger()` directly in every route handler, all server-triggered events go through `triggerJobEvent`. This keeps the channel naming convention (`private-job-` prefix) in one place — if the prefix ever changes, only `triggerJobEvent` needs updating.
+- **Dynamic import of `pusherClient` on the client**: The test page uses `import("@/lib/pusherClient")` inside a `useEffect` rather than a top-level import. This prevents `pusher-js` from being bundled into the server-side SSR build, which would fail because `WebSocket` is not available in Node.js. All future client-side Pusher pages should follow this pattern.
+- **`/api/pusher/auth` extracts jobId from the channel name**: Rather than accepting `jobId` as a separate body field, the endpoint parses it from `channel_name`. This matches Pusher's auth protocol — Pusher sends the exact `channel_name` it needs authorized, so deriving `jobId` from it avoids a second trust boundary.
+- **Location ping requires driver identity**: `POST /api/jobs/:id/location` compares `user.userId` against `job.driverId`. Only the assigned driver can send GPS pings for a job. This is checked after the Job is fetched, so a 404 for a missing job returns before the role check (consistent with the existing accept-route pattern).
+- **Zod validation on `body: unknown`**: The location route parses the body as `unknown` and validates with Zod before accessing `lat`/`lng`. This follows the project-wide convention (no implicit `any` from `req.json()`).
+
+### Learning Prompt: Why does Pusher use separate app-level keys for server vs client?
+Pusher's security model requires two layers: the **app secret** (server-only, used to sign channel authorization responses and trigger events) and the **app key** (client-safe, used to establish the WebSocket connection). Exposing the secret on the client would allow any visitor to trigger arbitrary events on any channel. The `NEXT_PUBLIC_` prefix in Next.js enforces this boundary — only `NEXT_PUBLIC_PUSHER_KEY` and `NEXT_PUBLIC_PUSHER_CLUSTER` are available in browser bundles, while `PUSHER_SECRET` and `PUSHER_APP_ID` stay server-side. The key and cluster are duplicated across server/client env vars because the server Pusher instance also needs them, but the secret never crosses the boundary.
+
+### Learning Prompt: Why authorize channels server-side instead of relying on Pusher's app-level access controls?
+Pusher private channels require an authorization request: when a client subscribes, Pusher's servers call your `/api/pusher/auth` endpoint with the `socket_id` and `channel_name`. Your server verifies the user is allowed to view that channel and signs the response. This means access control logic lives entirely in your codebase — you decide who sees what. Without it, any authenticated user could subscribe to any `private-job-*` channel regardless of whether they are the poster or driver. The `/api/pusher/auth` route is the gatekeeper: it fetches the Job, checks poster/driver membership, and rejects non-participants with 403. This is the same pattern used by the job detail API (`GET /api/jobs/:id`) but applied at the WebSocket subscription layer.
