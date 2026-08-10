@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/lib/db";
 import User from "@/models/User";
 import DriverProfile from "@/models/DriverProfile";
+import Job from "@/models/Job";
+import { JOB_STATUS } from "@/types/job";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -23,7 +25,12 @@ export async function GET(
 
     const profile = await DriverProfile.findOne({ userId: id }).lean();
 
-    return NextResponse.json({ user, profile });
+    const totalDeliveries = await Job.countDocuments({
+      driverId: id,
+      status: JOB_STATUS.DELIVERED,
+    });
+
+    return NextResponse.json({ user, profile, totalDeliveries });
   } catch (error: unknown) {
     console.error("Get driver profile error:", error);
     return NextResponse.json(
