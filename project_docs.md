@@ -465,3 +465,62 @@ Separating write permissions at the schema layer enforces a clean privilege boun
 
 ### Learning Prompt: Why populate rather than a separate User lookup per profile?
 `DriverProfile.find().populate("userId","name email")` executes a single secondary query that resolves all referenced users in one round-trip, versus N individual `User.findById` calls. This avoids the N+1 pattern while keeping the code clean and the response latency bounded. The `populate` result is then mapped onto the response to extract `name`/`email` as top-level fields, satisfying the flat `AdminVerificationProfile` contract.
+
+---
+
+## Days 24–26 — Ratings & Reviews
+
+### New Files
+- `src/models/Rating.ts` — Rating model with jobId/fromUserId/toUserId refs, score (min 1, max 5), optional comment, `createdAt`-only timestamps. Compound unique index `{ jobId: 1, fromUserId: 1 }` (duplicate prevention). HMR guard export.
+- `src/types/rating.ts` — Single source of truth: `ratingSubmitSchema` (zod) + inferred `RatingSubmitInput`, plus `RatingResponse`, `RatingSubmitResponse`, `RatingCheckResponse`, `ReviewItem`, `DriverReviewsResponse`.
+- `src/app/api/ratings/route.ts` — `POST /api/ratings`. Protected by `withAuth()` (any authenticated role). Guard chain: 404 job not found → 400 job not delivered → 403 not a participant → 400 self-rating → 400 invalid recipient → 409 duplicate (E11000). Returns 201 with the saved rating.
+- `src/app/api/ratings/check/route.ts` — `GET /api/ratings/check?jobId=`. Protected by `withAuth()`. Returns `{ rated }` scoped to the current user (`{ jobId, fromUserId: user.userId }`).
+- `src/lib/updateDriverRating.ts` — Aggregation helper. Guards on `User.role === "driver"`, then `$match` + `$group` (`$avg`, `$sum`), writes denormalized `ratingAvg`/`ratingCount` to `DriverProfile`.
+- `src/app/api/drivers/[id]/reviews/route.ts` — `GET /api/drivers/:id/reviews`. Public (no auth). Paginated (`page`/`limit`, default 10), `populate("fromUserId","name")`, sorted `createdAt` descending. Returns `{ reviews, total, page, totalPages }`.
+- `src/app/api/drivers/[id]/route.ts` — `GET /api/drivers/:id`. Public. Returns `{ user, profile }` (user name/role/createdAt + the driver profile with rating fields).
+- `src/types/drivers/driverPublicProfile.ts` — `DriverPublicUser` + `DriverPublicProfileResponse`.
+- `src/api/apis/ratings/ratingsApi.ts` + `src/api/hooks/ratings/ratingsApi.ts` — PLMS layer: `submitRating`, `checkRating`, `getDriverReviews` + `useSubmitRating` (invalidates ratings + driver-reviews keys, toasts), `useCheckRating`, `useDriverReviews`.
+- `src/api/apis/drivers/driverPublicProfileApi.ts` + `src/api/hooks/drivers/driverPublicProfileApi.ts` — `getDriverPublicProfile` + `useDriverPublicProfile`.
+- `src/app/(dashboard)/jobs/[id]/rate/page.tsx` — Rating form (poster-only, delivered-only, "Already submitted" state, 5-star selector, optional comment, `useSubmitRating` mutation, redirect to job detail on success).
+- `src/app/(dashboard)/drivers/[id]/page.tsx` — Public driver profile: hero card (initials, verified badge, vehicle chip, stats), rating banner (avg + count), paginated review list; distinct loading/empty/error states.
+
+### Modified Files
+- `src/models/DriverProfile.ts` + `src/types/driverProfile/driverProfile.ts` — Added `ratingAvg` (default 0, min 0, max 5) and `ratingCount` (default 0, min 0) fields.
+- `src/utils/format.ts` — Added `formatCompletedDate` (shared; used by the rate page).
+
+### API Routes Added
+| Method | Route | Auth | Purpose |
+|--------|-------|------|---------|
+| POST | `/api/ratings` | `withAuth()` | Submit a rating (guard chain 404→400→403→400→400→409) |
+| GET | `/api/ratings/check?jobId=` | `withAuth()` | Whether the current user already rated the job |
+| GET | `/api/drivers/:id/reviews?page=&limit=` | public | Paginated reviews for a driver |
+| GET | `/api/drivers/:id` | public | Public driver profile (user + profile with ratings) |
+
+### Architectural Decisions
+- **"completed" vs `JOB_STATUS.DELIVERED`**: The Phase 4 plan says rating is allowed when the job is `"completed"`, but the Job model enum (`src/types/job.ts`) has no `"completed"` value — it is `posted | accepted | in_transit | delivered | cancelled`. Rather than inventing a new status (which the strict constraints forbid), the trigger is `JOB_STATUS.DELIVERED`. "Delivered" is the terminal success state of a job, so it is the correct existing-value mapping. All checks reference `JOB_STATUS.DELIVERED` (no hardcoded string).
+- **Compound unique index as the only duplicate guard**: Duplicate prevention is `ratingSchema.index({ jobId: 1, fromUserId: 1 }, { unique: true })` — no application-level pre-check. The `POST` route catches the MongoDB E11000 error and returns 409. Rationale: the index is race-proof under concurrent requests, while a check-then-insert application pattern has a TOCTOU window. Tradeoff is answered in the Day 24 prompt below.
+- **Denormalized `ratingAvg`/`ratingCount`**: recompute-and-store on every new rating via `updateDriverRating`, invoked fire-and-forget (`updateDriverRating(toUserId).catch(...)`) so the 201 response is not blocked by aggregation latency. The helper itself only runs when the recipient is a driver (role check).
+- **`withAuth()` for submission, no auth for reviews**: rating submission needs the requester identity for participant/self-rating checks, so it uses `withAuth()`. Reviews are public read data (like job browsing), so the reviews/profile endpoints are unauthenticated.
+- **Check endpoint is user-scoped**: `GET /api/ratings/check` is `withAuth()`-wrapped and queries `{ jobId, fromUserId: user.userId }`. An earlier version returned `rated: true` if *anyone* rated the job (no user context), which would falsely show "Already submitted" to a participant who hadn't rated. Scoping to the requester fixes the "Already submitted" state.
+- **`toUserId` must be the other participant**: beyond the self-rating guard, the submit route validates `toUserId === (isPoster ? job.driverId : job.posterId)`, rejecting ratings sent to arbitrary users with 400.
+- **Reviews paginated from day one**: `GET /api/drivers/:id/reviews` defaults to `limit = 10` with `page`/`total`/`totalPages`, per the never-fetch-all-records rule. The public profile page reads only the first page.
+- **Recipient's name is fetched, not guessed**: the rate page resolves the driver's real name through `useDriverPublicProfile(job.driverId)` instead of a placeholder, matching the design reference's "How did {name} do?".
+
+### Learning Prompt (Day 24): Compound unique index vs application-level duplicate check?
+The compound unique index `{ jobId: 1, fromUserId: 1 }` is the cleanest and is what this project uses. An application-level check (`Rating.findOne({ jobId, fromUserId })` before insert) has a **time-of-check to time-of-use (TOCTOU) race**: two concurrent submissions can both pass the check and both insert. The unique index makes the database the single arbiter — the second insert fails atomically with an E11000 error, which the route maps to 409. The tradeoff is ergonomics: index violations surface as a `MongoServerError` you must detect via `error.code === 11000` (or the message), which is less readable than a clean "not found" check, and duplicate detection is coupled to the error-handling path. The app-level check is friendlier to read but only correct in single-writer scenarios or where duplicates are merely discouraged, not forbidden. For "never more than one rating per job per user", the unique index is the correct choice; a common hybrid is both — index for correctness, check for friendly error messages — but here the 409 branch already provides a friendly message, so no app-level check was added (per the plan's constraint).
+
+### Learning Prompt (Day 25): On-demand average vs denormalized average on write?
+Computing on-demand means each driver profile view runs an aggregation over that user's ratings and returns the live number — no extra state, always fresh, but every read pays the aggregation cost and the number grows linearly with the ratings collection. Storing a denormalized `ratingAvg`/`ratingCount` on the profile means reads are O(1) lookups, and the cost is paid once per write (one aggregation + one profile update per new rating). This project uses the denormalized approach per the PRD schema. Tradeoffs: on-demand wins when reads are rare and writes frequent; denormalized wins when reads dominate (the common case for a public profile page) and when you want the profile document itself to stay self-contained for list views. The costs of denormalization are write-path latency (mitigated here by fire-and-forget) and drift risk if ratings are ever deleted or edited without re-running the aggregation — which is why the aggregation is the single write point, keyed off `toUserId`, and recomputes from the full ratings set every time rather than incrementally.
+
+### Learning Prompt (Day 26): Quiz — MongoDB aggregation pipelines ($match, $group, $avg)
+Two example scenarios exercising the same pipeline family as `updateDriverRating`:
+
+1. **Average job offer price per vehicle type.** `$match` only non-cancelled jobs, `$group` by `vehicleType` with `$avg: "$offeredPrice"`, `$sort` descending. Pipeline: `[{ $match: { status: { $ne: "cancelled" } } }, { $group: { _id: "$vehicleType", avgPrice: { $avg: "$offeredPrice" } } }, { $sort: { avgPrice: -1 } }]`.
+2. **Top-rated drivers with a minimum review count.** `$group` ratings by `toUserId` computing `$avg` score and `$count`, then `$match` the grouped result with `count >= 5` (a `$match` after `$group` filters aggregates, not source docs), then `$lookup` the User names, `$sort` by avg descending, `$limit 10`.
+
+Key points the quiz targets: `$match` before `$group` filters input documents and can use indexes; `$match` after `$group` filters group results and cannot use the original indexes; `_id` in `$group` is the grouping key; `$avg`/`$sum`/`$count` are accumulator operators that only make sense inside `$group`; and the pipeline is order-sensitive.
+
+### Design System Notes
+- **Star ratings**: Material Symbols `star` (filled via `fontVariationSettings: "'FILL' 1"`), `star_half`, and outline stars. Active color `warning-amber`; inactive `secondary-fixed-dim`. Rating banner uses `primary-fixed` / `on-primary-fixed` on the profile page.
+- **Star selector touch targets**: each selectable star is `h-12 w-12` with flex centering so the visual 4xl glyph keeps its size while meeting the 48px mobile target.
+- **Driver profile bento grid**: 12-column grid — hero card `md:col-span-4`, rating + reviews stack `md:col-span-8`; collapses to single column on mobile.

@@ -19,6 +19,8 @@ export interface IDriverProfile extends Document {
   };
   rejectionReason?: string | null;
   verifiedAt?: Date | null;
+  ratingAvg: number;
+  ratingCount: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -48,6 +50,8 @@ const driverProfileSchema = new Schema<IDriverProfile>(
     },
     rejectionReason: { type: String, default: null },
     verifiedAt: { type: Date, default: null },
+    ratingAvg: { type: Number, default: 0, min: 0, max: 5 },
+    ratingCount: { type: Number, default: 0, min: 0 },
   },
   { timestamps: true }
 );

@@ -46,3 +46,30 @@ The design system utilizes **Inter** across all levels.
 - Horizontal dividers: #F3F3F3.
 
 *(Tokens have been applied to `src/app/globals.css`)*
+
+---
+
+## Star Rating Component Pattern
+Used on both the rating form and the driver profile page.
+
+### Rating Selector (poster form)
+- **Stars**: Material Symbols `star` with `fontVariationSettings: "'FILL' 1"`.
+- **Active color**: `warning-amber` (#F5A623).
+- **Inactive color**: `secondary-fixed-dim`.
+- **Touch target**: each star is `h-12 w-12` flex-center; visual glyph is `text-4xl`.
+- **Layout**: `flex-row-reverse` container, `gap-2`, hover/focus fills stars left-to-right via `activeRating = hoveredRating ?? selectedRating ?? 0`.
+
+### Display Stars (driver profile page)
+- **Half-star**: `star_half` symbol rendered when `score % 1 >= 0.5`.
+- **Empty stars**: outline `star` with no `FILL` style override.
+- **Color**: `warning-amber` (all filled/half).
+- **Size**: controlled by `size` prop; default `"text-[18px]"`.
+
+---
+
+## Driver Profile Page — Bento Grid
+- **Desktop**: 12-column grid; hero card `md:col-span-4`, reviews column `md:col-span-8`.
+- **Mobile**: single column, stacked top-to-bottom.
+- **Hero card**: `relative` with absolute top banner, centered avatar circle (24×24), `border-4 border-surface-white`, verified badge (`success-green` pill).
+- **Rating banner**: `bg-primary-fixed text-on-primary-fixed`, star icon in white circle, bold `text-3xl`/`text-4xl` score, `/ 5.0` suffix.
+- **Review cards**: each reviewer gets a colored avatar (`tertiary-fixed` alternating with `secondary-fixed`), score stars, date via `formatAppliedDate`, optional comment text.

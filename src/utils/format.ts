@@ -22,3 +22,13 @@ export function formatAppliedDate(createdAt: string): string {
   });
   return `${datePart} ${timePart}`;
 }
+
+export function formatCompletedDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
