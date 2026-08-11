@@ -6,7 +6,6 @@ import Job from "@/models/Job";
 import { pusherServer } from "@/lib/pusher";
 
 const PRIVATE_CHANNEL_PREFIX = "private-job-";
-const CHANNEL_JOB_ID_INDEX = 1;
 
 interface AuthBody {
   socket_id: string;

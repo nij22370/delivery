@@ -277,8 +277,8 @@ Per standards, extracted multi-step form components into `src/components/post-jo
 - `src/components/post-job/StepReview.tsx` — Step 4 review and submit
 
 ### Step 3 — Pricing & Schedule
-- **Price suggestion**: Uses Haversine formula to calculate distance between pickup/dropoff coordinates (geocoded by MapPreview).
-- **Formula**: `$5 base fare + $0.50 per kilometer` (placeholder rates - tune later).
+- **Price suggestion**: Vehicle-aware — uses the vehicle chosen in Step 2 plus Haversine distance between pickup/dropoff coordinates (geocoded via the `/api/geocode` proxy).
+- **Formula**: `baseCents + max(0, km - freeKm) * perKmCents`, with a per-vehicle rate tier (`VEHICLE_RATES` in `src/lib/pricing.ts`). Each tier encodes its weight-capacity bracket (bicycle 5 kg, car 50 kg, van 500 kg, truck 2000 kg), mirroring the base-fare + distance + weight factors used by Nepali delivery platforms (Pathao Parcel et al.). Placeholder rates — tune per market.
 - **UI**: Pre-filled `offeredPrice` in cents, but editable for user override.
 - **Package description**: Optional textarea for delivery notes.
 
@@ -334,6 +334,8 @@ Geocoding converts addresses to precise coordinates. The Haversine formula calcu
 ### New Files
 - `src/app/api/jobs/[id]/route.ts` — `GET /api/jobs/:id`.
 - `src/app/api/jobs/[id]/accept/route.ts` — `POST /api/jobs/:id/accept`.
+- `src/app/api/jobs/[id]/transit/route.ts` — `POST /api/jobs/:id/transit`.
+- `src/app/api/jobs/[id]/deliver/route.ts` — `POST /api/jobs/:id/deliver`.
 - `src/app/jobs/[id]/page.tsx` — Job detail page.
 
 ### API Routes
@@ -342,6 +344,8 @@ Geocoding converts addresses to precise coordinates. The Haversine formula calcu
   - `driver`: 403 unless the job is `posted` (open) or `job.driverId === user.userId` (their own accepted job).
   - `admin`: sees all.
 - **`POST /api/jobs/:id/accept`** — `withRole(["driver"])`. Atomic `findOneAndUpdate({ _id: id, status: "posted" }, { status: "accepted", driverId: user.userId })`. If no document matches, returns `409` ("no longer available"), preventing double-accept races.
+- **`POST /api/jobs/:id/transit`** — `withRole(["driver"])`. Atomic `findOneAndUpdate({ _id: id, driverId: user.userId, status: "accepted" }, { status: "in_transit" })`. The `driverId` in the filter guarantees only the assigned driver can transition a job that is exactly `accepted`; `409` on any mismatch (unassigned driver, or status not `accepted`). On success triggers Pusher `status-change` with the new status + timestamp.
+- **`POST /api/jobs/:id/deliver`** — `withRole(["driver"])`. Atomic `findOneAndUpdate({ _id: id, driverId: user.userId, status: "in_transit" }, { status: "delivered" })`; `409` on out-of-order or unassigned calls; triggers Pusher `status-change` on success. Enforces the strict `accepted → in_transit → delivered` state machine.
 - Both follow the `console.error` + `{ message }` error convention used across the jobs/auth routes.
 
 ### Page (`src/app/jobs/[id]/page.tsx`)
@@ -558,3 +562,76 @@ Pusher's security model requires two layers: the **app secret** (server-only, us
 
 ### Learning Prompt: Why authorize channels server-side instead of relying on Pusher's app-level access controls?
 Pusher private channels require an authorization request: when a client subscribes, Pusher's servers call your `/api/pusher/auth` endpoint with the `socket_id` and `channel_name`. Your server verifies the user is allowed to view that channel and signs the response. This means access control logic lives entirely in your codebase — you decide who sees what. Without it, any authenticated user could subscribe to any `private-job-*` channel regardless of whether they are the poster or driver. The `/api/pusher/auth` route is the gatekeeper: it fetches the Job, checks poster/driver membership, and rejects non-participants with 403. This is the same pattern used by the job detail API (`GET /api/jobs/:id`) but applied at the WebSocket subscription layer.
+
+---
+
+## Days 30–32 — Live Tracking, Location History, and Messaging
+
+### New Files
+- `src/components/LiveTrackingMap.tsx` — `"use client"` Leaflet map. Props: `jobId`, `initialLat/Lng`, optional `pickupLat/Lng`, `dropoffLat/Lng`, `routePath` (renders the OSRM `<Polyline>`), `vehiclePosition` (controlled marker), `onLocationUpdate` (parent callback). Zoom 13, OSM tiles. Custom `divIcon` markers for PICKUP (white pill, green text, store icon), DROPOFF (pill, flag icon), and the moving vehicle (pulsing blue circle, truck icon). Single marker instance via `useRef` — updates use `marker.setLatLng()` without re-mounting. Subscribes to `private-job-{jobId}`, binds `location-update`, unsubscribes/unbinds on unmount. Default Leaflet icon fixed via `L.Icon.Default.mergeOptions` pointing at `public/leaflet/`.
+- `src/utils/geocode.ts` — Shared `geocodeAddress(address)` + `Coordinates` type (moved from the local copy inside `MapPreview.tsx`; that component still works, only the new tracking page uses the shared version). Nominatim, `swiftship-dev/1.0` UA.
+- `src/app/(tracking)/jobs/[id]/track/page.tsx` — Poster live-tracking view at `/jobs/[id]/track`, full-screen, no layout wrapper (its own shell). Desktop `w-64` sidebar (SwiftShip logo, Dashboard, Jobs, Deliveries [active], Wallet, Settings, user profile), mobile `h-12` top bar. Center: `LiveTrackingMap` via `next/dynamic({ ssr: false })`, only for `accepted`/`in_transit`; geocoded pickup/dropoff coords with Kathmandu fallback `[27.7172, 85.3240]`; `MapPlaceholder` for posted/delivered/cancelled/geocoding. Right floating panel (`md:absolute md:top-6 md:right-6 md:w-[400px]`, bottom sheet on mobile): ETA header, status badge, courier card (avatar initials, name, vehicle, `ratingAvg`), 4-stage delivery stepper (Confirmed / Picked Up / On the way / Dropoff) with state derived from `JOB_STATUS`, and Support/Call Driver actions.
+- `src/models/LocationPing.ts` — `jobId` (Ref Job, index), `driverId` (Ref User), `lat`, `lng`, `timestamp`, `expiresAt`. TTL index `{ expiresAt: 1 }` with `expireAfterSeconds: 0` (MongoDB background deleter purges after `expiresAt`). Compound index `{ jobId: 1, timestamp: -1 }` for per-job history queries. HMR guard.
+- `src/models/Message.ts` — `jobId` (Ref Job), `senderId`/`recipientId` (Ref User), `content` (maxlength 2000 via exported `MESSAGE_MAX_LENGTH`), `readAt` (nullable), `createdAt` only (no `updatedAt`). Indexes: `{ jobId: 1, createdAt: 1 }` (conversation history) and `{ recipientId: 1, readAt: 1 }` (unread queries). HMR guard.
+- `src/types/message/message.ts` — `Message` + `GetMessagesResponse` mirroring the API response.
+- `src/app/api/jobs/[id]/messages/route.ts` — `GET /api/jobs/:id/messages`. `withAuth()`; 404 if the job is missing; 403 unless the user is `posterId` or `driverId`; paginated `page`/`limit` (default 50, max 100, clamped via `Math.min`); returns `{ messages, total, page, limit, totalPages }` sorted `createdAt` ascending (oldest-first).
+- `public/leaflet/` — copies of `marker-icon.png`, `marker-icon-2x.png`, `marker-shadow.png` (for the default-icon fix).
+
+### Modified Files
+- `src/app/api/jobs/[id]/location/route.ts` — Added fire-and-forget `LocationPing.create` (never awaited — `void ... .catch(...)`); `expiresAt = now + 48h` via `LOCATION_TTL_HOURS` constant. Pusher trigger logic unchanged.
+- `src/app/globals.css` — Added `swiftship-pulse` keyframe for the vehicle marker ring.
+
+### API Routes Added
+| Method | Route | Auth | Purpose |
+|--------|-------|------|---------|
+| GET | `/api/jobs/:id/messages?page=&limit=` | `withAuth()` | Paginated job conversation history (participants only) |
+
+### Architectural Decisions
+- **Tracking view lives at `/jobs/[id]/track`, not `/jobs/[id]`**: the existing driver-facing detail page (`(main)/jobs/[id]/page.tsx`) already owns `/jobs/[id]`, and two route groups cannot map the same path. The tracking page is a distinct poster-only view with its own full-screen shell, so it sits in a dedicated `(tracking)` route group with no layout wrapper (the design's sidebar/top bar are rendered by the page itself).
+- **Single marker instance updated via `setLatLng`**: the vehicle marker's `position` prop is set once (initial/pickup coords) and never changes from React state; `location-update` events call `markerRef.current.setLatLng()` directly. This avoids re-rendering the whole map on every GPS ping — the optimization the design reference demands.
+- **`divIcon` markers instead of the default Leaflet icon**: the design's PICKUP/DROPOFF/vehicle markers are styled pills/circles, so they use `L.divIcon` with inline HTML (Material Symbols render because the font is loaded globally in `layout.tsx`). The default-icon fix (`L.Icon.Default.mergeOptions` + `public/leaflet/` assets) is applied anyway so any future bare `<Marker>` won't hit the classic broken-icon bug. Note: the pre-existing `src/utils/mapIcons.js` is broken (`new L.Icon` without importing `L`) — left untouched since `MapPreview.tsx` is not part of this phase.
+- **Kathmandu fallback for pickup coords**: the Job model stores addresses as strings, not coordinates. The page geocodes `pickupAddress`/`dropoffAddress` via Nominatim (shared `geocode.ts`) and falls back to Kathmandu `[27.7172, 85.3240]` so the map always has a center. A `isGeocoding` placeholder ("Locating pickup point") shows while resolving instead of flashing the wrong state.
+- **Location pings persisted fire-and-forget**: `POST /api/jobs/:id/location` returns `{ ok: true }` immediately after the Pusher trigger; the DB write is not awaited (`void ... .catch(console.error)`). Same pattern as `updateDriverRating` — the live response must not be delayed by persistence, and a failed write degrades to "no history" rather than a 500.
+- **48h TTL via `expireAfterSeconds: 0`**: the TTL index deletes each document when `expiresAt` passes. The constant `LOCATION_TTL_HOURS = 48` keeps the expiry policy in one place. The compound `{ jobId, timestamp: -1 }` index serves future "playback route" queries (e.g., replay a delivery's path).
+- **Messages are job-scoped, participant-only**: the endpoint reuses the exact participant check from the Pusher auth route (poster or driver, strings compared via `String()`). Pagination defaults to 50 with a hard cap of 100 (`Math.min`), oldest-first sort, mirroring the reviews endpoint's shape (`total`/`page`/`totalPages`).
+
+### Learning Prompt: Why is `expireAfterSeconds: 0` used for the TTL instead of a fixed number of seconds?
+Because the expiry instant is stored per-document on `expiresAt` (which the app sets to `now + 48h`). MongoDB's TTL monitor deletes a document when `expiresAt <= now + expireAfterSeconds`. Setting `expireAfterSeconds: 0` makes the effective delete time exactly `expiresAt`, so the 48-hour policy lives in application code (`LOCATION_TTL_HOURS`) rather than being baked into the index. If the retention period ever changes (e.g., to 24h), only the write path changes — no index rebuild. A fixed `expireAfterSeconds: 86400` would be the right tool when every document should live for the same duration from creation, which isn't the case here (pings for an in-progress job would all get swept on the same absolute clock otherwise).
+
+## Day 27 — Driver Execution UI & Live Route ETA (Phases 2+3)
+
+### New Files
+- `src/app/(tracking)/jobs/[id]/active/page.tsx` — driver execution page (`/jobs/[id]/active`).
+- `src/utils/routing.ts` — `fetchRoute()` (OSRM Directions API → `{ path, distanceM, durationS }`), `interpolateAlongPath()` (haversine-weighted), `ROUTE_POLYLINE_STYLE`.
+- `src/utils/throttle.ts` — `createThrottle(intervalMs)` leading-edge throttle.
+
+### Modified Files
+- `src/components/LiveTrackingMap.tsx` — new optional props: `routePath` (renders `<Polyline>`), `vehiclePosition` (controlled marker via `markerRef.setLatLng`), `onLocationUpdate` (callback to parent). New `RouteBoundsUpdater` fits the view to the full route once on load (never re-fits on live movement).
+- `src/app/(tracking)/jobs/[id]/track/page.tsx` — poster tracking page.
+- `src/utils/format.ts` — `formatEtaLabel`, `formatDistanceMiles`, `formatArrivalTime`.
+- `src/app/(main)/jobs/[id]/page.tsx` — accepted card now links to `/jobs/[id]/active`.
+
+### Driver Execution Page (`/jobs/[id]/active`)
+- Placed in the `(tracking)` route group (no dashboard layout) so the map is truly full-screen, mirroring the poster track page. URL is the same as the plan's `(dashboard)` proposal; the group only changes the layout chrome.
+- Auth + assignment guard: renders "Not Authorized" unless `user.role === "driver"` and `user._id === job.driverId`.
+- **Start Delivery** → `POST /api/jobs/:id/transit` (status `accepted → in_transit`); **Mark Delivered** → `POST /api/jobs/:id/deliver` (only visible while in transit); delivered state renders a completion card.
+- GPS: while `in_transit` (and not simulating), `navigator.geolocation.watchPosition` updates the marker locally via `vehiclePosition` and pings `POST /api/jobs/:id/location` throttled to 10s (`createThrottle`).
+- **Simulate GPS toggle**: drives a vehicle along the OSRM path (`interpolateAlongPath`, 40 × 1s steps) so the demo works without a GPS device; sends the same pings.
+
+### Poster Tracking Page Updates
+- **Blue route polyline**: OSRM route is fetched from the driver's live position (or pickup before the first ping) to the dropoff and drawn via `<Polyline>` — replaces the "missing blue line".
+- **Dynamic ETA**: "Arriving in X mins" + distance from `routeData.durationS`/`distanceM`; "Est. HH:MM" is anchored to the last location ping's server timestamp (`livePingTime`) rather than `Date.now()` during render (keeps the render pure per the lint rule).
+- **Live status**: subscribes to `status-change` on `private-job-{id}` and patches the React Query cache (`setQueryData`), so the badge/stepper/map unlock without a refetch. Route re-fetches on each live location change (~10s cadence set by the driver's ping throttle).
+
+### Architectural Decisions
+- **Same URL, different group**: `(dashboard)` layout wraps children in a 256px sidebar + mobile bars, which would fight a full-screen driving map. Putting the page in `(tracking)` gives identical `/jobs/[id]/active` URLs with no chrome.
+- **Controlled `vehiclePosition` + Pusher echo**: the driver's marker moves instantly from local GPS (controlled prop → `setLatLng`), and the poster's marker moves via the Pusher `location-update` echo. Both paths reuse the same single-marker `setLatLng` optimization.
+- **ETA anchored to ping time**: the poster cannot call `Date.now()` in render (lint rule `react-hooks/purity`). Using the driver ping's server timestamp as the anchor is semantically correct and keeps rendering pure.
+- **Fire-and-forget pings**: the driver page does not await the location POST; a failed ping only logs, matching the server's own fire-and-forget persistence pattern.
+
+### Design System Notes
+- **Live-tracking shell**: full-screen `h-screen w-screen flex overflow-hidden`; desktop `w-64` sidebar (same SwiftShip logo block and nav-item styles as the dashboard layout), mobile `h-12` top bar; main canvas `flex-1 relative overflow-hidden`.
+- **Floating detail panel**: `md:absolute md:top-6 md:right-6 md:w-[400px] md:max-h-[calc(100vh-3rem)]`, `bg-surface-white md:rounded-xl shadow-lg border border-secondary-container flex flex-col`; bottom sheet (`inset-x-0 bottom-0`) on mobile. Header `bg-surface-bright p-6 border-b border-surface-container-high`; body `flex-1 overflow-y-auto p-6 space-y-8`; footer `p-6 border-t border-secondary-container flex gap-3`.
+- **Status badge**: rounded-full pill, per-status token classes (accepted/in_transit → `bg-primary/10 text-primary`; delivered → `bg-success-green/10 text-success-green`; cancelled → `bg-error-container text-error-red`).
+- **Delivery stepper**: left vertical line (`w-px bg-surface-container-high`); completed node `bg-success-green` with white check; active node white circle with `border-2 border-primary` + pulsing `w-2.5 h-2.5 bg-primary` dot; pending node `border-2 border-secondary-fixed-dim`.
+- **Map markers**: PICKUP/DROPOFF pills (`#fff` bg, `#05A357` text, radius 17px, shadow), vehicle = solid `#276EF1` circle over a `swiftship-pulse` animated ring (keyframe added to `globals.css`).

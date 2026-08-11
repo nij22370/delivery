@@ -1,17 +1,20 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { JOB_VEHICLE_TYPE, JOB_STATUS } from "@/types/job";
 import type { JobVehicleType } from "@/types/job";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
+import { useRouter } from "next/navigation";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const PAGE_SIZE = 10;
 const JOBS_QUERY_KEY = "browse-jobs";
 const BROWSE_ENDPOINT = "/api/jobs";
+const POSTER_ROLE = "poster";
+const DASHBOARD_PATH = "/dashboard";
 const MIN_PAYOUT_MIN = 0;
 const MIN_PAYOUT_MAX = 200;
 const MIN_PAYOUT_DEFAULT = 0;
@@ -289,7 +292,16 @@ function FiltersSidebar({
 
 // ── Main Page ────────────────────────────────────────────────────────────────
 export default function BrowseJobsPage() {
-  const { isLoading: isAuthLoading } = useAuthGuard();
+  const router = useRouter();
+  const { user, isLoading: isAuthLoading } = useAuthGuard();
+
+  useEffect(() => {
+    if (!isAuthLoading && user?.role === POSTER_ROLE) {
+      router.replace(DASHBOARD_PATH);
+    }
+  }, [isAuthLoading, user, router]);
+
+  const isDriver = !isAuthLoading && user?.role !== POSTER_ROLE;
   const [page, setPage] = useState(1);
   const [selectedVehicleTypes, setSelectedVehicleTypes] = useState<JobVehicleType[]>([]);
   const [distanceRadius, setDistanceRadius] = useState<string>(DISTANCE_RADIUS_OPTIONS[1]);
@@ -303,7 +315,7 @@ export default function BrowseJobsPage() {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: [JOBS_QUERY_KEY, page, selectedVehicleTypes, minPayoutCents],
     queryFn: () => fetchBrowseJobs(page, selectedVehicleTypes, minPayoutCents),
-    enabled: !isAuthLoading,
+    enabled: isDriver,
   });
 
   const handleVehicleTypeToggle = useCallback((vehicleType: JobVehicleType) => {

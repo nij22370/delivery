@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { JOB_STATUS } from "@/types/job";
 import type { JobVehicleType } from "@/types/job";
 import { use } from "react";
@@ -14,6 +15,8 @@ const MapPreview = dynamic(() => import("@/components/MapPreview"), { ssr: false
 // ── Constants ────────────────────────────────────────────────────────────────
 const JOB_DETAIL_QUERY_KEY = "job-detail";
 const ACCEPT_ENDPOINT_BASE = "/api/jobs";
+const POSTER_ROLE = "poster";
+const DASHBOARD_PATH = "/dashboard";
 
 const VEHICLE_LABELS: Record<JobVehicleType, string> = {
   bicycle: "Bicycle / Scooter",
@@ -105,8 +108,19 @@ export default function JobDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const router = useRouter();
   const queryClient = useQueryClient();
-  const { isLoading: isAuthLoading } = useAuthGuard();
+  const { user, isLoading: isAuthLoading } = useAuthGuard();
+
+  // Posters have no business on a driver-facing job detail page.
+  // Once auth resolves and we know the role, redirect them away.
+  useEffect(() => {
+    if (!isAuthLoading && user?.role === POSTER_ROLE) {
+      router.replace(DASHBOARD_PATH);
+    }
+  }, [isAuthLoading, user, router]);
+
+  const isDriver = !isAuthLoading && user?.role !== POSTER_ROLE;
 
   const {
     data: job,
@@ -117,7 +131,7 @@ export default function JobDetailPage({
     queryKey: [JOB_DETAIL_QUERY_KEY, id],
     queryFn: () => fetchJobById(id),
     retry: false,
-    enabled: !isAuthLoading,
+    enabled: isDriver,
   });
 
   const acceptMutation = useMutation({
@@ -385,6 +399,13 @@ export default function JobDetailPage({
                 <p className="text-xs text-on-surface-variant mt-1">
                   Contact info is now visible above.
                 </p>
+                <Link
+                  href={`/jobs/${job._id}/active`}
+                  className="mt-4 w-full h-12 flex items-center justify-center gap-2 bg-primary text-on-primary rounded-lg text-sm font-semibold hover:bg-primary-container transition-all cursor-pointer"
+                >
+                  Go to Active Delivery
+                  <span className="material-symbols-outlined text-xl">arrow_forward</span>
+                </Link>
               </div>
             )}
           </div>

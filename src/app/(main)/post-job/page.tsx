@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { useJobCreate } from "@/api/hooks/jobs/jobsApi";
-import { type JobCreationInput } from "@/types/job";
+import { type JobCreationInput, type JobVehicleType } from "@/types/job";
 import dynamic from "next/dynamic";
 import ProgressBar from "@/components/post-job/ProgressBar";
 import StepLocations from "@/components/post-job/StepLocations";
@@ -34,7 +34,7 @@ export default function PostJobPage() {
     dropoffContactName: string;
     dropoffPhone: string;
   } | null>(null);
-  const [vehicleData, setVehicleData] = useState<{ vehicleType: string } | null>(null);
+  const [vehicleData, setVehicleData] = useState<{ vehicleType: JobVehicleType } | null>(null);
   const [pricingData, setPricingData] = useState<{
     packageDescription?: string;
     offeredPrice: number;
@@ -64,7 +64,7 @@ export default function PostJobPage() {
     setCurrentStep(STEP_VEHICLE);
   }, []);
 
-  const handleVehicleNext = useCallback((data: { vehicleType: string }) => {
+  const handleVehicleNext = useCallback((data: { vehicleType: JobVehicleType }) => {
     setVehicleData(data);
     setCurrentStep(STEP_PRICING);
   }, []);
@@ -148,6 +148,7 @@ export default function PostJobPage() {
                 onNext={handlePricingNext}
                 onBack={handleStepBack}
                 locationData={locationData}
+                vehicleType={vehicleData?.vehicleType ?? null}
               />
             )}
             {currentStep === STEP_REVIEW && (

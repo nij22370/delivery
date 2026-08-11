@@ -133,3 +133,8 @@ body {
 }
 .animate-blob { animation: blob 7s infinite; }
 .animation-delay-2000 { animation-delay: 2s; }
+
+@keyframes swiftship-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50%      { opacity: 0.1; transform: scale(1.5); }
+}
