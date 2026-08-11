@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { AxiosError } from "axios";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
+import { apiFetch } from "@/utils/apiFetch";
 import { useCheckRating, useSubmitRating } from "@/api/hooks/ratings/ratingsApi";
 import { useDriverPublicProfile } from "@/api/hooks/drivers/driverPublicProfileApi";
 import { getBackendErrorMessage } from "@/lib/errorResponse";
@@ -40,7 +41,7 @@ interface JobDetail {
 
 // ── Pure helpers ─────────────────────────────────────────────────────────────
 async function fetchJobForRating(jobId: string): Promise<JobDetail> {
-  const response = await fetch(`${JOB_ENDPOINT_BASE}/${jobId}`);
+  const response = await apiFetch(`${JOB_ENDPOINT_BASE}/${jobId}`);
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error((errorData as { message?: string }).message ?? "Failed to load job.");

@@ -125,6 +125,42 @@ After completing any feature, route, or model:
 
 ---
 
+## AI Collaboration Habits (Field Guide)
+
+Process rules from the AI Collaboration Field Guide (see `docs/ai-collaboration/`). These govern *how* we work with AI on this project — not just what the code looks like. The 15 habits map to concrete files: read `docs/ai-collaboration/README.md` for the index.
+
+### Session Start Protocol (mandatory — do this before any development work)
+
+1. **Read `docs/ai-collaboration/Handover.md`** — current state, in-progress work, known issues, avoid-list.
+2. **Read `docs/ai-collaboration/Constraints.md`** — confirm nothing you're about to do is off-limits.
+3. **Read the relevant area docs** — `Architecture.md` (routes/models) and/or `Flow.md` (behavior) for the part of the system you're changing.
+4. **Check `Bug.md` / `Feature.md`** — if this work is already traced, resume from there; if not, create the trace entry first.
+5. **State your plan in plain terms before writing code** (Habit 11) and confirm it fits the existing architecture.
+
+Only after these 5 steps may implementation begin. At session end, update `Handover.md` and any trace files.
+
+### Session Rules (non-negotiable)
+
+- **Read the diff, every time** — never accept a change based on a summary. Read the actual diff line by line before applying or merging it.
+- **Ask why before what — plan first** — before implementing, explain the approach in plain terms and confirm it fits the existing architecture. Catch bad reasoning while it is a paragraph, not 200 lines of code.
+- **One logical change per request** — never bundle unrelated fixes ("fix the whole auth system"). Small diffs are reviewable; big ones are gambling.
+- **Comment non-obvious logic as it is written** — explain *why*, never restate *what*. "No obvious inline comments" still holds: comments capture intent and flow, not the obvious.
+- **Update `Handover.md` at the end of every session** — done / in progress / broken / avoid. Five lines is enough. Take the 30 seconds.
+- **Version-pin your context** — every notable decision in `docs/ai-collaboration/Decisions.md` records the reasoning and the model/session that made it.
+- **Trace bugs and features start to finish** — new bug → `docs/ai-collaboration/Bug.md`; new feature → `docs/ai-collaboration/Feature.md`. A bug that isn't traced will be re-introduced.
+- **Own the mental model** — if you cannot explain a change in your own words, it is not done. Docs support understanding; they do not replace it.
+
+### Guardrail Documents (read before touching that area)
+
+- `docs/ai-collaboration/Handover.md` — where the project stands right now; read first, update last
+- `docs/ai-collaboration/Architecture.md` — system map; consult before modifying routes/models/layers
+- `docs/ai-collaboration/Flow.md` — execution paths; consult before changing behavior
+- `docs/ai-collaboration/Constraints.md` — what is off-limits; check before proposing anything
+- `docs/ai-collaboration/TestChecklist.md` — run the relevant rows before claiming "done"
+- `docs/ai-collaboration/Rollback.md` — know the way out before making a risky change
+
+---
+
 ## Mongoose Model Exports
 
 When creating Mongoose schemas in a Next.js App Router environment, **always** use the HMR guard to prevent `OverwriteModelError`.

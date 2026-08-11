@@ -4,12 +4,15 @@ import { withAuth } from "@/lib/auth";
 import type { JwtAccessPayload } from "@/types/auth/auth";
 import connectDB from "@/lib/db";
 import Job from "@/models/Job";
+import LocationPing from "@/models/LocationPing";
 import { triggerJobEvent } from "@/lib/triggerJobEvent";
 
 const locationPingSchema = z.object({
   lat: z.number(),
   lng: z.number(),
 });
+
+const LOCATION_TTL_HOURS = 48;
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -50,6 +53,18 @@ async function handleLocationPing(
       lng,
       timestamp: new Date().toISOString(),
       driverId: user.userId,
+    });
+
+    // Fire-and-forget persistence: never delay the response on the DB write.
+    void LocationPing.create({
+      jobId,
+      driverId: user.userId,
+      lat,
+      lng,
+      timestamp: new Date(),
+      expiresAt: new Date(Date.now() + LOCATION_TTL_HOURS * 60 * 60 * 1000),
+    }).catch((error: unknown) => {
+      console.error("Location ping persist error:", error);
     });
 
     return NextResponse.json({ ok: true });

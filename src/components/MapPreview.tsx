@@ -5,11 +5,11 @@ import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { DEFAULT_MARKER_ICON } from "@/utils/mapIcons";
+import { geocodeAddress } from "@/utils/geocode";
 
 // ── Constants ────────────────────────────────────────────────────────────────────
 const DEFAULT_CENTER: [number, number] = [37.0902, -95.7129]; // USA
 const DEBOUNCE_MS = 500;
-const USER_AGENT = "swiftship-dev/1.0";
 
 const PAUSE_PADDING: [number, number] = [50, 50];
 const PAUSE_DURATION = 1;
@@ -35,31 +35,8 @@ interface Coords {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-async function geocodeAddress(address: string): Promise<Coords | null> {
-  if (!address) return null;
-  try {
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
-        address
-      )}&format=json&limit=1`,
-      {
-        headers: {
-          "User-Agent": USER_AGENT,
-        },
-      }
-    );
-    const data = await response.json();
-    if (data && data.length > 0) {
-      return {
-        lat: parseFloat(data[0].lat),
-        lng: parseFloat(data[0].lon),
-      };
-    }
-  } catch (err: unknown) {
-    console.error("Geocoding error:", err);
-  }
-  return null;
-}
+// geocodeAddress comes from @/utils/geocode (routes through the /api/geocode
+// server proxy so the browser never calls Nominatim directly).
 
 async function fetchRoute(start: Coords, end: Coords): Promise<[number, number][] | null> {
   try {

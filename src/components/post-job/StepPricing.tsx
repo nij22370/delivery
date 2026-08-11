@@ -4,9 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { jobPricingSchema } from "@/types/job";
-import type { JobPricingInput } from "@/types/job";
+import type { JobPricingInput, JobVehicleType } from "@/types/job";
 import FormFieldError from "@/components/post-job/FormFieldError";
-import { calculateSuggestedPrice } from "@/lib/pricing";
+import { calculateSuggestedPrice, VEHICLE_RATES } from "@/lib/pricing";
 
 const INPUT_CLASS =
   "w-full h-12 px-4 rounded-lg border border-outline-variant text-base focus:outline-none focus:border-2 focus:border-primary placeholder:text-on-surface-variant/50 transition-all bg-surface-white";
@@ -18,6 +18,13 @@ const TIME_WINDOW_OPTIONS = [
   "Flexible",
 ] as const;
 
+const VEHICLE_LABELS: Record<JobVehicleType, string> = {
+  bicycle: "Bicycle / Scooter",
+  car: "Standard Sedan",
+  van: "Cargo Van",
+  truck: "Box Truck",
+};
+
 interface StepPricingProps {
   onNext: (data: JobPricingInput) => void;
   onBack: () => void;
@@ -25,12 +32,23 @@ interface StepPricingProps {
     pickupAddress: string;
     dropoffAddress: string;
   } | null;
+  vehicleType: JobVehicleType | null;
 }
 
-export default function StepPricing({ onNext, onBack, locationData }: StepPricingProps) {
+export default function StepPricing({
+  onNext,
+  onBack,
+  locationData,
+  vehicleType,
+}: StepPricingProps) {
   const [suggestedPriceCents, setSuggestedPriceCents] = useState<number | undefined>();
   const [distanceMiles, setDistanceMiles] = useState<number | undefined>();
-  const [isCalculating, setIsCalculating] = useState(false);
+  // Starts "calculating" whenever addresses and a vehicle are present; the
+  // async suggestion callbacks flip it off. Avoids a synchronous setState in
+  // the effect body (react-hooks/set-state-in-effect).
+  const [isCalculating, setIsCalculating] = useState(
+    Boolean(locationData?.pickupAddress && locationData?.dropoffAddress && vehicleType)
+  );
 
   const {
     register,
@@ -42,21 +60,37 @@ export default function StepPricing({ onNext, onBack, locationData }: StepPricin
   });
 
   useEffect(() => {
-    if (!locationData?.pickupAddress || !locationData?.dropoffAddress) return;
+    if (!locationData?.pickupAddress || !locationData?.dropoffAddress || !vehicleType) return;
 
-    setIsCalculating(true);
+    let isActive = true;
 
-    calculateSuggestedPrice(locationData.pickupAddress, locationData.dropoffAddress).then(
-      (result) => {
+    calculateSuggestedPrice(locationData.pickupAddress, locationData.dropoffAddress, vehicleType)
+      .then((result) => {
+        if (!isActive) return;
         if (result) {
           setSuggestedPriceCents(result.suggestedPriceCents);
           setDistanceMiles(result.distanceMiles);
           setValue("offeredPrice", result.suggestedPriceCents, { shouldValidate: false });
+        } else {
+          // Suggestion unavailable (e.g. address could not be geocoded) — clear
+          // any previous values so the UI never shows stale pricing.
+          setSuggestedPriceCents(undefined);
+          setDistanceMiles(undefined);
         }
-        setIsCalculating(false);
-      }
-    );
-  }, [locationData, setValue]);
+      })
+      .catch(() => {
+        if (!isActive) return;
+        setSuggestedPriceCents(undefined);
+        setDistanceMiles(undefined);
+      })
+      .finally(() => {
+        if (isActive) setIsCalculating(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [locationData, vehicleType, setValue]);
 
   const handleFormSubmit = useCallback(
     (data: JobPricingInput) => {
@@ -96,8 +130,8 @@ export default function StepPricing({ onNext, onBack, locationData }: StepPricin
                 )}
               </div>
               <p className="text-xs text-on-surface-variant">
-                {distanceMiles !== undefined
-                  ? `Based on ${distanceMiles} miles and standard van requirement.`
+                {distanceMiles !== undefined && vehicleType
+                  ? `Based on ${distanceMiles} miles with ${VEHICLE_LABELS[vehicleType]} (up to ${VEHICLE_RATES[vehicleType].maxKg} kg).`
                   : suggestedPriceLabel}
               </p>
             </div>

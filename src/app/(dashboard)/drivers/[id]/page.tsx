@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useMemo } from "react";
+import { use, useEffect, useMemo } from "react";
 import type { ReactElement } from "react";
 import Link from "next/link";
 import { useDriverPublicProfile } from "@/api/hooks/drivers/driverPublicProfileApi";
@@ -9,11 +9,15 @@ import { VEHICLE_ICONS } from "@/lib/constants";
 import { getInitials, formatAppliedDate } from "@/utils/format";
 import { DRIVER_PROFILE_STATUS } from "@/types/driverProfile/driverProfile";
 import type { DriverVehicleType } from "@/types/driverProfile/driverProfile";
+import { useRouter } from "next/navigation";
+import { useAuthGuard } from "@/hooks/useAuthGuard";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const SHORT_ID_CHARS = 4;
 const REVIEW_SKELETON_ROWS = 3;
 const STAR_COUNT = 5;
+const POSTER_ROLE = "poster";
+const DASHBOARD_PATH = "/dashboard";
 
 const FILLED_ICON_STYLE = { fontVariationSettings: "'FILL' 1" } as const;
 
@@ -134,17 +138,27 @@ export default function DriverProfilePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const router = useRouter();
+  const { user, isLoading: isAuthLoading } = useAuthGuard();
+
+  useEffect(() => {
+    if (!isAuthLoading && user?.role === POSTER_ROLE) {
+      router.replace(DASHBOARD_PATH);
+    }
+  }, [isAuthLoading, user, router]);
+
+  const isDriver = !isAuthLoading && user?.role !== POSTER_ROLE;
 
   const {
     data: profileData,
     isLoading: isProfileLoading,
     isError: isProfileError,
-  } = useDriverPublicProfile(id);
+  } = useDriverPublicProfile(isDriver ? id : null);
 
   const {
     data: reviewsData,
     isLoading: isReviewsLoading,
-  } = useDriverReviews(id);
+  } = useDriverReviews(isDriver ? id : null);
 
   const memberSince = useMemo(() => {
     const createdAt = profileData?.user?.createdAt;
@@ -174,7 +188,7 @@ export default function DriverProfilePage({
     ));
   }, [reviewsData]);
 
-  if (isProfileLoading) {
+  if (isAuthLoading || isProfileLoading) {
     return (
       <div className="min-h-screen bg-surface-container-low flex items-center justify-center">
         <span className="material-symbols-outlined text-4xl text-primary animate-spin">
