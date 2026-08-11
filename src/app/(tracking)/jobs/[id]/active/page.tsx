@@ -6,6 +6,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
+import { apiFetch } from "@/utils/apiFetch";
 import { geocodeAddress } from "@/utils/geocode";
 import type { Coordinates } from "@/utils/geocode";
 import { fetchRoute, interpolateAlongPath } from "@/utils/routing";
@@ -79,7 +80,7 @@ interface JobLocations {
 
 // ── Pure helpers ─────────────────────────────────────────────────────────────
 async function fetchJobForExecution(jobId: string): Promise<JobDetail> {
-  const response = await fetch(`${JOB_ENDPOINT_BASE}/${jobId}`);
+  const response = await apiFetch(`${JOB_ENDPOINT_BASE}/${jobId}`);
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error((errorData as { message?: string }).message ?? "Failed to load job.");
@@ -100,7 +101,7 @@ async function postStatusChange(
   jobId: string,
   action: "transit" | "deliver"
 ): Promise<{ job: JobDetail }> {
-  const response = await fetch(`${JOB_ENDPOINT_BASE}/${jobId}/${action}`, {
+  const response = await apiFetch(`${JOB_ENDPOINT_BASE}/${jobId}/${action}`, {
     method: "POST",
   });
   if (!response.ok) {
@@ -217,7 +218,7 @@ export default function ActiveJobPage({
   const sendLocationPing = useCallback(
     async (position: Coordinates) => {
       try {
-        await fetch(`${JOB_ENDPOINT_BASE}/${id}/location`, {
+        await apiFetch(`${JOB_ENDPOINT_BASE}/${id}/location`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ lat: position.lat, lng: position.lng }),

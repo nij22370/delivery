@@ -3,7 +3,9 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { useJobCreate } from "@/api/hooks/jobs/jobsApi";
+import { AxiosError } from "axios";
+import { createJob } from "@/api/apis/jobs/jobApi";
+import { getBackendErrorMessage } from "@/lib/errorResponse";
 import { type JobCreationInput, type JobVehicleType } from "@/types/job";
 import dynamic from "next/dynamic";
 import ProgressBar from "@/components/post-job/ProgressBar";
@@ -17,7 +19,6 @@ const STEP_LOCATION = 1;
 const STEP_VEHICLE = 2;
 const STEP_PRICING = 3;
 const STEP_REVIEW = 4;
-const POST_JOB_ENDPOINT = "/api/jobs";
 
 const MapPreview = dynamic(() => import("@/components/MapPreview"), { ssr: false });
 
@@ -83,26 +84,20 @@ export default function PostJobPage() {
     setCurrentStep((previous) => Math.max(STEP_LOCATION, previous - 1));
   }, []);
 
-  // Mutation for job creation
+  // Mutation for job creation — uses the axios `api` client so the automatic
+  // 401 → token-refresh → retry interceptor applies when the access token expires.
   const createJobMutation = useMutation({
-    mutationFn: async (data: JobCreationInput) => {
-      const response = await fetch(POST_JOB_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message ?? "Failed to create job");
-      }
-      return response.json();
-    },
+    mutationFn: (data: JobCreationInput) => createJob(data),
     onSuccess: (data) => {
       router.push(`/jobs/${data.job._id}`);
     },
     onError: (error: unknown) => {
       const message =
-        error instanceof Error ? error.message : "An unexpected error occurred.";
+        error instanceof AxiosError
+          ? getBackendErrorMessage(error, "Failed to create job")
+          : error instanceof Error
+            ? error.message
+            : "An unexpected error occurred.";
       console.error("Job creation error:", message);
     },
   });
@@ -113,6 +108,17 @@ export default function PostJobPage() {
     },
     [createJobMutation]
   );
+
+  const submitErrorMessage =
+    createJobMutation.error instanceof AxiosError
+      ? createJobMutation.error.response?.status === 401
+        ? "Your session has expired. Please log in and try again."
+        : getBackendErrorMessage(createJobMutation.error, "Failed to create job")
+      : createJobMutation.error instanceof Error
+        ? createJobMutation.error.message
+        : createJobMutation.isError
+          ? "An unexpected error occurred."
+          : null;
 
   return (
     <div className="min-h-screen bg-surface-container-low text-on-surface">
@@ -158,13 +164,7 @@ export default function PostJobPage() {
                 pricingData={pricingData}
                 onSubmit={handleSubmit}
                 isSubmitting={createJobMutation.isPending}
-                submitError={
-                  createJobMutation.error instanceof Error
-                    ? createJobMutation.error.message
-                    : createJobMutation.isError
-                      ? "An unexpected error occurred."
-                      : null
-                }
+                submitError={submitErrorMessage}
               />
             )}
           </div>

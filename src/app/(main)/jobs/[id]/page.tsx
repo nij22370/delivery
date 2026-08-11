@@ -9,6 +9,7 @@ import { JOB_STATUS } from "@/types/job";
 import type { JobVehicleType } from "@/types/job";
 import { use } from "react";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
+import { apiFetch } from "@/utils/apiFetch";
 
 const MapPreview = dynamic(() => import("@/components/MapPreview"), { ssr: false });
 
@@ -56,7 +57,7 @@ interface JobDetail {
 
 // ── Fetchers ─────────────────────────────────────────────────────────────────
 async function fetchJobById(jobId: string): Promise<JobDetail> {
-  const response = await fetch(`${ACCEPT_ENDPOINT_BASE}/${jobId}`);
+  const response = await apiFetch(`${ACCEPT_ENDPOINT_BASE}/${jobId}`);
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error((errorData as { message?: string }).message ?? "Failed to load job.");
@@ -66,7 +67,7 @@ async function fetchJobById(jobId: string): Promise<JobDetail> {
 }
 
 async function acceptJob(jobId: string): Promise<{ job: JobDetail }> {
-  const response = await fetch(`${ACCEPT_ENDPOINT_BASE}/${jobId}/accept`, { method: "POST" });
+  const response = await apiFetch(`${ACCEPT_ENDPOINT_BASE}/${jobId}/accept`, { method: "POST" });
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(

@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type PusherJs from "pusher-js";
 import type { Channel } from "pusher-js";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
+import { apiFetch } from "@/utils/apiFetch";
 import { useDriverPublicProfile } from "@/api/hooks/drivers/driverPublicProfileApi";
 import { geocodeAddress } from "@/utils/geocode";
 import type { Coordinates } from "@/utils/geocode";
@@ -131,7 +132,7 @@ interface StatusChangePayload {
 
 // ── Pure helpers ─────────────────────────────────────────────────────────────
 async function fetchJobForTracking(jobId: string): Promise<JobDetail> {
-  const response = await fetch(`${JOB_ENDPOINT_BASE}/${jobId}`);
+  const response = await apiFetch(`${JOB_ENDPOINT_BASE}/${jobId}`);
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error((errorData as { message?: string }).message ?? "Failed to load job.");

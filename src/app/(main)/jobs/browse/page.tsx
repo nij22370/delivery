@@ -8,6 +8,7 @@ import { JOB_VEHICLE_TYPE, JOB_STATUS } from "@/types/job";
 import type { JobVehicleType } from "@/types/job";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
 import { useRouter } from "next/navigation";
+import { apiFetch } from "@/utils/apiFetch";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const PAGE_SIZE = 10;
@@ -75,7 +76,7 @@ async function fetchBrowseJobs(
     limit: String(PAGE_SIZE),
   });
 
-  const response = await fetch(`${BROWSE_ENDPOINT}?${params}`);
+  const response = await apiFetch(`${BROWSE_ENDPOINT}?${params}`);
   if (!response.ok) {
     throw new Error("Failed to load jobs. Please try again.");
   }

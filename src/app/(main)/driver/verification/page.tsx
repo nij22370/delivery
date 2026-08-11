@@ -7,6 +7,7 @@ import { DRIVER_PROFILE_STATUS, DRIVER_VEHICLE_TYPE } from "@/types/driverProfil
 import type { DriverVehicleType } from "@/types/driverProfile/driverProfile";
 import { toast } from "sonner";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
+import { apiFetch } from "@/utils/apiFetch";
 import { VEHICLE_ICONS } from "@/lib/constants";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -60,7 +61,7 @@ function UploadZone({
 
     try {
       setIsUploadingInternal(true);
-      const signRes = await fetch("/api/uploads/sign", {
+      const signRes = await apiFetch("/api/uploads/sign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ documentType }),
