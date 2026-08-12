@@ -4,7 +4,7 @@
 
 **App:** SwiftShip — Driver Delivery Platform
 **Stack:** Next.js 16 (App Router) · MongoDB Atlas (Mongoose 9) · Tailwind v4 · React Query · Zustand · Pusher · Leaflet
-**Last updated:** Aug 11 — live tracking loop complete (driver execution UI + poster route ETA)
+**Last updated:** Aug 12 — chat feature complete (POST messages API + ChatPanel + dedicated chat page)
 
 ---
 
@@ -15,6 +15,7 @@
 | Setup | Installed the AI Collaboration Field Guide docs (`docs/ai-collaboration/`) and codified the review habits in `AGENTS.md`/`CLAUDE.md` | Adopt the habits — read `Handover.md` first, update it last, trace every bug/feature | None |
 | Aug 11 | Added `POST /api/jobs/:id/transit` + `POST /api/jobs/:id/deliver` (driver-only, atomic status transitions with `driverId` filter, Pusher `status-change` trigger); lint + build clean; 22/22 Node E2E checks passed | Driver-side tracking UI / GPS sender; wire status stepper + buttons on tracking page to the new endpoints | Test harness note: PowerShell 5.1 mangles JSON quotes when passing `-d "{...}"` to native `curl.exe` — use Node fetch or `Invoke-WebRequest -UseBasicParsing` |
 | Aug 11 | Live tracking Phases 2+3: driver execution page `/jobs/[id]/active` (Start Delivery / Mark Delivered / watchPosition GPS throttled 10s / Simulate GPS toggle), poster track page now draws the OSRM blue polyline + dynamic ETA + live `status-change`, shared `utils/routing.ts` + `utils/throttle.ts`, job-detail accepted card links to the active page | True dual-browser demo (poster + driver); optional last-location GET API so a late-joining poster sees the vehicle without waiting for the next ping | OSRM route is re-fetched on every driver ping (~10s) on the poster side — external API dependency; keep the 10s driver throttle in place |
+| Aug 12 | Chat feature: `POST /api/jobs/:id/messages` (Zod + participant check + DB before Pusher), `ChatPanel.tsx` (TanStack Query + Pusher `new-message` + optimistic send), dedicated `/jobs/[id]/chat` route with `ActiveChatsSidebar`, `.chat-scroll` CSS, date utilities extracted to `utils/format.ts`, derived values memoized in chat page, job detail page replaced inline ChatPanel with "Open Chat" button | Rate-limit the chat feature for production; consider a "last seen" / read-receipt system | AGENTS.md compliance: moved date formatting utilities out of ChatPanel into shared utils (formatMessageTime, getChatDateLabel, isSameCalendarDay); memoized all derived values in chat page with useMemo |
 
 ---
 
@@ -50,6 +51,11 @@
 - `POST /api/jobs/:id/location` — driver-only, validates lat/lng, **fire-and-forget** persistence to `LocationPing` (48h TTL via `expireAfterSeconds: 0`), triggers Pusher `location-update` immediately.
 - `POST /api/pusher/auth` — authorizes `private-job-{jobId}` channels **only for job participants** (poster or assigned driver).
 - `GET /api/jobs/:id/messages` — participant-only, oldest-first, paginated (default 50, cap 100).
+- `POST /api/jobs/:id/messages` — sends a message. Zod validated, participant-only, DB write before Pusher `new-message` trigger. Returns 201.
+- `ChatPanel.tsx` — reusable chat component (TanStack Query history, Pusher `new-message` subscription, optimistic send with temp message swap, date dividers, typing indicator, read receipts). Date utilities live in `utils/format.ts`.
+- `ActiveChatsSidebar.tsx` — sidebar listing active conversations.
+- `/jobs/[id]/chat` — dedicated chat page (participant-only, full-height ChatPanel + ActiveChatsSidebar on desktop).
+- Job detail page now has "Open Chat →" button linking to `/jobs/[id]/chat` (visible when accepted/in_transit/delivered).
 - `LiveTrackingMap.tsx` — shared map (pickup/dropoff/vehicle markers, OSRM polyline via `routePath`, live `location-update` subscription, controlled `vehiclePosition`, fit-bounds once on route load).
 - Poster track page at `/(tracking)/jobs/[id]/track` — **dynamic ETA** (OSRM duration from live driver position → dropoff), **blue route polyline**, live `status-change` subscription unlocks badge/stepper without refetch.
 - Driver execution page at `/(tracking)/jobs/[id]/active` — Start Delivery (`transit`), Mark Delivered (`deliver`), `navigator.geolocation.watchPosition` pings throttled to 10s, GPS simulation toggle (interpolates along the OSRM path), delivered completion state.

@@ -138,3 +138,22 @@ body {
   0%, 100% { opacity: 0.3; transform: scale(1); }
   50%      { opacity: 0.1; transform: scale(1.5); }
 }
+
+/* Chat message area scrollbar — 6px thumb, #e2e2e2, 10px radius, transparent track */
+.chat-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.chat-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.chat-scroll::-webkit-scrollbar-thumb {
+  background: #e2e2e2;
+  border-radius: 10px;
+}
+.chat-scroll::-webkit-scrollbar-thumb:hover {
+  background: #c6c6c6;
+}
+.chat-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #e2e2e2 transparent;
+}
