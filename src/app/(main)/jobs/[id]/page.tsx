@@ -18,6 +18,11 @@ const JOB_DETAIL_QUERY_KEY = "job-detail";
 const ACCEPT_ENDPOINT_BASE = "/api/jobs";
 const POSTER_ROLE = "poster";
 const DASHBOARD_PATH = "/dashboard";
+const CHAT_VISIBLE_STATUSES: Set<string> = new Set([
+  JOB_STATUS.ACCEPTED,
+  JOB_STATUS.IN_TRANSIT,
+  JOB_STATUS.DELIVERED,
+]);
 
 const VEHICLE_LABELS: Record<JobVehicleType, string> = {
   bicycle: "Bicycle / Scooter",
@@ -202,6 +207,8 @@ export default function JobDetailPage({
 
   // ── Job ID display — first 8 chars of MongoDB ObjectId ──────────────────
   const shortJobId = `SF-${job._id.slice(-6).toUpperCase()}`;
+
+  const isChatVisible = CHAT_VISIBLE_STATUSES.has(job.status);
 
   return (
     <div className="min-h-screen bg-surface-container-low">
@@ -411,6 +418,19 @@ export default function JobDetailPage({
             )}
           </div>
         </div>
+
+        {/* Chat */}
+        {isChatVisible && (
+          <div className="mt-8">
+            <Link
+              href={`/jobs/${job._id}/chat`}
+              className="w-full sm:w-auto h-12 flex items-center justify-center gap-2 bg-primary text-on-primary rounded-lg text-sm font-semibold hover:bg-primary-container transition-all cursor-pointer"
+            >
+              Open Chat
+              <span className="material-symbols-outlined text-xl">arrow_forward</span>
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );

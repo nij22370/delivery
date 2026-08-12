@@ -131,7 +131,9 @@ export default function StepPricing({
               </div>
               <p className="text-xs text-on-surface-variant">
                 {distanceMiles !== undefined && vehicleType
-                  ? `Based on ${distanceMiles} miles with ${VEHICLE_LABELS[vehicleType]} (up to ${VEHICLE_RATES[vehicleType].maxKg} kg).`
+                  ? distanceMiles > 0
+                    ? `Based on ${distanceMiles} miles with ${VEHICLE_LABELS[vehicleType]} (up to ${VEHICLE_RATES[vehicleType].maxKg} kg).`
+                    : `Base fare for ${VEHICLE_LABELS[vehicleType]} (up to ${VEHICLE_RATES[vehicleType].maxKg} kg). Adjust for distance.`
                   : suggestedPriceLabel}
               </p>
             </div>

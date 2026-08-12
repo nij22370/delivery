@@ -635,3 +635,33 @@ Because the expiry instant is stored per-document on `expiresAt` (which the app 
 - **Status badge**: rounded-full pill, per-status token classes (accepted/in_transit → `bg-primary/10 text-primary`; delivered → `bg-success-green/10 text-success-green`; cancelled → `bg-error-container text-error-red`).
 - **Delivery stepper**: left vertical line (`w-px bg-surface-container-high`); completed node `bg-success-green` with white check; active node white circle with `border-2 border-primary` + pulsing `w-2.5 h-2.5 bg-primary` dot; pending node `border-2 border-secondary-fixed-dim`.
 - **Map markers**: PICKUP/DROPOFF pills (`#fff` bg, `#05A357` text, radius 17px, shadow), vehicle = solid `#276EF1` circle over a `swiftship-pulse` animated ring (keyframe added to `globals.css`).
+
+---
+
+## Day 33–34 — In-App Chat (Messaging API + ChatPanel)
+
+### New Files
+- `src/components/chat/ChatPanel.tsx` — reusable chat component; props: `{ jobId, currentUserId, otherParticipantName?, jobBackHref?, isTyping? }`. Loads message history via TanStack Query, subscribes to Pusher `new-message` on `private-job-{jobId}`, optimistic send with temp message swap, inline error on failure.
+- `src/components/chat/ActiveChatsSidebar.tsx` — sidebar listing active conversations (used in the dedicated chat page layout).
+- `src/app/(main)/jobs/[id]/chat/page.tsx` — dedicated chat page at `/jobs/[id]/chat`. Participant-only access (poster or driver), renders ChatPanel full-height with ActiveChatsSidebar on desktop.
+- `src/app/globals.css` — `.chat-scroll` custom scrollbar (6px thumb, #e2e2e2, 10px radius, transparent track).
+
+### Modified Files
+- `src/app/api/jobs/[id]/messages/route.ts` — added `POST` handler alongside existing `GET`. Zod validation (`content: z.string().min(1).max(2000)`), participant check via shared `assertParticipant` helper, DB write completes before Pusher `new-message` trigger. Returns 201 with saved message.
+- `src/utils/format.ts` — extracted chat date utilities from ChatPanel: `formatMessageTime`, `getChatDateLabel`, `isSameCalendarDay` (shared, not component-local per AGENTS.md).
+- `src/app/(main)/jobs/[id]/page.tsx` — replaced inline ChatPanel with an "Open Chat →" button linking to `/jobs/[id]/chat` (visible when status is accepted/in_transit/delivered).
+
+### API Routes
+- `POST /api/jobs/:id/messages` — sends a message. Protected by `withAuth()` + participant check. Validates `{ content }` with Zod. Determines `recipientId` from poster/driver lookup. Writes to `Message` model, then fires `triggerJobEvent(jobId, "new-message", { messageId, senderId, content, createdAt })`. Returns 201.
+
+### Architectural Decisions
+- **Date utilities in shared utils**: AGENTS.md requires utility logic (formatDate, etc.) in shared `utils/` files — `formatMessageTime`, `getChatDateLabel`, `isSameCalendarDay` live in `utils/format.ts`, not inside ChatPanel.
+- **Derived values memoized**: `isParticipant`, `isChatAvailable`, `otherParticipantName` in the chat page are wrapped in `useMemo` per AGENTS.md.
+- **Dedicated route over inline**: Chat was moved from an inline panel on the job detail page to a dedicated `/jobs/[id]/chat` route so the chat has its own URL, avoids layout conflicts, and allows full-height rendering.
+
+### Design System Notes
+- **Sent bubble**: `bg-primary text-white rounded-2xl rounded-br-sm shadow-[0_1px_2px_rgba(39,110,241,0.2)]`.
+- **Received bubble**: `bg-white border border-secondary-container rounded-2xl rounded-bl-sm shadow-[0_1px_2px_rgba(0,0,0,0.05)]`.
+- **Message area**: `bg-[#F9FAFB]`, custom `.chat-scroll` scrollbar.
+- **Input area**: attach button, auto-grow textarea (`field-sizing: content`), emoji button, send button (FILL=1).
+- **Typing indicator**: three `w-1.5 h-1.5 bg-secondary rounded-full animate-bounce` dots with staggered delays (0ms, 150ms, 300ms).

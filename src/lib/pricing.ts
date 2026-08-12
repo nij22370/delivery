@@ -86,7 +86,15 @@ export async function calculateSuggestedPrice(
     geocodeAddress(dropoffAddress),
   ]);
 
-  if (!pickup || !dropoff) return null;
+  if (!pickup || !dropoff) {
+    // Geocoding unavailable — fall back to the base fare so the UI always
+    // shows a useful starting suggestion instead of N/A.
+    return {
+      suggestedPriceCents: config.baseCents,
+      distanceKm: 0,
+      distanceMiles: 0,
+    };
+  }
 
   const distanceMeters = haversineDistanceMeters(pickup, dropoff);
   const distanceKm = distanceMeters / METERS_PER_KM;
