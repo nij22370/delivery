@@ -6,6 +6,24 @@ Format: newest at the top. Every decision gets the **model/session** that made i
 
 ---
 
+## D-28 — `sonner` for global notifications (reuse existing)
+
+**Status:** Accepted · **Model:** user decision at opencode session (Day 36) · **Applies to:** `src/components/providers/PusherProvider.tsx`
+
+**Decision:** The global `PusherProvider` reuses the app's existing `sonner` toast library instead of adding a new dependency. All toasts (mutation feedback and off-screen message notifications) use the same system — one `<Toaster />` in `layout.tsx`.
+
+---
+
+## D-27 — Read-mark and send update the cache; they never invalidate
+
+**Status:** Accepted · **Model:** opencode session (Days 35–37) · **Applies to:** `useMarkMessagesRead` in `src/api/hooks/jobs/jobsApi.ts`, `PusherProvider.tsx`
+
+**Decision:** After `PATCH /api/jobs/:id/messages/read` succeeds, the unread-counts cache entry for that job is set to 0 via `queryClient.setQueryData` — never `invalidateQueries`. The message-list query key is not touched at all.
+
+**Why:** An invalidation forces a refetch and risks a flicker window where the badge re-appears before fresh data lands. Setting the count to 0 synchronously is zero-cost, instant, and consistent with the established "append to cache, never invalidate" rule that Day 34 introduced for message sends. The DB is the source of truth; the cache write is only a UI affordance mirror.
+
+---
+
 ## D-26 — Denormalized rating average instead of on-demand aggregation
 
 **Status:** Accepted · **Model:** project session (Day 25) · **Applies to:** `src/lib/updateDriverRating.ts`

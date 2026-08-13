@@ -1,11 +1,12 @@
 "use client";
 
-import { use, useMemo } from "react";
+import { use, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { JOB_STATUS } from "@/types/job";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
 import { apiFetch } from "@/utils/apiFetch";
+import { useMarkMessagesRead } from "@/api/hooks/jobs/jobsApi";
 import ChatPanel from "@/components/chat/ChatPanel";
 
 import ActiveChatsSidebar from "@/components/chat/ActiveChatsSidebar";
@@ -51,6 +52,7 @@ export default function ChatPage({
 }) {
   const { id } = use(params);
   const { user, isLoading: isAuthLoading } = useAuthGuard();
+  const markMessagesReadMutation = useMarkMessagesRead();
 
   const {
     data: job,
@@ -80,6 +82,15 @@ export default function ChatPage({
     () => Boolean(job && CHAT_AVAILABLE_STATUSES.has(job.status)),
     [job]
   );
+
+  // Opening the chat view marks every unread message as read. The mutation
+  // updates only the unread-counts cache — the message list cache is untouched.
+  useEffect(() => {
+    if (!isAuthLoading && user && job && isParticipant && isChatAvailable) {
+      markMessagesReadMutation.mutate(id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthLoading, user, job, id, isParticipant, isChatAvailable]);
 
   // The poster's display name comes from the pickup contact; the driver's
   // name would need a separate profile fetch, so fall back to "Driver".

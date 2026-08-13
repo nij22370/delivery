@@ -6,6 +6,7 @@ import { useState, useMemo } from "react";
 import { apiFetch } from "@/utils/apiFetch";
 import { JOB_STATUS } from "@/types/job";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
+import { useUnreadCounts } from "@/api/hooks/jobs/jobsApi";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface JobListItem {
@@ -46,6 +47,7 @@ export default function ActiveChatsSidebar({
 }: ActiveChatsSidebarProps) {
   const { user } = useAuthGuard();
   const [searchQuery, setSearchQuery] = useState("");
+  const { data: unreadCounts } = useUnreadCounts();
 
   const isDriver = user?.role === "driver";
 
@@ -118,6 +120,7 @@ export default function ActiveChatsSidebar({
         ) : (
           activeChats.map((job) => {
             const isActive = job._id === currentJobId;
+            const unreadCount = unreadCounts?.[job._id] ?? 0;
             // Posters see "Driver", Drivers see the pickup contact name (Poster)
             const participantName = isDriver ? job.pickupContactName : "Driver";
             const initials = getInitials(participantName);
@@ -165,10 +168,15 @@ export default function ActiveChatsSidebar({
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <h3 className="text-sm font-bold text-on-surface truncate">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-sm font-bold text-on-surface truncate flex-1">
                       {participantName}
                     </h3>
+                    {unreadCount !== 0 && (
+                      <span className="min-w-5 h-5 px-1.5 rounded-full bg-primary text-on-primary text-xs font-bold flex items-center justify-center shrink-0">
+                        {unreadCount}
+                      </span>
+                    )}
                     {timeLabel && (
                       <span
                         className={`text-[11px] shrink-0 ${

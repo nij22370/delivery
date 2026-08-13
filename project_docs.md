@@ -665,3 +665,44 @@ Because the expiry instant is stored per-document on `expiresAt` (which the app 
 - **Message area**: `bg-[#F9FAFB]`, custom `.chat-scroll` scrollbar.
 - **Input area**: attach button, auto-grow textarea (`field-sizing: content`), emoji button, send button (FILL=1).
 - **Typing indicator**: three `w-1.5 h-1.5 bg-secondary rounded-full animate-bounce` dots with staggered delays (0ms, 150ms, 300ms).
+
+---
+
+## Days 35–37 — Read Receipts, Unread Badges, and Global Off-Screen Notifications
+
+### New Files
+- `src/app/api/jobs/[id]/messages/read/route.ts` — `PATCH` marks every message in the job where `recipientId === currentUser._id && readAt === null` as read. `withAuth` + participant check; only the recipient's own messages are ever touched.
+- `src/app/api/jobs/unread-counts/route.ts` — `GET` returns `{ [jobId]: number }` — unread message counts for the current user, aggregated from `Message` where `recipientId === me && readAt === null`.
+- `src/app/api/jobs/my-active-ids/route.ts` — `GET` returns `{ jobIds: string[] }` — IDs of the user's active jobs (status `accepted` or `in_transit`) where the user is poster or driver. Feeds the global Pusher provider.
+- `src/components/providers/PusherProvider.tsx` — global React context provider. Fetches active job IDs (TanStack Query, 30s staleTime), subscribes to `private-job-{jobId}` for each with a single shared `pusherClient` instance, listens for `new-message`, and fires a top-right `react-hot-toast` ("New message from [senderName]") when the user is not already on that job's chat page. Reconciles channel subscriptions when the job set changes; full teardown on unmount.
+
+### Modified Files
+- `src/app/api/jobs/[id]/messages/route.ts` — the `new-message` Pusher payload now includes `senderName` (looked up from the sender's `User`), so the global provider can render the toast text.
+- `src/app/(main)/jobs/[id]/chat/page.tsx` — on mount (once auth + job resolve, user is a participant, chat is available), fires `useMarkMessagesRead().mutate(id)`. No cache invalidation after the read-mark.
+- `src/components/chat/ActiveChatsSidebar.tsx` — each conversation row reads `useUnreadCounts()` and renders an unread-count badge (primary pill) when the count is > 0; renders nothing at 0.
+- `src/api/apis/jobs/jobApi.ts` — added `fetchUnreadCounts()`, `markJobMessagesRead(jobId)`, `fetchMyActiveJobIds()`.
+- `src/api/hooks/jobs/jobsApi.ts` — added `useUnreadCounts()` (30s staleTime) and `useMarkMessagesRead()` (on success, sets that job's unread count to 0 in the cache — never invalidates).
+- `src/types/message/message.ts` — added `UnreadCountsByJob` and `MarkMessagesReadResponse`.
+- `src/app/layout.tsx` — wrapped `<main>` with `<PusherProvider>` inside the existing auth/query providers.
+- `package.json` — added `react-hot-toast`.
+
+### API Routes
+- `PATCH /api/jobs/:id/messages/read` — `withAuth` + participant gate. `Message.updateMany({ jobId, recipientId: user.userId, readAt: null }, { $set: { readAt: new Date() } })`. Returns `{ ok, markedCount }`.
+- `GET /api/jobs/unread-counts` — `withAuth`. Mongo aggregation `$match {recipientId, readAt: null}` → `$group` by `jobId` → plain `{ [jobId]: count }` object.
+- `GET /api/jobs/my-active-ids` — `withAuth`. `Job.find({ status: { $in: [accepted, in_transit] }, $or: [{ posterId: me }, { driverId: me }] })` → array of IDs.
+
+### Architectural Decisions
+- **Read-mark updates cache, never invalidates**: per the project rule, after a read-mark the message list query key is untouched. The unread-counts cache entry for that job is set to 0 directly via `queryClient.setQueryData`, so the badge clears instantly without a refetch.
+- **Toast library**: the task specified `react-hot-toast`; installed as the one new dependency and used only by `PusherProvider` (the app's existing `sonner` toasts remain untouched).
+- **Independent subscriptions**: the chat page's per-job Pusher subscription is unchanged. The global provider subscribes to the same channel separately — additive, no refactor of the chat page.
+- **Single Pusher client**: `PusherProvider` imports the module-level `pusherClient` singleton from `src/lib/pusherClient.ts`; it never constructs a new instance per channel or mount.
+- **Self-message guard**: the server echoes a sender's own message back over Pusher, so the provider skips toasts where `payload.senderId === currentUser._id` (also documented in ChatPanel's dedupe logic).
+
+### Learning Prompt: Why must the unread badge clear without a refetch?
+Opening the chat marks messages read, and the badge should disappear the instant the chat opens. If we invalidated the unread-counts query we'd trigger an extra network round-trip and (worse) risk a race where the badge flickers back before the fresh payload lands. Setting the count to 0 directly in the query cache is synchronous, zero-cost, and matches the project's "append to cache, never invalidate" rule for message/read flows.
+
+### Verification (Day 37)
+- Node E2E script (`day35-36.mjs`, temp) — 30/30 checks passed: register/login both roles, post job, accept, send messages both directions, `my-active-ids` correct for both participants, unread count 1 for recipient / 0 for sender, mark-read returns `markedCount: 1` and clears the badge, recipient scoping (driver's mark-read never clears the poster's unread), 401 on all three new routes without a cookie, location ping 200 (driver) / 403 (poster).
+- `npm run lint` — only pre-existing errors remain (register page unescaped entities, auth register `any`, errorResponse `any`); none introduced by Days 35–37.
+- `npm run build` — clean; all three new API routes listed in the route manifest.
+- Live-map marker + toast behavior require two real browser sessions (poster + driver) with the dev server running and are documented in `TestChecklist.md` rows 16–18; the API surface behind them is fully E2E-verified.

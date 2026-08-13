@@ -51,6 +51,9 @@ After starting `npm run dev`, walk these flows against `http://localhost:3000`. 
 | 13 | Public profile | `/drivers/:id` | name, rating avg, total deliveries, reviews list |
 | 14 | Refresh session | wait 15m (or use short access expiry in dev) and make a request | `refresh` endpoint rotates token silently, request succeeds |
 | 15 | Logout | click logout | cookies cleared, protected pages redirect to `/login` |
+| 16 | Read receipts + unread badge | two sessions (poster+driver on an accepted job): sender sends a chat message, receiver stays on job list | unread badge shows the count on the receiver's job list; badge clears the moment the receiver opens that job's chat (no refetch — cache update) |
+| 17 | Off-screen toast | sender is on a different page, receiver sends a chat message | toast "New message from [name]" appears top-right; **no** toast when already on that job's chat page; no toast for your own echoed message |
+| 18 | Dual-session live tracking + chat (Day 37) | same job open in two browsers (poster + driver); driver pings location while poster watches the map | message arrives live on receiver; `readAt` null until chat opened then populated in DB; vehicle marker updates live; no stale/duplicate Pusher subscriptions, no key warnings, no Pusher auth failures in the console |
 
 **Rule:** if a flow you touched is not in the table, add it. The table is the living definition of "works."
 
