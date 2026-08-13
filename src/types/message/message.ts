@@ -15,3 +15,10 @@ export interface GetMessagesResponse {
   limit: number;
   totalPages: number;
 }
+
+export type UnreadCountsByJob = Record<string, number>;
+
+export interface MarkMessagesReadResponse {
+  ok: boolean;
+  markedCount: number;
+}

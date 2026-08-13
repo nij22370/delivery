@@ -3,6 +3,7 @@ import { z } from "zod";
 import connectDB from "@/lib/db";
 import Job from "@/models/Job";
 import Message from "@/models/Message";
+import User from "@/models/User";
 import { withAuth } from "@/lib/auth";
 import { triggerJobEvent } from "@/lib/triggerJobEvent";
 import type { JwtAccessPayload } from "@/types/auth/auth";
@@ -123,6 +124,11 @@ async function handlePostMessage(
     const { posterId, driverId } = participantResult;
     const recipientId = user.userId === posterId ? driverId : posterId;
 
+    // The sender's display name rides along in the Pusher event so the global
+    // notification provider can render "New message from [senderName]".
+    const sender = await User.findById(user.userId).select("name").lean();
+    const senderName = sender?.name ?? "Unknown";
+
     // DB write completes BEFORE Pusher fires — no fire-and-forget.
     const savedMessage = await Message.create({
       jobId,
@@ -134,6 +140,7 @@ async function handlePostMessage(
     await triggerJobEvent(jobId, "new-message", {
       messageId: String(savedMessage._id),
       senderId: user.userId,
+      senderName,
       content: savedMessage.content,
       createdAt: savedMessage.createdAt,
     });

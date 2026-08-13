@@ -20,6 +20,7 @@ export const metadata: Metadata = {
 
 import AuthProvider from "@/components/providers/AuthProvider";
 import QueryProvider from "@/components/providers/QueryProvider";
+import PusherProvider from "@/components/providers/PusherProvider";
 import { Toaster } from "sonner";
 
 export default function RootLayout({
@@ -43,9 +44,11 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-surface-white text-on-surface" suppressHydrationWarning>
         <AuthProvider>
           <QueryProvider>
-            <main className="flex-1 flex flex-col w-full h-full">
-              {children}
-            </main>
+            <PusherProvider>
+              <main className="flex-1 flex flex-col w-full h-full">
+                {children}
+              </main>
+            </PusherProvider>
           </QueryProvider>
         </AuthProvider>
         <Toaster />
