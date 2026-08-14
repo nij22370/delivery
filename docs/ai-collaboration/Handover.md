@@ -4,7 +4,7 @@
 
 **App:** SwiftShip — Driver Delivery Platform
 **Stack:** Next.js 16 (App Router) · MongoDB Atlas (Mongoose 9) · Tailwind v4 · React Query · Zustand · Pusher · Leaflet
-**Last updated:** Aug 13 — Days 35–37 complete (read receipts + unread badges + global Pusher toasts)
+**Last updated:** Aug 14 — Days 38–40 complete (Khalti sandbox payment backend)
 
 ---
 
@@ -17,6 +17,7 @@
 | Aug 11 | Live tracking Phases 2+3: driver execution page `/jobs/[id]/active` (Start Delivery / Mark Delivered / watchPosition GPS throttled 10s / Simulate GPS toggle), poster track page now draws the OSRM blue polyline + dynamic ETA + live `status-change`, shared `utils/routing.ts` + `utils/throttle.ts`, job-detail accepted card links to the active page | True dual-browser demo (poster + driver); optional last-location GET API so a late-joining poster sees the vehicle without waiting for the next ping | OSRM route is re-fetched on every driver ping (~10s) on the poster side — external API dependency; keep the 10s driver throttle in place |
 | Aug 12 | Chat feature: `POST /api/jobs/:id/messages` (Zod + participant check + DB before Pusher), `ChatPanel.tsx` (TanStack Query + Pusher `new-message` + optimistic send), dedicated `/jobs/[id]/chat` route with `ActiveChatsSidebar`, `.chat-scroll` CSS, date utilities extracted to `utils/format.ts`, derived values memoized in chat page, job detail page replaced inline ChatPanel with "Open Chat" button | Rate-limit the chat feature for production; consider a "last seen" / read-receipt system | AGENTS.md compliance: moved date formatting utilities out of ChatPanel into shared utils (formatMessageTime, getChatDateLabel, isSameCalendarDay); memoized all derived values in chat page with useMemo |
 | Aug 13 | Days 35–37: `PATCH /api/jobs/:id/messages/read` (marks recipient's unread as read), `GET /api/jobs/unread-counts` (per-job badge data), `GET /api/jobs/my-active-ids` (feeds global provider), `PusherProvider.tsx` global context (single shared client, subscribes active jobs, top-right `react-hot-toast` "New message from [name]"), unread badge in `ActiveChatsSidebar`, `senderName` added to `new-message` Pusher payload, chat page marks-read on open (cache update, no invalidation) | Manual dual-browser playback of TestChecklist rows 16–18 (API surface fully E2E-verified 30/30; toast + live-map marker need real browsers) | `react-hot-toast` added as the one new dependency (task-specified; sonner toasts untouched); read-mark updates only the unread-counts cache — never touch the message-list query key |
+| Aug 14 | Days 38–40: `POST /api/payments/initiate` (poster-only, Khalti initiation, stores `pidx` on Job), `GET /api/payments/khalti/verify` (server-side lookup, 90/10 payout split, PaymentTransaction unique index for idempotency), `PaymentTransaction` model, `Payout` model, Job model extended with payment fields, `.env.example` with payment variables | Payment UI, success/failure pages, eSewa implementation, actual driver payout transfer | Khalti uses paisa (NPR × 100); verification never trusts redirect params; eSewa returns 501 Not Implemented |
 
 ---
 

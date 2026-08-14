@@ -1,26 +1,29 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose";
 import { JOB_STATUS, JOB_VEHICLE_TYPE, type JobStatus, type JobVehicleType } from "@/types/job";
 
+export type PaymentGateway = "khalti" | "esewa";
+export type PaymentStatus = "initiated" | "paid" | "failed";
+
 export interface IJob extends Document {
   posterId: Types.ObjectId;
   driverId: Types.ObjectId | null;
   status: JobStatus;
-  // Pickup location fields (from Stitch Step 1)
   pickupAddress: string;
   pickupContactName: string;
   pickupPhone: string;
   pickupInstructions?: string;
-  // Dropoff location fields (from Stitch Step 1)
   dropoffAddress: string;
   dropoffContactName: string;
   dropoffPhone: string;
-  // Vehicle (Step 2)
   vehicleType: JobVehicleType;
-  // Pricing (Step 3)
   packageDescription?: string;
   offeredPrice: number;
   pickupDate: string;
   pickupTimeWindow: string;
+  paymentGateway?: PaymentGateway;
+  paymentPidx?: string;
+  paymentTransactionUuid?: string;
+  paymentStatus?: PaymentStatus;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -60,6 +63,16 @@ const jobSchema = new Schema<IJob>(
     offeredPrice: { type: Number, required: true },
     pickupDate: { type: String, required: true },
     pickupTimeWindow: { type: String, required: true },
+    paymentGateway: {
+      type: String,
+      enum: ["khalti", "esewa"],
+    },
+    paymentPidx: { type: String },
+    paymentTransactionUuid: { type: String },
+    paymentStatus: {
+      type: String,
+      enum: ["initiated", "paid", "failed"],
+    },
   },
   { timestamps: true }
 );

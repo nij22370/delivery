@@ -6,6 +6,16 @@ Format: newest at the top. Every decision gets the **model/session** that made i
 
 ---
 
+## D-29 — Khalti payment backend (sandbox)
+
+**Status:** Accepted · **Model:** opencode session (Days 38–40) · **Applies to:** `src/lib/payments/khalti.ts`, `src/app/api/payments/initiate/route.ts`, `src/app/api/payments/khalti/verify/route.ts`
+
+**Decision:** Khalti sandbox is the first payment gateway implemented. Initiation returns a redirect URL; verification calls Khalti's lookup API (never trusts client-provided status). Driver payout is 90% / 10% platform fee. PaymentTransaction model prevents duplicate processing via unique compound index on `{gateway, transactionId}`.
+
+**Why:** Server-to-server verification is non-negotiable for payment security. The lookup API is authoritative — redirect parameters can be spoofed. Idempotency via unique index prevents double-payouts if Khalti redirects multiple times.
+
+---
+
 ## D-28 — `sonner` for global notifications (reuse existing)
 
 **Status:** Accepted · **Model:** user decision at opencode session (Day 36) · **Applies to:** `src/components/providers/PusherProvider.tsx`
