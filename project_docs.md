@@ -706,3 +706,42 @@ Opening the chat marks messages read, and the badge should disappear the instant
 - `npm run lint` — only pre-existing errors remain (register page unescaped entities, auth register `any`, errorResponse `any`); none introduced by Days 35–37.
 - `npm run build` — clean; all three new API routes listed in the route manifest.
 - Live-map marker + toast behavior require two real browser sessions (poster + driver) with the dev server running and are documented in `TestChecklist.md` rows 16–18; the API surface behind them is fully E2E-verified.
+
+---
+
+## Days 38–40 — Khalti Sandbox Payment Backend
+
+### New Files
+- `src/lib/payments/khalti.ts` — `initiateKhalti(job, poster)` (POST to Khalti initiate API, returns `{method, url, pidx}`), `verifyKhaltiPayment(pidx)` (POST to Khalti lookup API, returns authoritative status), `getPaymentFailureUrl()`.
+- `src/app/api/payments/initiate/route.ts` — `POST /api/payments/initiate` (poster-only, validates job ownership + status `accepted`, calls `initiateKhalti`, stores `paymentPidx`/`paymentGateway`/`paymentStatus` on Job, returns redirect URL).
+- `src/app/api/payments/khalti/verify/route.ts` — `GET /api/payments/khalti/verify?pidx=...` (no auth required, server-side Khalti lookup, handles Completed/Pending/Expired/User canceled/Refunded/unknown statuses, creates PaymentTransaction + Payout on success, redirects to job detail or failure URL).
+- `src/models/PaymentTransaction.ts` — `{jobId, gateway, transactionId, amount, status, processedAt}` with unique compound index `{gateway: 1, transactionId: 1}` for idempotency.
+- `src/models/Payout.ts` — `{driverId, jobId, amount, platformFee, gateway, gatewayTransactionId, status, paidAt?, notes?}`; status `pending` on creation.
+- `.env.example` — payment environment variables added.
+
+### Modified Files
+- `src/models/Job.ts` — added `paymentGateway`, `paymentPidx`, `paymentTransactionUuid`, `paymentStatus` fields.
+
+### API Routes
+- `POST /api/payments/initiate` — poster-only. Validates: user owns job, job status is `accepted`. For `gateway: "khalti"`, calls Khalti initiate API, stores `pidx` on Job, returns `{method: "redirect", url}`. For `gateway: "esewa"`, returns 501 Not Implemented.
+- `GET /api/payments/khalti/verify?pidx=...` — no auth (Khalti redirect may not have session). Reads `pidx` from query, calls Khalti lookup API, finds Job by `paymentPidx`. Handles:
+  - `Completed` → checks for existing PaymentTransaction (idempotency), marks Job `paymentStatus: "paid"`, creates Payout (90% driver / 10% platform fee, status `pending`), creates PaymentTransaction, redirects to `/jobs/:id`.
+  - `Pending` → redirects to failure URL with `?reason=pending`.
+  - `Expired`, `User canceled`, `Refunded` → marks Job `paymentStatus: "failed"`, redirects to failure URL with appropriate reason.
+  - Unknown status → logs error, redirects to failure URL with `?reason=unknown`.
+
+### Architectural Decisions
+- **Server-side verification**: Khalti redirect params are never trusted; the lookup API is authoritative.
+- **Idempotency**: PaymentTransaction unique index `{gateway, transactionId}` prevents duplicate processing.
+- **Payout split**: 90% driver, 10% platform fee (hardcoded for now).
+- **No UI**: Days 38–40 are backend only — payment buttons, success/failure pages come later.
+
+### Learning Prompt: Why must payment verification use the Khalti lookup API?
+The redirect from Khalti contains `pidx`, `status`, and `transaction_id` in the URL query string. These are client-provided and can be forged. The server must call Khalti's lookup API with the `pidx` to get the authoritative payment status. This prevents a malicious user from marking their own job as paid without actually paying.
+
+### Learning Prompt: Why a unique index on PaymentTransaction?
+Khalti may redirect the user multiple times (e.g., page reload, back button). Without idempotency, each redirect would create a new Payout and PaymentTransaction. The unique compound index `{gateway, transactionId}` ensures that only one PaymentTransaction is ever created for a given Khalti transaction — subsequent redirects detect the existing record and skip processing.
+
+### Verification (Day 40)
+- `npm run build` — clean; new payment routes listed in manifest (`/api/payments/initiate`, `/api/payments/khalti/verify`).
+- Manual testing: poster initiates payment for accepted job → Khalti sandbox URL returned → complete sandbox payment → verification endpoint processes → Job `paymentStatus: "paid"`, Payout created, PaymentTransaction created.
