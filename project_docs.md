@@ -745,3 +745,42 @@ Khalti may redirect the user multiple times (e.g., page reload, back button). Wi
 ### Verification (Day 40)
 - `npm run build` — clean; new payment routes listed in manifest (`/api/payments/initiate`, `/api/payments/khalti/verify`).
 - Manual testing: poster initiates payment for accepted job → Khalti sandbox URL returned → complete sandbox payment → verification endpoint processes → Job `paymentStatus: "paid"`, Payout created, PaymentTransaction created.
+
+---
+
+## Days 41–44 — eSewa v2 + Unified Payment Abstraction + Admin Payouts
+
+### New Files
+- `src/lib/payments/esewa.ts` — `generateEsewaSignature(totalAmount, transactionUuid, productCode)` (HMAC-SHA256 over `total_amount={n},transaction_uuid={uuid},product_code={code}`), `initiateEsewa(job, poster)` (generates `crypto.randomUUID()` transactionUuid, saves `paymentTransactionUuid` + `paymentGateway: "esewa"` on Job, returns `{method: "form", url, params}` for hidden-form POST to `https://rc-epay.esewa.com.np/api/epay/main/v2/form`), `verifyEsewaSignature(signedFieldNames, data, receivedSignature)` (recomputes HMAC over fields listed in `signed_field_names` in order).
+- `src/app/api/payments/esewa/verify/route.ts` — `GET /api/payments/esewa/verify?data=...` (no auth; decodes base64 `data` param, verifies HMAC signature over `signed_field_names` order, idempotency check on `transaction_code` in PaymentTransaction, on `COMPLETE` marks Job `paid`, creates PaymentTransaction + Payout, redirects to job detail; on `FAILED`/`AMBIGUOUS` marks Job `failed`, redirects to failure URL).
+- `src/lib/payments/index.ts` — `PaymentGateway` type (`khalti | esewa`), `PaymentInitResult` union (`redirect` | `form`), `initiatePayment(gateway, job, poster)` routes to gateway-specific function.
+- `src/app/api/admin/payouts/route.ts` — `GET /api/admin/payouts?status=&page=&limit=` (admin-only, paginated, populates `driverId` name/email and `jobId` offeredPrice).
+- `src/app/api/admin/payouts/[id]/route.ts` — `PATCH /api/admin/payouts/:id` (admin-only, accepts `{status: "paid", notes?}`, validates forward transition only, sets `paidAt`, returns updated payout).
+
+### Modified Files
+- `src/app/api/payments/initiate/route.ts` — removed 501 eSewa stub, calls `initiatePayment()` from abstraction layer, handles `pidx` for Khalti, persists `paymentGateway` and `paymentStatus` on Job, returns `PaymentInitResult` as-is to frontend.
+- `src/lib/payments/khalti.ts` — no functional changes; exported via `index.ts`.
+- `src/app/api/jobs/[id]/deliver/route.ts` — on delivery, auto-creates Payout from PaymentTransaction (90/10 split) if none exists.
+
+### API Routes Added
+| Method | Route | Auth | Purpose |
+|--------|-------|------|---------|
+| GET | `/api/payments/esewa/verify?data=` | none | eSewa server-side verification (base64 HMAC) |
+| GET | `/api/admin/payouts?status=&page=&limit=` | `withRole(["admin"])` | Paginated payout list with driver/job populates |
+| PATCH | `/api/admin/payouts/:id` | `withRole(["admin"])` | Mark payout paid with notes + paidAt |
+
+### Architectural Decisions
+- **Unified abstraction layer**: `src/lib/payments/index.ts` is the single entry point. Route handlers contain zero gateway-specific logic. `PaymentInitResult` union handles Khalti redirect vs eSewa form POST.
+- **eSewa uses form POST, not redirect**: Khalti returns a JS redirect URL; eSewa v2 requires a server-rendered hidden form with HMAC-signed parameters. The abstraction returns `{method: "form", url, params}` — frontend must programmatically create and submit the form.
+- **HMAC verification mirrors Khalti lookup**: eSewa verify decodes the base64 `data` param, recomputes the HMAC over `signed_field_names` in the exact order specified, and rejects on mismatch. Corrupted or tampered data fails closed.
+- **Idempotency on both gateways**: PaymentTransaction unique index `{gateway, transactionId}` covers both Khalti `transaction_id` and eSewa `transaction_code`.
+- **Auto-payout on delivery**: When a driver marks a job `delivered`, the route checks for a PaymentTransaction and creates a Payout (status `pending`, 90/10 split) if one doesn't already exist. This ensures payouts are created even for jobs where payment was already verified (Khalti creates payout on verify; eSewa creates on verify; delivery creates as fallback).
+- **Admin payout endpoints require `role === "admin"`**: `withRole(["admin"])` guard enforces this. PATCH only allows `status: "paid"` transition; `failed` and already-`paid` payouts are blocked.
+
+### Verification (Day 44)
+- `npm run build` — clean; all new routes listed in manifest.
+- eSewa sandbox form submission reaches eSewa payment page (manual test).
+- Manually corrupting base64 `data` param causes verify to reject (signature mismatch).
+- Single `POST /api/payments/initiate` handles both gateways via `PaymentInitResult`.
+- Admin can list pending payouts and mark them paid with notes.
+- Both gateways work end-to-end after Day 43 refactor.

@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Types } from "mongoose";
 import connectDB from "@/lib/db";
 import Job from "@/models/Job";
+import PaymentTransaction from "@/models/PaymentTransaction";
+import Payout from "@/models/Payout";
 import { withRole } from "@/lib/auth";
 import type { JwtAccessPayload } from "@/types/auth/auth";
 import { JOB_STATUS } from "@/types/job";
 import { triggerJobEvent } from "@/lib/triggerJobEvent";
 
 const STATUS_CHANGE_EVENT = "status-change";
+const DRIVER_PAYOUT_PERCENTAGE = 0.9;
+const PLATFORM_FEE_PERCENTAGE = 0.1;
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -41,6 +46,29 @@ async function handleDeliverJob(
       status: JOB_STATUS.DELIVERED,
       timestamp: new Date().toISOString(),
     });
+
+    const paymentTx = await PaymentTransaction.findOne({ jobId: new Types.ObjectId(id) }).lean();
+    if (paymentTx && paymentTx.gateway && paymentTx.transactionId) {
+      const existingPayout = await Payout.findOne({
+        jobId: new Types.ObjectId(id),
+        driverId: deliveredJob.driverId,
+      }).lean();
+
+      if (!existingPayout && deliveredJob.driverId) {
+        const amount = deliveredJob.offeredPrice * DRIVER_PAYOUT_PERCENTAGE;
+        const platformFee = deliveredJob.offeredPrice * PLATFORM_FEE_PERCENTAGE;
+
+        await Payout.create({
+          driverId: new Types.ObjectId(deliveredJob.driverId),
+          jobId: new Types.ObjectId(deliveredJob._id),
+          amount,
+          platformFee,
+          gateway: paymentTx.gateway,
+          gatewayTransactionId: paymentTx.transactionId,
+          status: "pending",
+        });
+      }
+    }
 
     return NextResponse.json({ job: deliveredJob }, { status: 200 });
   } catch (error: unknown) {

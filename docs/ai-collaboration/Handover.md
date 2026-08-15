@@ -4,7 +4,7 @@
 
 **App:** SwiftShip — Driver Delivery Platform
 **Stack:** Next.js 16 (App Router) · MongoDB Atlas (Mongoose 9) · Tailwind v4 · React Query · Zustand · Pusher · Leaflet
-**Last updated:** Aug 14 — Days 38–40 complete (Khalti sandbox payment backend)
+**Last updated:** Aug 15 — Days 41–44 complete (eSewa + unified payment abstraction + admin payouts)
 
 ---
 
@@ -18,6 +18,7 @@
 | Aug 12 | Chat feature: `POST /api/jobs/:id/messages` (Zod + participant check + DB before Pusher), `ChatPanel.tsx` (TanStack Query + Pusher `new-message` + optimistic send), dedicated `/jobs/[id]/chat` route with `ActiveChatsSidebar`, `.chat-scroll` CSS, date utilities extracted to `utils/format.ts`, derived values memoized in chat page, job detail page replaced inline ChatPanel with "Open Chat" button | Rate-limit the chat feature for production; consider a "last seen" / read-receipt system | AGENTS.md compliance: moved date formatting utilities out of ChatPanel into shared utils (formatMessageTime, getChatDateLabel, isSameCalendarDay); memoized all derived values in chat page with useMemo |
 | Aug 13 | Days 35–37: `PATCH /api/jobs/:id/messages/read` (marks recipient's unread as read), `GET /api/jobs/unread-counts` (per-job badge data), `GET /api/jobs/my-active-ids` (feeds global provider), `PusherProvider.tsx` global context (single shared client, subscribes active jobs, top-right `react-hot-toast` "New message from [name]"), unread badge in `ActiveChatsSidebar`, `senderName` added to `new-message` Pusher payload, chat page marks-read on open (cache update, no invalidation) | Manual dual-browser playback of TestChecklist rows 16–18 (API surface fully E2E-verified 30/30; toast + live-map marker need real browsers) | `react-hot-toast` added as the one new dependency (task-specified; sonner toasts untouched); read-mark updates only the unread-counts cache — never touch the message-list query key |
 | Aug 14 | Days 38–40: `POST /api/payments/initiate` (poster-only, Khalti initiation, stores `pidx` on Job), `GET /api/payments/khalti/verify` (server-side lookup, 90/10 payout split, PaymentTransaction unique index for idempotency), `PaymentTransaction` model, `Payout` model, Job model extended with payment fields, `.env.example` with payment variables | Payment UI, success/failure pages, eSewa implementation, actual driver payout transfer | Khalti uses paisa (NPR × 100); verification never trusts redirect params; eSewa returns 501 Not Implemented |
+| Aug 15 | Days 41–44: eSewa v2 HMAC initiation (`src/lib/payments/esewa.ts`), eSewa server-side verify (`/api/payments/esewa/verify`), unified payment abstraction (`src/lib/payments/index.ts`), admin payout endpoints (`GET/PATCH /api/admin/payouts` + `/:id`), auto-payout creation on job delivered | Frontend form submission for eSewa, payment success/failure pages | eSewa uses form POST (not redirect); signature verification must match signed_field_names order; admin endpoints require role="admin" |
 
 ---
 
@@ -119,6 +120,9 @@
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | `src/app/api/uploads/sign/route.ts` |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | `src/app/api/auth/[...nextauth]/route.ts` |
 | `NODE_ENV` | cookie `secure` flag |
+| `KHALTI_SECRET_KEY` | `src/lib/payments/khalti.ts` |
+| `ESEWA_SECRET_KEY`, `ESEWA_MERCHANT_CODE` | `src/lib/payments/esewa.ts` |
+| `PAYMENT_SUCCESS_URL`, `PAYMENT_FAILURE_URL` | `src/lib/payments/khalti.ts`, `src/lib/payments/esewa.ts` |
 
 ---
 

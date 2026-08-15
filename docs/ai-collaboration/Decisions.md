@@ -6,6 +6,16 @@ Format: newest at the top. Every decision gets the **model/session** that made i
 
 ---
 
+## D-30 — Unified payment abstraction + eSewa implementation
+
+**Status:** Accepted · **Model:** project session (Days 41–44) · **Applies to:** `src/lib/payments/esewa.ts`, `src/lib/payments/index.ts`, `src/app/api/payments/initiate/route.ts`, `src/app/api/payments/esewa/verify/route.ts`, `src/app/api/admin/payouts/route.ts`, `src/app/api/admin/payouts/[id]/route.ts`
+
+**Decision:** A `PaymentInitResult` union (`redirect` | `form`) is the single contract for all gateways. `initiatePayment(gateway, job, poster)` routes to Khalti or eSewa inside `src/lib/payments/index.ts`; route handlers contain no gateway-specific logic. eSewa initiation signs HMAC-SHA256 over `total_amount,transaction_uuid,product_code` and returns a hidden-form POST target (not a redirect). eSewa verify decodes a base64 `data` query param, recomputes the HMAC over `signed_field_names` order, and rejects on mismatch.
+
+**Why:** Khalti redirects to a JS URL; eSewa requires a server-rendered form POST with an HMAC signature. A single abstraction lets the initiate route stay gateway-agnostic. Verifying the signature server-side (not trusting the redirect params) is the same security posture as Khalti's lookup verification — base64 corruption or tampering must fail closed.
+
+---
+
 ## D-29 — Khalti payment backend (sandbox)
 
 **Status:** Accepted · **Model:** opencode session (Days 38–40) · **Applies to:** `src/lib/payments/khalti.ts`, `src/app/api/payments/initiate/route.ts`, `src/app/api/payments/khalti/verify/route.ts`
