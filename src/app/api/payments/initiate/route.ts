@@ -4,7 +4,7 @@ import connectDB from "@/lib/db";
 import Job from "@/models/Job";
 import User from "@/models/User";
 import { withRole } from "@/lib/auth";
-import { initiateKhalti } from "@/lib/payments/khalti";
+import { initiatePayment } from "@/lib/payments";
 import type { JwtAccessPayload } from "@/types/auth/auth";
 
 const initiatePaymentSchema = z.object({
@@ -31,13 +31,6 @@ async function handleInitiatePayment(
 
     const { jobId, gateway } = parsed.data;
 
-    if (gateway === "esewa") {
-      return NextResponse.json(
-        { message: "eSewa payment gateway will be implemented separately" },
-        { status: 501 }
-      );
-    }
-
     const job = await Job.findById(jobId);
     if (!job) {
       return NextResponse.json({ message: "Job not found" }, { status: 404 });
@@ -62,17 +55,20 @@ async function handleInitiatePayment(
       return NextResponse.json({ message: "User not found" }, { status: 404 });
     }
 
-    const result = await initiateKhalti(job, poster);
+    const result = await initiatePayment(gateway, job, poster);
 
-    job.paymentPidx = result.pidx;
-    job.paymentGateway = "khalti";
+    if (gateway === "khalti" && result.method === "redirect" && result.pidx) {
+      job.paymentPidx = result.pidx;
+    }
+    
+    if (gateway === "khalti") {
+      job.paymentGateway = "khalti";
+    }
+    
     job.paymentStatus = "initiated";
     await job.save();
 
-    return NextResponse.json({
-      method: result.method,
-      url: result.url,
-    });
+    return NextResponse.json(result);
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "Failed to initiate payment";
