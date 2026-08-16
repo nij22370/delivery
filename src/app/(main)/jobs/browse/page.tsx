@@ -17,7 +17,8 @@ const BROWSE_ENDPOINT = "/api/jobs";
 const POSTER_ROLE = "poster";
 const DASHBOARD_PATH = "/dashboard";
 const MIN_PAYOUT_MIN = 0;
-const MIN_PAYOUT_MAX = 200;
+const MIN_PAYOUT_MAX = 5000;
+const MIN_PAYOUT_STEP = 100;
 const MIN_PAYOUT_DEFAULT = 0;
 
 const DISTANCE_RADIUS_OPTIONS = [
@@ -68,7 +69,7 @@ interface JobsApiResponse {
 async function fetchBrowseJobs(
   page: number,
   selectedVehicleTypes: JobVehicleType[],
-  minPayoutCents: number
+  minPayoutNpr: number
 ): Promise<JobsApiResponse> {
   const params = new URLSearchParams({
     status: JOB_STATUS.POSTED,
@@ -90,8 +91,8 @@ async function fetchBrowseJobs(
     );
   }
 
-  if (minPayoutCents > 0) {
-    filteredJobs = filteredJobs.filter((job) => job.offeredPrice >= minPayoutCents);
+  if (minPayoutNpr > 0) {
+    filteredJobs = filteredJobs.filter((job) => job.offeredPrice >= minPayoutNpr);
   }
 
   return { ...data, jobs: filteredJobs };
@@ -138,7 +139,7 @@ function JobCard({ job }: { job: JobListing }) {
             {job.pickupDate} · {job.pickupTimeWindow}
           </p>
           <p className="text-xl font-bold text-on-surface shrink-0">
-            ${(job.offeredPrice / 100).toFixed(2)}
+            NPR {job.offeredPrice.toLocaleString("en-NP")}
           </p>
         </div>
 
@@ -186,7 +187,7 @@ interface FiltersSidebarProps {
   onVehicleTypeToggle: (vehicleType: JobVehicleType) => void;
   distanceRadius: string;
   onDistanceRadiusChange: (value: string) => void;
-  minPayoutDollars: number;
+  minPayoutNpr: number;
   onMinPayoutChange: (value: number) => void;
 }
 
@@ -195,7 +196,7 @@ function FiltersSidebar({
   onVehicleTypeToggle,
   distanceRadius,
   onDistanceRadiusChange,
-  minPayoutDollars,
+  minPayoutNpr,
   onMinPayoutChange,
 }: FiltersSidebarProps) {
   return (
@@ -273,17 +274,17 @@ function FiltersSidebar({
             id="browse-min-payout"
             min={MIN_PAYOUT_MIN}
             max={MIN_PAYOUT_MAX}
-            step={1}
-            value={minPayoutDollars}
+            step={MIN_PAYOUT_STEP}
+            value={minPayoutNpr}
             onChange={(e) => onMinPayoutChange(Number(e.target.value))}
             className="w-full accent-primary cursor-pointer"
           />
           <div className="flex justify-between items-center mt-1">
-            <span className="text-xs text-on-surface-variant">$0</span>
+            <span className="text-xs text-on-surface-variant">NPR 0</span>
             <span className="text-xs font-semibold text-on-surface">
-              {minPayoutDollars === 0 ? "No minimum" : `Min $${minPayoutDollars}`}
+              {minPayoutNpr === 0 ? "No minimum" : `Min NPR ${minPayoutNpr.toLocaleString("en-NP")}`}
             </span>
-            <span className="text-xs text-on-surface-variant">${MIN_PAYOUT_MAX}+</span>
+            <span className="text-xs text-on-surface-variant">NPR {MIN_PAYOUT_MAX.toLocaleString("en-NP")}+</span>
           </div>
         </div>
       </div>
@@ -306,16 +307,11 @@ export default function BrowseJobsPage() {
   const [page, setPage] = useState(1);
   const [selectedVehicleTypes, setSelectedVehicleTypes] = useState<JobVehicleType[]>([]);
   const [distanceRadius, setDistanceRadius] = useState<string>(DISTANCE_RADIUS_OPTIONS[1]);
-  const [minPayoutDollars, setMinPayoutDollars] = useState(MIN_PAYOUT_DEFAULT);
-
-  const minPayoutCents = useMemo(
-    () => Math.round(minPayoutDollars * 100),
-    [minPayoutDollars]
-  );
+  const [minPayoutNpr, setMinPayoutNpr] = useState(MIN_PAYOUT_DEFAULT);
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: [JOBS_QUERY_KEY, page, selectedVehicleTypes, minPayoutCents],
-    queryFn: () => fetchBrowseJobs(page, selectedVehicleTypes, minPayoutCents),
+    queryKey: [JOBS_QUERY_KEY, page, selectedVehicleTypes, minPayoutNpr],
+    queryFn: () => fetchBrowseJobs(page, selectedVehicleTypes, minPayoutNpr),
     enabled: isDriver,
   });
 
@@ -333,7 +329,7 @@ export default function BrowseJobsPage() {
   }, []);
 
   const handleMinPayoutChange = useCallback((value: number) => {
-    setMinPayoutDollars(value);
+    setMinPayoutNpr(value);
     setPage(1);
   }, []);
 
@@ -379,7 +375,7 @@ export default function BrowseJobsPage() {
             onVehicleTypeToggle={handleVehicleTypeToggle}
             distanceRadius={distanceRadius}
             onDistanceRadiusChange={handleDistanceRadiusChange}
-            minPayoutDollars={minPayoutDollars}
+            minPayoutNpr={minPayoutNpr}
             onMinPayoutChange={handleMinPayoutChange}
           />
 

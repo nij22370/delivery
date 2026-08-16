@@ -97,6 +97,16 @@ src/
 | GET `/api/drivers/:id` | public | public profile + totalDeliveries |
 | GET `/api/drivers/:id/reviews` | public | paginated reviews |
 
+### Payments & Payouts (Days 38–48)
+| Method/Route | Access | Purpose |
+| --- | --- | --- |
+| POST `/api/payments/initiate` | poster | validate job is `accepted` + assigned + unpaid; returns `{ method: "redirect", url }` (Khalti) or `{ method: "form", params, url }` (eSewa) |
+| GET `/api/payments/khalti/verify` | public (gateway callback) | lookup API verify → idempotent single Payout → redirect job detail / payment failure |
+| GET `/api/payments/esewa/verify` | public (gateway callback) | HMAC recompute + decode `data` → idempotent single Payout → redirect |
+| GET `/api/drivers/payouts` | driver | own payouts (createdAt desc) + `totalEarned`/`pendingPayout`; **unpaginated — see BUG-06** |
+| GET `/api/admin/payouts` | admin | payout queue + search + pagination |
+| PATCH `/api/admin/payouts/:id` | admin | mark paid / failed |
+
 ### Ratings
 | Method/Route | Access | Purpose |
 | --- | --- | --- |

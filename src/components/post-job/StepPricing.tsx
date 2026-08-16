@@ -41,7 +41,7 @@ export default function StepPricing({
   locationData,
   vehicleType,
 }: StepPricingProps) {
-  const [suggestedPriceCents, setSuggestedPriceCents] = useState<number | undefined>();
+  const [suggestedPriceNpr, setSuggestedPriceNpr] = useState<number | undefined>();
   const [distanceMiles, setDistanceMiles] = useState<number | undefined>();
   // Starts "calculating" whenever addresses and a vehicle are present; the
   // async suggestion callbacks flip it off. Avoids a synchronous setState in
@@ -68,19 +68,19 @@ export default function StepPricing({
       .then((result) => {
         if (!isActive) return;
         if (result) {
-          setSuggestedPriceCents(result.suggestedPriceCents);
+          setSuggestedPriceNpr(result.suggestedPriceNpr);
           setDistanceMiles(result.distanceMiles);
-          setValue("offeredPrice", result.suggestedPriceCents, { shouldValidate: false });
+          setValue("offeredPrice", result.suggestedPriceNpr, { shouldValidate: false });
         } else {
           // Suggestion unavailable (e.g. address could not be geocoded) — clear
           // any previous values so the UI never shows stale pricing.
-          setSuggestedPriceCents(undefined);
+          setSuggestedPriceNpr(undefined);
           setDistanceMiles(undefined);
         }
       })
       .catch(() => {
         if (!isActive) return;
-        setSuggestedPriceCents(undefined);
+        setSuggestedPriceNpr(undefined);
         setDistanceMiles(undefined);
       })
       .finally(() => {
@@ -101,8 +101,8 @@ export default function StepPricing({
 
   const suggestedPriceLabel = isCalculating
     ? "Calculating suggested price..."
-    : suggestedPriceCents
-      ? `Suggested price: $${(suggestedPriceCents / 100).toFixed(2)}`
+    : suggestedPriceNpr
+      ? `Suggested price: NPR ${suggestedPriceNpr.toLocaleString("en-NP")}`
       : "Could not calculate a price suggestion";
 
   return (
@@ -123,8 +123,8 @@ export default function StepPricing({
               <div className="text-4xl font-bold text-primary mb-2">
                 {isCalculating ? (
                   <span className="text-xl animate-pulse">Calculating...</span>
-                ) : suggestedPriceCents ? (
-                  `$${(suggestedPriceCents / 100).toFixed(2)}`
+                ) : suggestedPriceNpr ? (
+                  `NPR ${suggestedPriceNpr.toLocaleString("en-NP")}`
                 ) : (
                   <span className="text-xl text-on-surface-variant">N/A</span>
                 )}
@@ -147,21 +147,21 @@ export default function StepPricing({
                 Your Offer (Agreed Price) *
               </label>
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant font-medium select-none">
-                  $
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant font-medium select-none text-xs">
+                  NPR
                 </span>
                 <input
                   {...register("offeredPrice", { valueAsNumber: true })}
                   type="number"
                   id="post-job-offered-price"
-                  placeholder="45.00"
+                  placeholder="1500"
                   min="1"
                   step="1"
-                  className={`${INPUT_CLASS} pl-8`}
+                  className={`${INPUT_CLASS} pl-14`}
                 />
               </div>
               <p className="text-xs text-on-surface-variant">
-                Enter the amount in cents (e.g. 4500 = $45.00). Couriers are more likely to
+                Enter the amount in NPR (e.g. 1500). Couriers are more likely to
                 accept offers at or above the suggested price.
               </p>
               <FormFieldError message={errors.offeredPrice?.message} />

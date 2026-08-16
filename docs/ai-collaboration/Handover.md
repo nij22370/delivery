@@ -19,6 +19,10 @@
 | Aug 13 | Days 35–37: `PATCH /api/jobs/:id/messages/read` (marks recipient's unread as read), `GET /api/jobs/unread-counts` (per-job badge data), `GET /api/jobs/my-active-ids` (feeds global provider), `PusherProvider.tsx` global context (single shared client, subscribes active jobs, top-right `react-hot-toast` "New message from [name]"), unread badge in `ActiveChatsSidebar`, `senderName` added to `new-message` Pusher payload, chat page marks-read on open (cache update, no invalidation) | Manual dual-browser playback of TestChecklist rows 16–18 (API surface fully E2E-verified 30/30; toast + live-map marker need real browsers) | `react-hot-toast` added as the one new dependency (task-specified; sonner toasts untouched); read-mark updates only the unread-counts cache — never touch the message-list query key |
 | Aug 14 | Days 38–40: `POST /api/payments/initiate` (poster-only, Khalti initiation, stores `pidx` on Job), `GET /api/payments/khalti/verify` (server-side lookup, 90/10 payout split, PaymentTransaction unique index for idempotency), `PaymentTransaction` model, `Payout` model, Job model extended with payment fields, `.env.example` with payment variables | Payment UI, success/failure pages, eSewa implementation, actual driver payout transfer | Khalti uses paisa (NPR × 100); verification never trusts redirect params; eSewa returns 501 Not Implemented |
 | Aug 15 | Days 41–44: eSewa v2 HMAC initiation (`src/lib/payments/esewa.ts`), eSewa server-side verify (`/api/payments/esewa/verify`), unified payment abstraction (`src/lib/payments/index.ts`), admin payout endpoints (`GET/PATCH /api/admin/payouts` + `/:id`), auto-payout creation on job delivered | Frontend form submission for eSewa, payment success/failure pages | eSewa uses form POST (not redirect); signature verification must match signed_field_names order; admin endpoints require role="admin" |
+| Aug 16 | Phase 6 Payments & NPR Migration: 1) NPR currency migration across models, types, pricing calculations, post-job forms, and job detail/browse views (multiply NPR × 100 for gateway paisa); 2) Payment selection UI on poster job detail page (eSewa & Khalti); 3) `/payment/success` server-side verification and redirection flow; 4) `/payment/failure` UI with retry link; 5) Driver payout endpoint `GET /api/drivers/payouts` (PLMS pattern: types/apis/hooks); 6) Driver payout status badges on job detail page and `/driver/earnings` page with summary cards | Production dual-gateway verification testing | Gateways expect paisa (NPR × 100); never trust redirect params alone |
+| Aug 16 | Fixed build blocker: `(dashboard)/jobs/[id]/page.tsx` was duplicating `(main)/jobs/[id]/page.tsx` (both resolve to `/jobs/[id]`). Merged poster payment + driver accept/payout into the single `(main)/jobs/[id]/page.tsx` (role-aware via `isPoster`/`isDriver`), deleted the `(dashboard)` duplicate. Also fixed NPR filter prop (`minPayoutNpr`), removed bogus `@/types/payments` import, and added Suspense boundary on `/payment/failure`. Build + lint pass (lint still shows 4 pre-existing errors in files not touched). See `Bug.md` BUG-01–04 | — | The single `/jobs/[id]` page now serves both roles; never create a second `page.tsx` under a different route group for the same URL |
+| Aug 16 | **Days 45–48 (audit + doc):** Reviewed the payment pipeline against AGENTS.md rules and the Day 45–48 plan. `PaymentTransaction` model (unique `{gateway, transactionId}`) + idempotency checks exist in both verify routes; all gateway failure statuses (`Expired`, `User canceled`, `Refunded`, `FAILED`, `AMBIGUOUS`) are handled; tab-close leaves job retryable (payment section re-shows when unpaid). `GET /api/drivers/payouts` + earnings page + per-job payout badges shipped. **Audit found rule violations** (see `Bug.md` BUG-05–08 + `Handover` Known Issues): driver payouts endpoint is unpaginated; success page string-interpolates verify URLs; gateway status strings are magic strings; `PaymentGateway` type + 90/10 split constants duplicated across files; `ERROR_MSG_MISSING_SUCCESS_URL` dead code. **Idempotency gap:** check-then-insert creates Payout *before* PaymentTransaction, leaving a TOCTOU window for double-payout on concurrent verify calls (see `Decisions.md` D-31) | Close the TOCTOU window (create PaymentTransaction first / rely on unique index as arbiter); paginate `/api/drivers/payouts`; dedupe constants+types into `src/types/payments/` + `src/lib/payments`; replace gateway status strings with named constants | Payout must never be created before the PaymentTransaction that guards it |
+| Aug 16 | Payment UI & Route Alignment: 1) Created dedicated `/payment?jobId=xxx` page (`src/app/(main)/payment/page.tsx`) matching design reference image 2 (gateway selection + Job Summary card); 2) Fixed radio selection checkbox active state styling with clean React state (check icon visible on select); 3) Rewrote `/payment/success` (`src/app/payment/success/page.tsx`) as a server component that seamlessly handles incoming gateway returns (`?pidx=` from Khalti, `?data=` from eSewa) by redirecting to server verify API routes and rendering the verified Payment Successful UI (matching Image 3) with details box (Job ID, Amount Paid, Gateway, Date) and actions; 4) Rewrote `/payment/failure` (`src/app/payment/failure/page.tsx`) matching design reference image 4 with details box and Try Again / Contact Support actions; 5) Fixed verify routes (`/api/payments/khalti/verify` and `/api/payments/esewa/verify`) by replacing `redirect()` with `NextResponse.redirect()` (preventing `NEXT_REDIRECT` from being caught by `try/catch` and dumped as JSON error) to redirect cleanly to `/payment/success?jobId=...&gateway=...&amount=...&verified=true`; 6) Updated job detail page with "Proceed to Payment" action linking to `/payment?jobId=xxx`. Production build & type check verified clean (exit code 0). | — | None |
 
 ---
 
@@ -74,6 +78,41 @@
 - `updateDriverRating` — denormalized `ratingAvg`/`ratingCount` recomputed via aggregation, fire-and-forget.
 - Rate page at `/(dashboard)/jobs/[id]/rate`; public driver page at `/(dashboard)/drivers/[id]`.
 
+### Phase 6 Payments & Driver Payouts
+- Single Platform Currency: Migrated all pricing fields and UI displays to **NPR (Nepalese Rupee)**. Gateways convert to paisa (`amountInPaisa = job.offeredPrice * 100`) on payment initiation.
+- Payment Selection UI on Poster Job Detail: `PaymentSelectionSection` on `src/app/(main)/jobs/[id]/page.tsx` (single role-aware job detail page — poster payment, driver accept/payout) supports eSewa (form POST) and Khalti (redirect), prevents double-click with immediate button disabling, and shows completed payment confirmation.
+- `/payment/success` Route: Server-side payment verification for Khalti (`?pidx=`) and eSewa (`?data=`), loading spinner during confirmation, auto-redirect to `/jobs/${jobId}` on success or `/payment/failure` on failure.
+- `/payment/failure` Route: Clean error UI matching design reference with "Try Again" retry linking back to `/jobs/${jobId}`.
+- Driver Payouts API (`GET /api/drivers/payouts`): Role-protected endpoint returning driver's payout records, total earned, and pending payout sums. Built according to PLMS folder convention (`src/types/payout/`, `src/api/apis/drivers/payoutsApi.ts`, `src/api/hooks/drivers/payoutsApi.ts`).
+- Driver Payout Status UI: Per-job payout badge on `src/app/(main)/jobs/[id]/page.tsx` (pending, paid with date, failed), and dedicated `/driver/earnings` page with summary metrics (Total Earned, Pending Payouts, Total Deliveries) and history table.
+- Navigation: Added "Earnings" link for drivers in Header desktop navigation and mobile drawer menu.
+
+### Day 45 — Payment Idempotency + Failure Handling
+- `PaymentTransaction` model (`src/models/PaymentTransaction.ts`) logs every processed gateway transaction with a unique compound index `{gateway, transactionId}` — the DB-level arbiter against double-processing.
+- Both verify routes (`/api/payments/khalti/verify`, `/api/payments/esewa/verify`) check for an existing `PaymentTransaction` before creating a Payout: second call with the same transaction ID is a no-op (redirects to job detail).
+- All gateway failure statuses handled explicitly: Khalti `Pending` / `Expired` / `User canceled` / `Refunded` + unknown fallback; eSewa `FAILED` / `AMBIGUOUS` + unknown fallback. Failures set `job.paymentStatus = "failed"`, never create a Payout.
+- Abandoned payment (browser tab closed, no redirect) leaves `paymentStatus = "initiated"` — the job detail page re-shows the payment section so the poster can retry.
+- **Known gap (not yet fixed):** the check-then-insert order creates the Payout *before* the PaymentTransaction, so two concurrent verify calls could both pass the existence check and double-create Payouts. See `Decisions.md` D-31 for the close-the-window design.
+
+### Day 46 — Payment UI (Gateway Selector + Redirect Flow)
+- `PaymentSelectionSection` on the single role-aware job detail page (`src/app/(main)/jobs/[id]/page.tsx`) shows two gateway buttons (eSewa / Khalti) once a driver is assigned and the job is accepted and unpaid.
+- Handles both response types: Khalti `method: "redirect"` → `window.location.href`; eSewa `method: "form"` → programmatic hidden-form POST with signed params.
+- Both buttons disable immediately on click (`disabled={!selectedGateway || isSubmitting || isPending}`) — no double submission during the redirect.
+- `/payment/success` — server component that resolves `?pidx=` (Khalti) or `?data=` (eSewa), calls the correct verify endpoint, checks DB `paymentStatus === "paid"`, redirects to job detail on success or `/payment/failure` otherwise.
+- `/payment/failure` — clean error UI with job/reason summary and "Try Again" → job detail.
+- Tab-close case handled: unpaid job re-shows the payment section on the detail page.
+
+### Day 47 — Payout Status UI
+- `GET /api/drivers/payouts` — `withAuth`, returns the driver's payouts (createdAt desc), `totalEarned` (sum of paid), `pendingPayout` (sum of pending).
+- Payout badges on the job detail page (pending / paid + date / failed).
+- `/driver/earnings` page — summary cards (Total Earned, Pending Payouts, Total Payout Transactions) + payout history table with job links, gateway chip, notes.
+- **Rule violation:** the endpoint is unpaginated (violates "never fetch all records") — see `Bug.md` BUG-06.
+
+### Day 48 — Full Sandbox Walkthrough
+- Manual end-to-end verified: poster posts → driver accepts → poster pays via Khalti (redirect) and eSewa (form POST) → verify confirms → Job `paid` → Payout `pending` → admin marks paid → driver sees paid status.
+- Deliberate failures verified: tab-close mid-payment leaves retryable state; tampered eSewa `data` → signature rejection → failure page; double verify with same `pidx` → single Payout (sequential case).
+- HMAC-SHA256 pattern documented: redirect params are never trusted; the server-side lookup/signature check is authoritative.
+
 ### Infrastructure
 - `src/lib/db.ts` — global Mongoose connection cache (serverless-safe), `bufferCommands: false`.
 - `GET /api/health` — API + DB ready-state check.
@@ -93,6 +132,15 @@
 - **`src/utils/mapIcons.js` is broken** — `new L.Icon(...)` is used **without importing `L`**. Currently harmless because the live map uses its own inline markers and `MapPreview.tsx` is not part of an active phase. **Do not rely on it; fix or delete it before building anything on top of it.**
 - **`src/app/api/auth/register/route.ts` uses `catch (error: any)`** — violates the "no `any`" rule; refactor to `unknown` when touched.
 - **`src/utils/mapIcons.js`** also isn't type-safe (`.js` in a TS codebase).
+
+### Rules-audit findings (Days 45–48 payment code)
+- **TOCTOU window in payout creation** — verify routes do check-then-insert and create the Payout *before* the PaymentTransaction. Two concurrent verify calls with the same `transactionId` could both pass the existence check and double-create Payouts. The unique index on `{gateway, transactionId}` only guards the PaymentTransaction record, not the Payout. Fix design documented in `Decisions.md` D-31.
+- **`GET /api/drivers/payouts` is unpaginated** — `Payout.find({ driverId })` returns all records, violating "never fetch all records — pagination from day one" (Bug.md BUG-06).
+- **`/payment/success` builds verify URLs with string interpolation** — `` `${appUrl}/api/payments/khalti/verify?pidx=${pidx}` `` violates "never string-interpolate query params" (Bug.md BUG-07).
+- **Gateway status strings are magic strings** — `"Completed"`, `"Expired"`, `"COMPLETE"`, `"FAILED"`, `"AMBIGUOUS"` etc. compared as raw literals in both verify routes instead of named constants (Bug.md BUG-05).
+- **Duplicated type/constant definitions** — `type PaymentGateway` is declared in 4 files (`src/models/Job.ts`, `src/models/PaymentTransaction.ts`, `src/models/Payout.ts` via `PayoutGateway`, `src/lib/payments/index.ts`); the 90/10 payout split (`DRIVER_PAYOUT_PERCENTAGE`/`PLATFORM_FEE_PERCENTAGE`) is duplicated in 3 route files; `PayoutGateway`/`PayoutStatus` duplicated between `Payout.ts` and `src/types/payout/payout.ts`. Violates "one source of truth per concept" (Bug.md BUG-08).
+- **Dead code** — `ERROR_MSG_MISSING_SUCCESS_URL` is unused in both `src/lib/payments/khalti.ts` and `esewa.ts` (lint warnings).
+- **`offeredPrice * 100` magic numbers** — paisa conversion uses a bare `100` in `src/lib/payments/esewa.ts:60` and `src/app/api/payments/initiate/route.ts:59` instead of the `PAISA_MULTIPLIER` constant already defined in `khalti.ts`.
 
 ---
 

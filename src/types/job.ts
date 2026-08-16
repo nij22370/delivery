@@ -48,7 +48,7 @@ export const jobCreationSchema = z.object({
   packageDescription: z.string().max(500).optional(),
   offeredPrice: z
     .number()
-    .int("Price must be a whole number of cents")
+    .int("Price must be a whole number in NPR")
     .positive("Price must be greater than zero"),
   pickupDate: z.string().min(1, "Please select a pickup date"),
   pickupTimeWindow: z.string().min(1, "Please select a time window"),

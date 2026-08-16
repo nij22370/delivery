@@ -54,7 +54,13 @@ After starting `npm run dev`, walk these flows against `http://localhost:3000`. 
 | 16 | Read receipts + unread badge | two sessions (poster+driver on an accepted job): sender sends a chat message, receiver stays on job list | unread badge shows the count on the receiver's job list; badge clears the moment the receiver opens that job's chat (no refetch — cache update) |
 | 17 | Off-screen toast | sender is on a different page, receiver sends a chat message | toast "New message from [name]" appears top-right; **no** toast when already on that job's chat page; no toast for your own echoed message |
 | 18 | Dual-session live tracking + chat (Day 37) | same job open in two browsers (poster + driver); driver pings location while poster watches the map | message arrives live on receiver; `readAt` null until chat opened then populated in DB; vehicle marker updates live; no stale/duplicate Pusher subscriptions, no key warnings, no Pusher auth failures in the console |
-
+| 19 | Khalti redirect payment (Day 46) | poster on accepted job with assigned driver, select Khalti, pay in sandbox | window redirects to Khalti; after payment returns via /payment/success; Job paymentStatus becomes paid; exactly one Payout created (pending) |
+| 20 | eSewa form payment (Day 46) | poster selects eSewa; sandbox form submits signed params | hidden form POSTs to eSewa; return via /payment/success; job paid; one Payout created |
+| 21 | Double verify is a no-op (Day 45) | hit verify twice with the same transactionId/pidx sequentially | second call redirects without creating a second Payout; Payout count stays 1 |
+| 22 | Payment failure statuses (Day 45) | force Expired/User canceled/Refunded (Khalti) and FAILED/AMBIGUOUS (eSewa) | job paymentStatus = failed, no Payout created, user lands on /payment/failure with retry link |
+| 23 | Abandoned payment retry (Day 45) | close the tab mid-redirect / never return from gateway | job stays retryable: payment section re-shows on job detail; poster can pay again |
+| 24 | Payout status UI (Day 47) | driver opens /driver/earnings and job detail after admin marks payout paid | earnings cards show correct totals; payout history table shows gateway + status + date; job detail badge shows paid/pending/failed |
+| 25 | Manual payment verify (both gateways) | poster logs in, job accepted + driver assigned; Khalti: GET /api/payments/khalti/verify?pidx=<pidx>; eSewa: GET /api/payments/esewa/verify?data=<base64> | verify returns a redirect to the job detail; Job paymentStatus becomes paid; exactly one Payout (pending) appears in the driver's /driver/earnings and the admin payout queue; repeat call with same pidx/data is a no-op |
 **Rule:** if a flow you touched is not in the table, add it. The table is the living definition of "works."
 
 ---

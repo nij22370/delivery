@@ -55,7 +55,9 @@ async function handleInitiatePayment(
       return NextResponse.json({ message: "User not found" }, { status: 404 });
     }
 
-    const result = await initiatePayment(gateway, job, poster);
+    // Convert NPR to paisa for payment gateways
+    const amountInPaisa = job.offeredPrice * 100;
+    const result = await initiatePayment(gateway, job, poster, amountInPaisa);
 
     if (gateway === "khalti" && result.method === "redirect" && result.pidx) {
       job.paymentPidx = result.pidx;

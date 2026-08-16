@@ -784,3 +784,43 @@ Khalti may redirect the user multiple times (e.g., page reload, back button). Wi
 - Single `POST /api/payments/initiate` handles both gateways via `PaymentInitResult`.
 - Admin can list pending payouts and mark them paid with notes.
 - Both gateways work end-to-end after Day 43 refactor.
+
+---
+
+## Days 45–48 — Idempotency + Payment UI + Payout Status UI + Sandbox Walkthrough
+
+### Day 45 — Payment Idempotency & Failure Handling
+- **PaymentTransaction model** (`src/models/PaymentTransaction.ts`): logs every processed gateway transaction; unique compound index `{gateway, transactionId}` is the DB-level idempotency arbiter (prevents double-processing).
+- **Verify routes are idempotent**: both `/api/payments/khalti/verify` and `/api/payments/esewa/verify` `findOne` an existing PaymentTransaction before creating a Payout; a second call with the same transaction ID is a no-op redirect to the job detail page.
+- **All gateway failure statuses handled explicitly**: Khalti `Pending`, `Expired`, `User canceled`, `Refunded` + unknown fallback; eSewa `FAILED`, `AMBIGUOUS` + unknown fallback. Failures set `job.paymentStatus = "failed"` and never create a Payout.
+- **Abandoned payment**: closing the tab mid-payment (no return redirect) leaves `paymentStatus = "initiated"` — the job detail page re-shows the payment section so the poster can retry.
+- **Learning prompt (answer) — "How do I close the window between 'check if exists' and 'save the record'?":** A `findOne` check followed by a `create` is two separate operations — two concurrent calls can both pass the check before either insert, so the check is not an arbiter. The fix is to make the insert itself the arbiter: rely on the unique index by inserting the `PaymentTransaction` first and catching the duplicate-key error (`E11000`); on `E11000`, treat it as "already processed" and skip Payout creation. **Current code does NOT yet do this** — it creates the Payout before the PaymentTransaction, leaving a TOCTOU window for concurrent double-verify (see `Decisions.md` D-31). This is the single most important hardening item outstanding.
+
+### Day 46 — Payment UI (Gateway Selector + Redirect/Form Flow)
+- **`PaymentSelectionSection`** on the role-aware job detail page (`src/app/(main)/jobs/[id]/page.tsx`) shows eSewa + Khalti buttons only when the job is `accepted`, has an assigned driver, and is unpaid.
+- **Both gateway response types handled**: Khalti `{method: "redirect"}` → `window.location.href`; eSewa `{method: "form"}` → programmatic hidden-form POST with signed params.
+- **No double-submission**: buttons disable immediately on click and while pending; one redirect per click.
+- **`/payment/success`** — server component resolving `?pidx=` (Khalti) or `?data=` (eSewa), calling the correct verify endpoint, checking the DB `paymentStatus`, and redirecting to the job detail on success or `/payment/failure` otherwise.
+- **`/payment/failure`** — clean error UI with job/reason summary + "Try Again" link back to job detail.
+
+### Day 47 — Payout Status UI
+- **`GET /api/drivers/payouts`** — `withAuth`; returns the driver's payouts (createdAt desc) plus `totalEarned` (sum of paid) and `pendingPayout` (sum of pending).
+- **Payout badges** on the job detail page (pending / paid + date / failed) so the driver sees what they are owed per job.
+- **`/driver/earnings`** page — summary cards (Total Earned, Pending Payouts, Total Payout Transactions) + payout history table with job links, gateway chip, and notes. "Earnings" nav link added for drivers in the Header (desktop + mobile drawer).
+- **Rule note (BUG-06):** the driver payouts endpoint is unpaginated, which violates "never fetch all records" — pagination is a planned follow-up.
+
+### Day 48 — Full Sandbox Walkthrough
+- Manual E2E verified with both gateways: poster posts → driver accepts → poster pays → verify confirms → Job `paid` → Payout `pending` → admin marks `paid` → driver sees paid status on earnings page and job badge.
+- Deliberate failure cases verified: tab-close mid-payment leaves a retryable state; tampered eSewa `data` is rejected (HMAC mismatch) and lands on the failure page; sequential double-verify with the same `pidx` creates exactly one Payout.
+
+### Rules Audit (Aug 16) — Summary
+- **Followed:** Mongoose HMR guard on all new models; no `any` (all catch blocks use `unknown` + `instanceof`); named constants for the 90/10 split; explicit gateway failure statuses; retryable-on-abandon; role-guarded admin/driver payout routes.
+- **Violations found** (traced in `Bug.md` BUG-05–08, designs in `Decisions.md` D-31): status strings are magic strings; `/api/drivers/payouts` unpaginated; `/payment/success` string-interpolates verify URLs; `PaymentGateway` type + 90/10 constants duplicated across files; `ERROR_MSG_MISSING_SUCCESS_URL` dead code; bare `100` paisa multiplier in eSewa + initiate routes; and the TOCTOU double-Payout window described above.
+
+### Architectural Decisions
+- **D-31 (proposed):** close the TOCTOU window by making the unique index the arbiter — insert PaymentTransaction first, treat `E11000` as already-processed, then create the Payout.
+
+### Verification (Day 48)
+- `npm run build` — clean (after BUG-01–04 fixes).
+- `npm run lint` — 19 problems / 4 errors, all pre-existing in files outside this feature (register page unescaped entities, `any` in auth register + errorResponse).
+- Manual sandbox walkthrough of both gateways + failure cases above. TestChecklist rows 19–24 added.

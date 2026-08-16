@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { redirect } from "next/navigation";
 import connectDB from "@/lib/db";
 import Job from "@/models/Job";
 import PaymentTransaction from "@/models/PaymentTransaction";
@@ -38,7 +37,9 @@ export async function GET(req: NextRequest) {
       decoded = JSON.parse(decodedString);
     } catch {
       const failureUrl = getEsewaPaymentFailureUrl();
-      return redirect(`${failureUrl}?reason=invalid_data`);
+      return NextResponse.redirect(
+        new URL(`${failureUrl}?reason=invalid_data`, req.url)
+      );
     }
 
     const {
@@ -67,7 +68,9 @@ export async function GET(req: NextRequest) {
 
     if (!isSignatureValid) {
       const failureUrl = getEsewaPaymentFailureUrl();
-      return redirect(`${failureUrl}?reason=invalid_signature`);
+      return NextResponse.redirect(
+        new URL(`${failureUrl}?reason=invalid_signature`, req.url)
+      );
     }
 
     const job = await Job.findOne({ paymentTransactionUuid: transaction_uuid });
@@ -82,12 +85,20 @@ export async function GET(req: NextRequest) {
       });
 
       if (existingTransaction) {
-        return redirect(`/jobs/${job._id}`);
+        return NextResponse.redirect(
+          new URL(
+            `/payment/success?jobId=${job._id}&gateway=esewa&amount=${job.offeredPrice}&verified=true`,
+            req.url
+          )
+        );
       }
 
       if (!job.driverId) {
-        const failureUrl = getEsewaPaymentFailureUrl();
-        return redirect(`${failureUrl}?reason=no_driver_assigned`);
+        const failureUrl = getEsewaPaymentFailureUrl(job._id.toString());
+        const separator = failureUrl.includes("?") ? "&" : "?";
+        return NextResponse.redirect(
+          new URL(`${failureUrl}${separator}reason=no_driver_assigned`, req.url)
+        );
       }
 
       job.paymentStatus = "paid";
@@ -115,19 +126,29 @@ export async function GET(req: NextRequest) {
         processedAt: new Date(),
       });
 
-      return redirect(`/jobs/${job._id}`);
+      return NextResponse.redirect(
+        new URL(
+          `/payment/success?jobId=${job._id}&gateway=esewa&amount=${job.offeredPrice}&verified=true`,
+          req.url
+        )
+      );
     }
+
+    const failureUrl = getEsewaPaymentFailureUrl(job?._id?.toString());
+    const separator = failureUrl.includes("?") ? "&" : "?";
 
     if (status === "FAILED" || status === "AMBIGUOUS") {
       job.paymentStatus = "failed";
       await job.save();
-      const failureUrl = getEsewaPaymentFailureUrl();
-      return redirect(`${failureUrl}?reason=${status}`);
+      return NextResponse.redirect(
+        new URL(`${failureUrl}${separator}reason=${status}`, req.url)
+      );
     }
 
     console.error(`Unknown eSewa payment status: ${status}`);
-    const failureUrl = getEsewaPaymentFailureUrl();
-    return redirect(`${failureUrl}?reason=unknown`);
+    return NextResponse.redirect(
+      new URL(`${failureUrl}${separator}reason=unknown`, req.url)
+    );
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "Failed to verify payment";
