@@ -26,13 +26,13 @@ function getEsewaMerchantCode(): string {
 }
 
 function getPaymentSuccessUrl(): string {
-  const url = process.env.PAYMENT_SUCCESS_URL;
-  if (!url) throw new Error(ERROR_MSG_MISSING_SUCCESS_URL);
-  return url;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  return `${appUrl}/payment/success`;
 }
 
-function getPaymentFailureUrl(): string {
-  return process.env.PAYMENT_FAILURE_URL || "/jobs";
+function getPaymentFailureUrl(jobId?: string): string {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  return jobId ? `${appUrl}/payment/failure?jobId=${jobId}` : `${appUrl}/payment/failure`;
 }
 
 export function generateEsewaSignature(
@@ -49,14 +49,16 @@ export function generateEsewaSignature(
 }
 
 export async function initiateEsewa(
-  job: IJob
+  job: IJob,
+  amountInPaisa?: number
 ): Promise<EsewaInitResult> {
   const merchantCode = getEsewaMerchantCode();
   const successUrl = getPaymentSuccessUrl();
-  const failureUrl = getPaymentFailureUrl();
+  const failureUrl = getPaymentFailureUrl(job._id.toString());
   
   const transactionUuid = crypto.randomUUID();
-  const amount = job.offeredPrice.toString();
+  const totalAmountPaisa = amountInPaisa ?? job.offeredPrice * 100;
+  const amount = totalAmountPaisa.toString();
   const taxAmount = "0";
   const totalAmount = amount;
   const productServiceCharge = "0";
@@ -89,8 +91,8 @@ export async function initiateEsewa(
   };
 }
 
-export function getEsewaPaymentFailureUrl(): string {
-  return getPaymentFailureUrl();
+export function getEsewaPaymentFailureUrl(jobId?: string): string {
+  return getPaymentFailureUrl(jobId);
 }
 
 export function verifyEsewaSignature(

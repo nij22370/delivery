@@ -138,3 +138,56 @@ Page/component → src/api/hooks/... (React Query hooks)
 ```
 
 **Key files:** `src/api/api.ts` (axios instance), `src/api/apis/{auth,jobs,drivers,ratings,admin}/...`, `src/api/hooks/{...}`, `src/components/providers/QueryProvider.tsx`.
+
+## 8. Payment Flow (Days 38-48)
+
+### 8a. Initiation (poster)
+`
+Poster clicks eSewa/Khalti on job detail (accepted + assigned + unpaid)
+   -> POST /api/payments/initiate  { gateway, jobId }
+       -> zod validate -> job must be accepted + assigned + paymentStatus != paid
+       -> driverPayout = offeredPrice * DRIVER_PAYOUT_PERCENTAGE (0.9)
+       -> initiatePayment(gateway, job, poster)
+            Khalti: create invoice -> { method: "redirect", url }
+            eSewa:  HMAC-SHA256(total_amount, transaction_uuid, product_code)
+                    -> { method: "form", params, url }
+   <- PaymentInitResult union (D-30)
+Client: redirect (window.location.href) or hidden-form POST (programmatic submit)
+`
+
+### 8b. Verification (server, never trust redirect params)
+`
+Khalti return ?pidx= -> /payment/success reads pidx
+   -> fetch /api/payments/khalti/verify?pidx=...
+       -> Khalti lookup API (authoritative) -> status
+       -> findOne PaymentTransaction {gateway, transactionId}
+            exists -> redirect job detail (no-op, already processed)
+       -> success: job.paymentStatus = paid; Payout.create; PaymentTransaction.create
+       -> failure statuses (Expired/User canceled/Refunded/unknown):
+            job.paymentStatus = failed; redirect /payment/failure
+   NOTE (BUG, see D-31): Payout is created BEFORE PaymentTransaction; the unique
+   index {gateway, transactionId} is on PaymentTransaction only, so concurrent
+   double-verify can double-create Payouts. Fix: insert PaymentTransaction first,
+   treat E11000 as already-processed.
+
+eSewa return ?data= -> /payment/success reads data
+   -> fetch /api/payments/esewa/verify?data=...
+       -> base64 decode + HMAC recompute over signed_field_names -> signature check
+       -> same idempotent Payout + status handling as Khalti
+`
+
+### 8c. Tab-close / retry
+`
+No return to /payment/success -> job.paymentStatus stays "initiated"
+   -> job detail re-shows payment section (unpaid) -> poster can pay again
+`
+
+### 8d. Payout lifecycle
+`
+verify success or job delivery -> Payout.create { pending, 90/10 split }
+   -> GET /api/drivers/payouts (earnings page, per-job badge)
+   -> admin PATCH /api/admin/payouts/:id -> paid (records paidAt) / failed
+   -> driver earnings page + job badge reflect new status
+`
+
+**Key files:** src/lib/payments/{index,khalti,esewa}.ts, src/app/api/payments/{initiate,khalti/verify,esewa/verify}/route.ts, src/models/{PaymentTransaction,Payout}.ts, src/app/payment/{success,failure}/page.tsx, src/app/(main)/jobs/[id]/page.tsx, src/app/(main)/driver/earnings/page.tsx, src/app/api/drivers/payouts/route.ts, src/app/api/admin/payouts/route.ts.

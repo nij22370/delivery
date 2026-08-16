@@ -6,23 +6,23 @@ import { JOB_VEHICLE_TYPE, type JobVehicleType } from "@/types/job";
 // Parcel et al.): a flat base fare per vehicle tier, plus a per-km rate for
 // distance beyond the free allowance. Each vehicle's rate tier encodes its
 // weight-capacity bracket (maxKg), so heavier vehicles carry a higher base
-// fare. Placeholder rates in USD cents — tune per market.
+// fare. Rates are stored in NPR.
 const EARTH_RADIUS_METERS = 6371e3;
 const METERS_PER_KM = 1000;
 const METERS_PER_MILE = 1609.344;
 
 export interface VehicleRateConfig {
-  baseCents: number; // flat pickup/handling fee
+  basePrice: number; // flat pickup/handling fee in NPR
   freeKm: number; // distance (km) included in the base fare
-  perKmCents: number; // charge per additional km
+  perKmPrice: number; // charge per additional km in NPR
   maxKg: number; // vehicle weight-capacity bracket (kg)
 }
 
 export const VEHICLE_RATES: Record<JobVehicleType, VehicleRateConfig> = {
-  [JOB_VEHICLE_TYPE.BICYCLE]: { baseCents: 500, freeKm: 2, perKmCents: 45, maxKg: 5 },
-  [JOB_VEHICLE_TYPE.CAR]: { baseCents: 700, freeKm: 2, perKmCents: 60, maxKg: 50 },
-  [JOB_VEHICLE_TYPE.VAN]: { baseCents: 1200, freeKm: 2, perKmCents: 90, maxKg: 500 },
-  [JOB_VEHICLE_TYPE.TRUCK]: { baseCents: 2000, freeKm: 2, perKmCents: 120, maxKg: 2000 },
+  [JOB_VEHICLE_TYPE.BICYCLE]: { basePrice: 150, freeKm: 2, perKmPrice: 30, maxKg: 5 },
+  [JOB_VEHICLE_TYPE.CAR]: { basePrice: 300, freeKm: 2, perKmPrice: 50, maxKg: 50 },
+  [JOB_VEHICLE_TYPE.VAN]: { basePrice: 600, freeKm: 2, perKmPrice: 80, maxKg: 500 },
+  [JOB_VEHICLE_TYPE.TRUCK]: { basePrice: 1200, freeKm: 2, perKmPrice: 120, maxKg: 2000 },
 };
 
 interface Coordinates {
@@ -31,7 +31,7 @@ interface Coordinates {
 }
 
 interface PriceSuggestion {
-  suggestedPriceCents: number;
+  suggestedPriceNpr: number;
   distanceKm: number;
   distanceMiles: number;
 }
@@ -90,7 +90,7 @@ export async function calculateSuggestedPrice(
     // Geocoding unavailable — fall back to the base fare so the UI always
     // shows a useful starting suggestion instead of N/A.
     return {
-      suggestedPriceCents: config.baseCents,
+      suggestedPriceNpr: config.basePrice,
       distanceKm: 0,
       distanceMiles: 0,
     };
@@ -101,10 +101,10 @@ export async function calculateSuggestedPrice(
   const distanceMiles = distanceMeters / METERS_PER_MILE;
 
   const billableKm = Math.max(0, distanceKm - config.freeKm);
-  const suggestedPriceCents = Math.round(config.baseCents + billableKm * config.perKmCents);
+  const suggestedPriceNpr = Math.round(config.basePrice + billableKm * config.perKmPrice);
 
   return {
-    suggestedPriceCents,
+    suggestedPriceNpr,
     distanceKm: Math.round(distanceKm * 10) / 10,
     distanceMiles: Math.round(distanceMiles * 10) / 10,
   };

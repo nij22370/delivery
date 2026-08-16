@@ -17,7 +17,7 @@ export interface IJob extends Document {
   dropoffPhone: string;
   vehicleType: JobVehicleType;
   packageDescription?: string;
-  offeredPrice: number;
+  offeredPrice: number; // stored in NPR
   pickupDate: string;
   pickupTimeWindow: string;
   paymentGateway?: PaymentGateway;
@@ -60,7 +60,7 @@ const jobSchema = new Schema<IJob>(
       required: true,
     },
     packageDescription: { type: String, default: null },
-    offeredPrice: { type: Number, required: true },
+    offeredPrice: { type: Number, required: true }, // stored in NPR
     pickupDate: { type: String, required: true },
     pickupTimeWindow: { type: String, required: true },
     paymentGateway: {

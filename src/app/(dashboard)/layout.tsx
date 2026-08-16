@@ -96,6 +96,21 @@ export default function DashboardLayout({
               </li>
             );
           })}
+
+          {/* Mobile: always show Jobs navigation, Desktop: hide jobs since it's in main navigation */}
+          <li className="md:hidden">
+            <Link
+              href="/jobs/browse"
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
+                pathname === "/jobs/browse"
+                  ? "bg-primary-container text-on-primary-container font-bold"
+                  : "text-secondary hover:bg-surface-container-high"
+              }`}
+            >
+              <span className="material-symbols-outlined">list_alt</span>
+              Browse Jobs
+            </Link>
+          </li>
         </ul>
 
         <div className="mt-auto pt-4 border-t border-secondary-container">

@@ -52,6 +52,14 @@ export default function Header() {
               Find Jobs
             </Link>
           )}
+          {isDriver && (
+            <Link
+              href="/driver/earnings"
+              className="text-sm text-on-surface-variant font-medium hover:text-primary transition-colors"
+            >
+              Earnings
+            </Link>
+          )}
           {(!user || isPoster) && (
             <Link
               href="/post-job"
@@ -160,6 +168,15 @@ export default function Header() {
                 className="text-sm text-on-surface font-medium py-3 border-b border-outline-variant/50 hover:text-primary transition-colors"
               >
                 Find Jobs
+              </Link>
+            )}
+            {isDriver && (
+              <Link
+                href="/driver/earnings"
+                onClick={handleCloseMobileMenu}
+                className="text-sm text-on-surface font-medium py-3 border-b border-outline-variant/50 hover:text-primary transition-colors"
+              >
+                Earnings
               </Link>
             )}
             {(!user || isPoster) && (

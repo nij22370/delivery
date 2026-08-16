@@ -12,10 +12,11 @@ export type PaymentInitResult =
 export async function initiatePayment(
   gateway: PaymentGateway,
   job: IJob,
-  poster: IUser
+  poster: IUser,
+  amountInPaisa?: number
 ): Promise<PaymentInitResult> {
   if (gateway === "khalti") {
-    const result = await initiateKhalti(job, poster);
+    const result = await initiateKhalti(job, poster, amountInPaisa);
     return {
       method: result.method,
       url: result.url,
@@ -24,7 +25,7 @@ export async function initiatePayment(
   }
 
   if (gateway === "esewa") {
-    return initiateEsewa(job);
+    return initiateEsewa(job, amountInPaisa);
   }
 
   throw new Error(`Unknown payment gateway: ${gateway}`);

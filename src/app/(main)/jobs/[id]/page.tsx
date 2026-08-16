@@ -1,15 +1,15 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { use, useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
 import { JOB_STATUS } from "@/types/job";
 import type { JobVehicleType } from "@/types/job";
-import { use } from "react";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
 import { apiFetch } from "@/utils/apiFetch";
+import { useDriverPayouts } from "@/api/hooks/drivers/payoutsApi";
+import { formatCompletedDate } from "@/utils/format";
 
 const MapPreview = dynamic(() => import("@/components/MapPreview"), { ssr: false });
 
@@ -57,6 +57,10 @@ interface JobDetail {
   offeredPrice: number;
   pickupDate: string;
   pickupTimeWindow: string;
+  paymentStatus?: string;
+  paymentGateway?: string;
+  paymentPidx?: string;
+  paymentTransactionUuid?: string;
   createdAt: string;
 }
 
@@ -114,18 +118,10 @@ export default function JobDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const router = useRouter();
   const queryClient = useQueryClient();
   const { user, isLoading: isAuthLoading } = useAuthGuard();
 
-  // Posters have no business on a driver-facing job detail page.
-  // Once auth resolves and we know the role, redirect them away.
-  useEffect(() => {
-    if (!isAuthLoading && user?.role === POSTER_ROLE) {
-      router.replace(DASHBOARD_PATH);
-    }
-  }, [isAuthLoading, user, router]);
-
+  const isPoster = !isAuthLoading && user?.role === POSTER_ROLE;
   const isDriver = !isAuthLoading && user?.role !== POSTER_ROLE;
 
   const {
@@ -137,8 +133,15 @@ export default function JobDetailPage({
     queryKey: [JOB_DETAIL_QUERY_KEY, id],
     queryFn: () => fetchJobById(id),
     retry: false,
-    enabled: isDriver,
+    enabled: !isAuthLoading,
   });
+
+  const { data: payoutsData } = useDriverPayouts(isDriver);
+
+  const jobPayout = payoutsData?.payouts.find(
+    (p) =>
+      (typeof p.jobId === "string" ? p.jobId : p.jobId?._id) === job?._id
+  );
 
   const acceptMutation = useMutation({
     mutationFn: () => acceptJob(id),
@@ -152,6 +155,8 @@ export default function JobDetailPage({
   }, [acceptMutation]);
 
   const isContactRevealed = job?.status !== JOB_STATUS.POSTED;
+
+  const backHref = isPoster ? DASHBOARD_PATH : "/jobs/browse";
 
   // ── Loading ──────────────────────────────────────────────────────────────
   if (isAuthLoading) {
@@ -195,17 +200,17 @@ export default function JobDetailPage({
             {error instanceof Error ? error.message : "This job could not be loaded."}
           </p>
           <Link
-            href="/jobs/browse"
+            href={backHref}
             className="text-sm font-semibold text-primary hover:underline"
           >
-            ← Back to Browse
+            ← Back to {isPoster ? "Dashboard" : "Browse"}
           </Link>
         </div>
       </div>
     );
   }
 
-  // ── Job ID display — first 8 chars of MongoDB ObjectId ──────────────────
+  // ── Job ID display ──────────────────────────────────────────────────────
   const shortJobId = `SF-${job._id.slice(-6).toUpperCase()}`;
 
   const isChatVisible = CHAT_VISIBLE_STATUSES.has(job.status);
@@ -215,11 +220,11 @@ export default function JobDetailPage({
       <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-8 md:py-12">
         {/* Back Link */}
         <Link
-          href="/jobs/browse"
+          href={backHref}
           className="inline-flex items-center gap-1 text-sm text-on-surface-variant hover:text-primary transition-colors mb-6 cursor-pointer"
         >
           <span className="material-symbols-outlined text-base">arrow_back</span>
-          Back to Browse
+          Back to {isPoster ? "Dashboard" : "Browse"}
         </Link>
 
         {/* Page Header */}
@@ -231,7 +236,7 @@ export default function JobDetailPage({
           <div className="text-right">
             <p className="text-xs text-on-surface-variant uppercase tracking-wide">Agreed Payout</p>
             <p className="text-3xl font-bold text-primary">
-              ${(job.offeredPrice / 100).toFixed(2)}
+              NPR {job.offeredPrice.toLocaleString("en-NP")}
             </p>
           </div>
         </div>
@@ -353,8 +358,42 @@ export default function JobDetailPage({
               </div>
             </div>
 
-            {/* Accept / Decline — driver only, posted status only */}
-            {job.status === JOB_STATUS.POSTED && (
+            {/* ── Poster: Payment Section ──────────────────────────────── */}
+            {isPoster && job.driverId && job.status === JOB_STATUS.ACCEPTED && job.paymentStatus !== "paid" && (
+              <div className="bg-surface-white border border-outline-variant rounded-xl p-6">
+                <h2 className="text-base font-semibold text-on-surface mb-2">Payment Required</h2>
+                <p className="text-sm text-secondary mb-5">
+                  Your driver is assigned and ready. Complete payment to confirm the delivery.
+                </p>
+                <Link
+                  href={`/payment?jobId=${job._id}`}
+                  className="w-full h-12 flex items-center justify-center gap-2 bg-primary text-on-primary rounded-lg text-sm font-semibold hover:bg-primary-container transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-xl">payment</span>
+                  Proceed to Payment
+                  <span className="material-symbols-outlined text-xl">arrow_forward</span>
+                </Link>
+              </div>
+            )}
+
+            {/* ── Poster: Payment completed ──────────────────────────────*/}
+            {isPoster && job.paymentStatus === "paid" && (
+              <div className="bg-success-green/10 border border-success-green/30 rounded-xl p-5 text-center">
+                <span
+                  className="material-symbols-outlined text-3xl text-success-green block mb-2"
+                  style={{ fontVariationSettings: "'FILL' 1" }}
+                >
+                  check_circle
+                </span>
+                <p className="text-sm font-semibold text-success-green">Payment Completed</p>
+                <p className="text-xs text-on-surface-variant mt-1">
+                  {job.paymentGateway ? `via ${job.paymentGateway.toUpperCase()}` : "Verified"}
+                </p>
+              </div>
+            )}
+
+            {/* ── Driver: Accept / Decline ───────────────────────────────*/}
+            {isDriver && job.status === JOB_STATUS.POSTED && (
               <div className="bg-surface-white border border-outline-variant rounded-xl p-6">
                 {acceptMutation.isError && (
                   <div className="mb-4 p-3 text-sm text-error-red bg-error-container border border-error-red/40 rounded-lg">
@@ -397,8 +436,8 @@ export default function JobDetailPage({
               </div>
             )}
 
-            {/* Accepted confirmation */}
-            {job.status === JOB_STATUS.ACCEPTED && (
+            {/* ── Driver: Accepted confirmation ──────────────────────────*/}
+            {isDriver && job.status === JOB_STATUS.ACCEPTED && (
               <div className="bg-success-green/10 border border-success-green/30 rounded-xl p-5 text-center">
                 <span className="material-symbols-outlined text-3xl text-success-green block mb-2">
                   check_circle
@@ -414,6 +453,58 @@ export default function JobDetailPage({
                   Go to Active Delivery
                   <span className="material-symbols-outlined text-xl">arrow_forward</span>
                 </Link>
+              </div>
+            )}
+
+            {/* ── Driver: Payout status badge ────────────────────────────*/}
+            {isDriver && jobPayout && (
+              <div className="mt-4">
+                {jobPayout.status === "pending" && (
+                  <div className="bg-warning-amber/10 border border-warning-amber/30 rounded-xl p-4 flex items-start gap-3">
+                    <span className="material-symbols-outlined text-warning-amber text-2xl mt-0.5">
+                      schedule
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-warning-amber">Payout Processing</p>
+                      <p className="text-xs text-on-surface-variant mt-0.5 leading-relaxed">
+                        Payment received. Payout being processed — typically within 1–2 business days.
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {jobPayout.status === "paid" && (
+                  <div className="bg-success-green/10 border border-success-green/30 rounded-xl p-4 flex items-start gap-3">
+                    <span
+                      className="material-symbols-outlined text-success-green text-2xl mt-0.5"
+                      style={{ fontVariationSettings: "'FILL' 1" }}
+                    >
+                      check_circle
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-success-green">Payout Paid</p>
+                      <p className="text-xs text-on-surface-variant mt-0.5 leading-relaxed">
+                        Paid NPR {jobPayout.amount.toLocaleString("en-NP")} on{" "}
+                        {formatCompletedDate(jobPayout.paidAt || jobPayout.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {jobPayout.status === "failed" && (
+                  <div className="bg-error-container border border-error-red/30 rounded-xl p-4 flex items-start gap-3">
+                    <span
+                      className="material-symbols-outlined text-error-red text-2xl mt-0.5"
+                      style={{ fontVariationSettings: "'FILL' 1" }}
+                    >
+                      error
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-error-red">Payout Failed</p>
+                      <p className="text-xs text-on-surface-variant mt-0.5 leading-relaxed">
+                        Payout failed. Please contact support.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -6,6 +6,16 @@ Format: newest at the top. Every decision gets the **model/session** that made i
 
 ---
 
+## D-31 — Close the check-then-insert TOCTOU window by making the unique index the arbiter
+
+**Status:** Proposed (Day 45 prompt: "how do I close the window between 'check if exists' and 'save the record'?") · **Model:** opencode session (Days 45–48) · **Applies to:** `src/app/api/payments/khalti/verify/route.ts`, `src/app/api/payments/esewa/verify/route.ts`
+
+**Decision:** The current verify flow is check-then-insert: `PaymentTransaction.findOne({gateway, transactionId})` → create Payout → create PaymentTransaction. That leaves a TOCTOU window — two concurrent verify calls with the same `transactionId` can both pass the existence check before either inserts, creating two Payouts. The unique compound index on `{gateway, transactionId}` is the correct arbiter but it only guards the PaymentTransaction record, not the Payout created before it. **Close the window by inverting the order:** insert (or upsert) the `PaymentTransaction` first and let the unique index reject the duplicate (`E11000`) — on a duplicate-key error, treat it as "already processed" and skip Payout creation. Only after a successful PaymentTransaction insert should the Payout be created.
+
+**Why:** A DB uniqueness constraint is atomic; a `findOne` check is not. Relying on the index to be the arbiter (instead of a check) makes idempotency correct under concurrency with no extra lock machinery. Catch `code === 11000` on the PaymentTransaction insert and redirect to the job detail as an already-paid no-op.
+
+---
+
 ## D-30 — Unified payment abstraction + eSewa implementation
 
 **Status:** Accepted · **Model:** project session (Days 41–44) · **Applies to:** `src/lib/payments/esewa.ts`, `src/lib/payments/index.ts`, `src/app/api/payments/initiate/route.ts`, `src/app/api/payments/esewa/verify/route.ts`, `src/app/api/admin/payouts/route.ts`, `src/app/api/admin/payouts/[id]/route.ts`

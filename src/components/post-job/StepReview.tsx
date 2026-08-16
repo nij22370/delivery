@@ -144,7 +144,7 @@ export default function StepReview({
               <p className="text-sm text-on-surface mt-1">
                 Agreed Price:{" "}
                 <span className="font-semibold text-primary">
-                  ${(pricingData.offeredPrice / 100).toFixed(2)}
+                  NPR {pricingData.offeredPrice.toLocaleString("en-NP")}
                 </span>
               </p>
             </div>

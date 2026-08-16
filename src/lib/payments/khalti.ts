@@ -32,18 +32,19 @@ function getKhaltiSecretKey(): string {
 }
 
 function getPaymentSuccessUrl(): string {
-  const url = process.env.PAYMENT_SUCCESS_URL;
-  if (!url) throw new Error(ERROR_MSG_MISSING_SUCCESS_URL);
-  return url;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  return `${appUrl}/payment/success`;
 }
 
-function getFailureUrl(): string {
-  return process.env.PAYMENT_FAILURE_URL || "/jobs";
+function getFailureUrl(jobId?: string): string {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  return jobId ? `${appUrl}/payment/failure?jobId=${jobId}` : `${appUrl}/payment/failure`;
 }
 
 export async function initiateKhalti(
   job: IJob,
-  poster: IUser
+  poster: IUser,
+  amountInPaisa?: number
 ): Promise<{
   method: "redirect";
   url: string;
@@ -51,6 +52,7 @@ export async function initiateKhalti(
 }> {
   const secretKey = getKhaltiSecretKey();
   const returnUrl = getPaymentSuccessUrl();
+  const totalAmountPaisa = amountInPaisa ?? job.offeredPrice * PAISA_MULTIPLIER;
 
   const response = await fetch(KHALTI_INITIATE_URL, {
     method: "POST",
@@ -61,7 +63,7 @@ export async function initiateKhalti(
     body: JSON.stringify({
       return_url: returnUrl,
       website_url: WEBSITE_URL,
-      amount: job.offeredPrice * PAISA_MULTIPLIER,
+      amount: totalAmountPaisa,
       purchase_order_id: job._id.toString(),
       purchase_order_name: `SwiftShip Delivery Job ${job._id}`,
       customer_info: {
@@ -107,6 +109,6 @@ export async function verifyKhaltiPayment(
   return (await response.json()) as KhaltiLookupResponse;
 }
 
-export function getPaymentFailureUrl(): string {
-  return getFailureUrl();
+export function getPaymentFailureUrl(jobId?: string): string {
+  return getFailureUrl(jobId);
 }
