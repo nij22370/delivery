@@ -210,7 +210,9 @@ async function main(): Promise<void> {
           createdAt,
         }).save({ timestamps: false });
 
-        const createdAtMatches = payout.createdAt.getTime() === createdAt.getTime();
+        const savedCreatedAt = payout.get("createdAt") as Date | undefined;
+        const createdAtMatches =
+          savedCreatedAt !== undefined && savedCreatedAt.getTime() === createdAt.getTime();
         if (!createdAtMatches) {
           console.error(
             `WARNING: createdAt was overridden for ${driverEmail} spec daysAgo=${spec.daysAgo}`
@@ -218,7 +220,7 @@ async function main(): Promise<void> {
         }
 
         createdPayouts.push({
-          createdAt: payout.createdAt,
+          createdAt: savedCreatedAt ?? createdAt,
           amount: payout.amount,
           status: payout.status,
         });
