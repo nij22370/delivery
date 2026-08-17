@@ -61,6 +61,8 @@ After starting `npm run dev`, walk these flows against `http://localhost:3000`. 
 | 23 | Abandoned payment retry (Day 45) | close the tab mid-redirect / never return from gateway | job stays retryable: payment section re-shows on job detail; poster can pay again |
 | 24 | Payout status UI (Day 47) | driver opens /driver/earnings and job detail after admin marks payout paid | earnings cards show correct totals; payout history table shows gateway + status + date; job detail badge shows paid/pending/failed |
 | 25 | Manual payment verify (both gateways) | poster logs in, job accepted + driver assigned; Khalti: GET /api/payments/khalti/verify?pidx=<pidx>; eSewa: GET /api/payments/esewa/verify?data=<base64> | verify returns a redirect to the job detail; Job paymentStatus becomes paid; exactly one Payout (pending) appears in the driver's /driver/earnings and the admin payout queue; repeat call with same pidx/data is a no-op |
+| 26 | Earnings aggregation seed (Day 49) | `npx tsx scripts/seed-earnings.ts` | 9/9 PASS (3 drivers × weekly 8w / monthly 12m / all-time); pending + failed payouts absent from all buckets; weekly labels `YYYY-MM-DD` (Monday start), monthly `YYYY-MM`; all amounts NPR |
+| 27 | Earnings endpoint (Day 50) | sign a JWT for a seeded driver (`signAccessToken`) and call `GET /api/drivers/[id]/earnings?range=week\|month\|all-time` | owner id → 200 with `{ summary, breakdown }` and `summary == aggregate(breakdown)`; another driver's id → 403; admin token → 200 for any id; omitted/invalid `range` → weekly; no cookie → 401; pending/failed payouts excluded from every response |
 **Rule:** if a flow you touched is not in the table, add it. The table is the living definition of "works."
 
 ---
