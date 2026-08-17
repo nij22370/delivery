@@ -6,6 +6,18 @@ Format: newest at the top. Every decision gets the **model/session** that made i
 
 ---
 
+## D-32 — `$dateTrunc` buckets for earnings; week start uses `startOfWeek`, not `weekStartDay`
+
+**Status:** Accepted · **Model:** opencode session (Days 49–50) · **Applies to:** `src/lib/earnings.ts`
+
+**Decision:** Earnings aggregation buckets `Payout.createdAt` with `$dateTrunc` (`unit: "week"` for weekly, `unit: "month"` for monthly) inside a `$group._id`, formatting the bucket via `$dateToString` (`%Y-%m-%d` weekly, `%Y-%m` monthly) so the label comes straight out of the aggregation. Weekly windows start Monday (`startOfWeek: "monday"`); monthly/all-time use the same month unit. Windows: weekly default 8 weeks (`weekStart(now) − (weeks−1)·7d`), monthly default 12 months, all-time has no `createdAt` filter. The `$match` filters `status: "paid"` so `pending`/`failed` payouts are excluded server-side. All bucket math runs in UTC.
+
+**Why:** One `$match → $group → $sort` aggregation replaces "fetch all payouts and sum in JS", which violates the never-fetch-all rule and ships every record just to throw it away. `$dateTrunc` keeps bucket boundaries authoritative (MongoDB's calendar/week logic) instead of re-implementing "start of week" in consumers.
+
+**Correction learned at runtime:** the option to control the week start is `startOfWeek` (a case-insensitive string like `"monday"`), **not** `weekStartDay`. The initial implementation passed `weekStartDay: 1` and Atlas rejected it with `Unrecognized argument to $dateTrunc: weekStartDay. Expected ... optionally, binSize, timezone, startOfWeek`. Switched to `startOfWeek: "monday"`; all 9 seed aggregation checks then passed. The seed script's independent JS expectations (UTC Monday week-start + month-start) matched the aggregation output exactly, confirming `$dateTrunc` week/month boundaries align with the JS helpers.
+
+---
+
 ## D-31 — Close the check-then-insert TOCTOU window by making the unique index the arbiter
 
 **Status:** Proposed (Day 45 prompt: "how do I close the window between 'check if exists' and 'save the record'?") · **Model:** opencode session (Days 45–48) · **Applies to:** `src/app/api/payments/khalti/verify/route.ts`, `src/app/api/payments/esewa/verify/route.ts`

@@ -824,3 +824,52 @@ Khalti may redirect the user multiple times (e.g., page reload, back button). Wi
 - `npm run build` — clean (after BUG-01–04 fixes).
 - `npm run lint` — 19 problems / 4 errors, all pre-existing in files outside this feature (register page unescaped entities, `any` in auth register + errorResponse).
 - Manual sandbox walkthrough of both gateways + failure cases above. TestChecklist rows 19–24 added.
+
+---
+
+## Phase 7 — Days 49–50 Earnings Aggregation Pipeline & Endpoint
+
+### New Files
+- `src/types/payout/earnings.ts` — types layer: `EarningsRange` (`"week" | "month" | "all-time"`), `EarningsBucket` (lib output: `period`, `totalAmount`, `jobCount`), `EarningsSummary`, `EarningsBreakdownItem` (`period`, `amount`, `jobCount`), `EarningsResponse` (`{ summary, breakdown }`).
+- `src/lib/earnings.ts` — aggregation logic over the `Payout` model: `getWeeklyEarnings(driverId, weeks = 8)`, `getMonthlyEarnings(driverId, months = 12)`, `getAllTimeEarnings(driverId)`. All return `EarningsBucket[]` sorted chronologically, amounts in NPR.
+- `scripts/seed-earnings.ts` — idempotent seed: 3 driver users + 1 poster + jobs + payouts spanning ~4 months with a mix of `paid`/`pending`/`failed` statuses. Run with `npx tsx scripts/seed-earnings.ts`. Self-verifies the three aggregation functions against independently computed JS expectations and prints PASS/FAIL per bucket.
+- `src/app/api/drivers/[id]/earnings/route.ts` — `GET /api/drivers/[id]/earnings?range=week|month|all-time`.
+
+### API Route
+| Method | Route | Auth | Purpose |
+|--------|-------|------|---------|
+| GET | `/api/drivers/:id/earnings?range=` | `withAuth` (owner or admin) | Paid-payout earnings breakdown + summary for a driver |
+
+Response shape:
+```json
+{
+  "summary": { "totalAmount": 7700, "jobCount": 5 },
+  "breakdown": [
+    { "period": "2026-05", "amount": 2200, "jobCount": 1 },
+    { "period": "2026-06", "amount": 1800, "jobCount": 1 }
+  ]
+}
+```
+- `range=week` → weekly buckets (`$dateTrunc` unit `week`, Monday start), labeled `YYYY-MM-DD`, default 8 weeks.
+- `range=month` → monthly buckets, labeled `YYYY-MM`, default 12 months.
+- `range=all-time` → monthly buckets over the full payout history, no date window.
+- `summary` is the aggregate of the full `breakdown` array; `breakdown[i].amount` is the lib's per-bucket `totalAmount`.
+- Access: driver can query only their own `[id]`; admin can query any. Non-owner non-admin → 403. No token → 401 (via `withAuth`). Invalid `range` value falls back to `week` (default).
+
+### Architectural Decisions
+- **PLMS layering (types → lib → api):** bucket/response types live in `src/types/payout/earnings.ts`; the aggregation pipeline lives in `src/lib/earnings.ts`; the route handler only parses `range`, runs the owner/admin gate, and calls the matching lib function. No query logic in the route.
+- **Single shared pipeline:** weekly and monthly share one internal `getEarningsByPeriod(driverId, unit, periodFormat, startDate?)`; the unit + `$dateToString` format are the only differences. `all-time` is the same pipeline without a `startDate` (no `createdAt` in the `$match`).
+- **`$dateTrunc` for bucketing (MongoDB 5.0+):** the `$group._id` is `$dateToString` of `$dateTrunc` on `createdAt`, so the bucket label comes out of the aggregation itself — no client-side date math. Weekly uses `startOfWeek: "monday"` (the option is `startOfWeek`, not `weekStartDay` — Atlas rejects `weekStartDay` with a "Unrecognized argument" error, see D-32).
+- **Window math in UTC:** `startDate` for weekly is `weekStart(now) − (weeks−1)·7d`; for monthly it is `monthStart(now)` minus `(months−1)` months. Bucketing is UTC-based, consistent with how the app stores timestamps.
+- **`status: "paid"` only:** the `$match` filters `status: "paid"`, so `pending` and `failed` payouts are excluded from every response — no application-level filtering, the DB does it.
+- **Named constants, no magic strings:** `PAYOUT_STATUS_PAID`, `WEEK_START_DAY = "monday"`, `DATE_TRUNC_UNIT_WEEK/MONTH`, `WEEKLY/MONTHLY_PERIOD_FORMAT`, `DEFAULT_WEEKS/DEFAULT_MONTHS` all live at module level in `src/lib/earnings.ts`.
+- **Driver id cast in `$match`:** `new Types.ObjectId(driverId)` (same pattern as `updateDriverRating`), so aggregation always compares against `ObjectId`.
+
+### Learning Prompt: Why aggregate in the database instead of fetching payouts and summing in JS?
+Fetching a driver's full payout history to compute totals in JS (a) violates "never fetch all records", (b) ships every record over the wire just to throw it away, and (c) makes totals drift as history grows. A single `$match → $group → $sort` aggregation returns only the summary buckets — MongoDB computes `$sum` and bucketing server-side, so the payload is tiny and the cost is one index-backed scan. `$dateTrunc` also keeps the bucket boundaries authoritative (MongoDB's own calendar/week logic) instead of re-implementing "start of week" in every consumer.
+
+### Verification (Day 50)
+- Seed run: `npx tsx scripts/seed-earnings.ts` — 9/9 aggregation checks PASSED (3 drivers × weekly/monthly/all-time); pending/failed amounts absent from every bucket; the 120-day-old payout appears in monthly/all-time but not in the 8-week weekly window; no `createdAt` override warnings.
+- Endpoint harness (temp script, direct handler invocation with real signed JWTs): 13/13 checks PASSED — driver-own week 3700/3, month 7700/5, all-time 7700/5; default range = week; driver querying another driver → 403; admin can query any driver (week 4500/2, month 7700/5); breakdown shape valid; `summary` equals the aggregate of `breakdown`; invalid range falls back to week; no token → 401.
+- `npm run lint` — no new problems; the 4 errors are pre-existing (register page unescaped entities, `any` in `errorResponse.ts` and one other file).
+- `npm run build` — clean; `/api/drivers/[id]/earnings` listed in the route manifest.

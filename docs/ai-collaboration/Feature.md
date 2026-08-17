@@ -41,10 +41,66 @@ Known gaps, future enhancements, things deliberately left out.
 
 | ID | Title | Status | Requested | Shipped in |
 | --- | --- | --- | --- | --- |
+| FEATURE-04 | 404 Not Found & Error Boundary UI Pages | Shipped | Aug 17 | Days 51–52 |
+| FEATURE-03 | Earnings aggregation pipeline + driver earnings endpoint | Shipped | Phase 7 Days 49–50 | Days 49–50 |
 | FEATURE-01 | Read receipts + unread badges + off-screen toasts | Shipped | Aug 13 | Days 35–37 |
 | FEATURE-02 | Nepal payment pipeline: Khalti + eSewa, idempotent verify, payout status UI | Shipped | build plan Days 38-48 | Days 38-48 |
 
 ---
+
+## FEATURE-04 — 404 Not Found & Error Boundary UI Pages
+
+**Requested:** Aug 17 | **Requested by:** Stitch design reference
+**Status:** Shipped
+**Scope:** Root App Router 404 page (`src/app/not-found.tsx`), root client error boundary (`src/app/error.tsx`), and root shell fallback (`src/app/global-error.tsx`) matching design references in `design-reference/404-not-found.md` and `design-reference/error-boundary.md`.
+
+### Why (intent)
+Provide branded, friendly, and responsive 404 and error recovery screens when users navigate to broken routes or encounter unexpected client rendering exceptions.
+
+### Design
+- `src/app/not-found.tsx`: Visual anchor with animated logistics icons, primary "Back to Dashboard", secondary "Contact Support", quick links grid.
+- `src/app/error.tsx`: Centered error state with `cloud_off` animated icon, "Refresh Page" (calls `reset()`), "Contact Support", 3 helpful information cards.
+- `src/app/global-error.tsx`: Root HTML/body error boundary for shell rendering failures.
+
+### Implementation trail
+1. `src/app/not-found.tsx` created matching 404 design specs.
+2. `src/app/error.tsx` created matching error boundary specs.
+3. `src/app/global-error.tsx` created with fallback root markup.
+
+### Verification
+- Production build verified (`npm run build`). All pages generated and typechecked cleanly.
+
+
+---
+
+## FEATURE-03 — Earnings aggregation pipeline + driver earnings endpoint
+
+**Requested:** Aug 17 | **Requested by:** Phase 7 Days 49–50
+**Status:** Shipped
+**Scope:** Backend-only earnings pipeline over the `Payout` model: weekly (8w), monthly (12m), and all-time aggregates using Mongoose aggregation with `$dateTrunc` bucketing, plus `GET /api/drivers/[id]/earnings?range=week|month|all-time` (owner-or-admin gated). Deliberately does NOT include any UI, does NOT touch payment/payout files, and does NOT modify the Payout schema.
+
+### Why (intent)
+Drivers need to see how much they earned per week/month over time from their paid payouts — without the client summing raw payout records. The aggregation must be correct (only `paid` payouts, correctly bucketed by calendar week/month) and the endpoint must never leak one driver's earnings to another.
+
+### Design
+- `src/types/payout/earnings.ts` — `EarningsRange`, `EarningsBucket`, `EarningsSummary`, `EarningsBreakdownItem`, `EarningsResponse`. One source of truth per concept (PLMS types layer).
+- `src/lib/earnings.ts` — shared internal pipeline `getEarningsByPeriod(driverId, unit, periodFormat, startDate?)`: `$match { driverId: ObjectId, status: "paid", createdAt ≥ startDate? }` → `$group` `_id = $dateToString($dateTrunc(createdAt, unit))` summing `amount` and counting docs → `$sort` → `$project` to `{ period, totalAmount, jobCount }`. `getWeeklyEarnings` (Monday-start weeks, `YYYY-MM-DD`, default 8), `getMonthlyEarnings` (`YYYY-MM`, default 12), `getAllTimeEarnings` (monthly, no window).
+- `GET /api/drivers/[id]/earnings` — `withAuth`; 403 unless caller owns the id or is admin; invalid `range` falls back to `week`; returns `{ summary, breakdown }` where `summary` is the aggregate of `breakdown` and `breakdown[i].amount = bucket.totalAmount`.
+- `scripts/seed-earnings.ts` — idempotent seed (3 drivers, payouts over 4 months, paid/pending/failed mix) that also self-verifies all three functions against independent JS expectations.
+- Decisions: D-32 (`$dateTrunc` + `startOfWeek`).
+
+### Implementation trail
+1. Day 49 — types, `src/lib/earnings.ts`, seed script; ran seed → first run surfaced `vehicleType` enum fix (`bike` → `bicycle`), then Atlas rejected `weekStartDay` → switched to `startOfWeek: "monday"` (D-32); 9/9 aggregation checks passed. Commit `7e14b52`.
+2. Day 50 — `GET /api/drivers/[id]/earnings` route; build surfaced a seed typing fix (read `createdAt` via `get()`); 13/13 endpoint checks passed with a temp harness (real JWTs, direct handler invocation); lint no new problems, build clean. Commits `627604d`, `5f500e9`.
+
+### Verification
+- Seed: `npx tsx scripts/seed-earnings.ts` — 9/9 PASS; pending/failed absent from every bucket; 120-day-old payout present in monthly/all-time, absent from 8-week weekly; no createdAt-override warnings.
+- Endpoint harness: 13/13 PASS — owner week 3700/3 · month 7700/5 · all-time 7700/5; default = week; cross-driver 403; admin any-driver; breakdown shape; summary == aggregate(breakdown); invalid range → week; no token → 401.
+- `npm run lint` (4 pre-existing errors only) and `npm run build` (clean) both pass.
+- TestChecklist rows 26–27 added.
+
+### Follow-ups
+- Permanent E2E harness for the earnings endpoint (temp one was deleted after verification); consider filling zero-activity buckets (e.g. `$densify`) if the UI wants a continuous timeline; timezone-aware bucketing (`Asia/Kathmandu`) if the product wants Nepal-local week/month boundaries instead of UTC.
 
 ## FEATURE-02 - Nepal payment pipeline: Khalti + eSewa, idempotent verify, payout status UI
 
