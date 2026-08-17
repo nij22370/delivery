@@ -41,9 +41,35 @@ Known gaps, future enhancements, things deliberately left out.
 
 | ID | Title | Status | Requested | Shipped in |
 | --- | --- | --- | --- | --- |
+| FEATURE-04 | 404 Not Found & Error Boundary UI Pages | Shipped | Aug 17 | Days 51–52 |
 | FEATURE-03 | Earnings aggregation pipeline + driver earnings endpoint | Shipped | Phase 7 Days 49–50 | Days 49–50 |
 | FEATURE-01 | Read receipts + unread badges + off-screen toasts | Shipped | Aug 13 | Days 35–37 |
 | FEATURE-02 | Nepal payment pipeline: Khalti + eSewa, idempotent verify, payout status UI | Shipped | build plan Days 38-48 | Days 38-48 |
+
+---
+
+## FEATURE-04 — 404 Not Found & Error Boundary UI Pages
+
+**Requested:** Aug 17 | **Requested by:** Stitch design reference
+**Status:** Shipped
+**Scope:** Root App Router 404 page (`src/app/not-found.tsx`), root client error boundary (`src/app/error.tsx`), and root shell fallback (`src/app/global-error.tsx`) matching design references in `design-reference/404-not-found.md` and `design-reference/error-boundary.md`.
+
+### Why (intent)
+Provide branded, friendly, and responsive 404 and error recovery screens when users navigate to broken routes or encounter unexpected client rendering exceptions.
+
+### Design
+- `src/app/not-found.tsx`: Visual anchor with animated logistics icons, primary "Back to Dashboard", secondary "Contact Support", quick links grid.
+- `src/app/error.tsx`: Centered error state with `cloud_off` animated icon, "Refresh Page" (calls `reset()`), "Contact Support", 3 helpful information cards.
+- `src/app/global-error.tsx`: Root HTML/body error boundary for shell rendering failures.
+
+### Implementation trail
+1. `src/app/not-found.tsx` created matching 404 design specs.
+2. `src/app/error.tsx` created matching error boundary specs.
+3. `src/app/global-error.tsx` created with fallback root markup.
+
+### Verification
+- Production build verified (`npm run build`). All pages generated and typechecked cleanly.
+
 
 ---
 
