@@ -41,6 +41,7 @@ Known gaps, future enhancements, things deliberately left out.
 
 | ID | Title | Status | Requested | Shipped in |
 | --- | --- | --- | --- | --- |
+| FEATURE-05 | Driver Earnings Dashboard UI (Phase 7 Days 51–52) | Shipped | Aug 18 | Days 51–52 |
 | FEATURE-04 | 404 Not Found & Error Boundary UI Pages | Shipped | Aug 17 | Days 51–52 |
 | FEATURE-03 | Earnings aggregation pipeline + driver earnings endpoint | Shipped | Phase 7 Days 49–50 | Days 49–50 |
 | FEATURE-01 | Read receipts + unread badges + off-screen toasts | Shipped | Aug 13 | Days 35–37 |
@@ -70,6 +71,45 @@ Provide branded, friendly, and responsive 404 and error recovery screens when us
 ### Verification
 - Production build verified (`npm run build`). All pages generated and typechecked cleanly.
 
+
+---
+
+## FEATURE-05 — Driver Earnings Dashboard UI (Phase 7 Days 51–52)
+
+**Requested:** Aug 18 | **Requested by:** Phase 7 build plan
+**Status:** Shipped
+**Scope:** Client-side driver earnings dashboard at `/(dashboard)/driver/earnings` with summary metric cards, a Recharts bar chart, payout info sidebar, support card, and recent transactions table. Deliberately does NOT modify backend models, API routes, or auth files; consumes the existing `GET /api/drivers/:id/earnings` endpoint plus the existing `GET /api/drivers/payouts` endpoint.
+
+### Why (intent)
+Drivers need a single-page financial overview that combines earned totals, weekly trends, and recent payout history — all role-gated and styled to match the SwiftShip design system.
+
+### Design
+- `src/types/earnings.ts` — re-exports `EarningsRange`, `EarningsSummary`, `EarningsBreakdownItem`, `EarningsResponse` from the existing payout types (single source of truth).
+- `src/api/apis/drivers/earningsApi.ts` — plain async fetcher for `GET /drivers/:id/earnings?range=`, using structured `params` (no string interpolation).
+- `src/hooks/useEarnings.ts` — TanStack Query hook (`useEarnings(driverId, range)`) with `enabled: !!driverId` and 30s staleTime.
+- `src/components/earnings/SummaryCards.tsx` — 3-column grid (This Week / This Month / All Time) rendering `summary.totalAmount` as `NPR X,XXX`. Extracted to standalone component per Rule 0.
+- `src/components/earnings/EarningsChart.tsx` — Recharts `BarChart` rendering the `week` range `breakdown` items. Includes range selector dropdown (`week` / `month` / `all-time`), gradient bars, custom tooltip with NPR formatting, and empty state. `formatPeriodLabel` and `formatYAxisTick` are pure module-level helpers.
+- `src/components/earnings/RecentTransactions.tsx` — payout history table with gateway chips and status badges.
+- `src/components/earnings/PayoutInfoCard.tsx` — payout processing info sidebar card.
+- `src/components/earnings/SupportCard.tsx` — need-help support card.
+- `src/app/(dashboard)/driver/earnings/page.tsx` — composes all components above; uses `useAuthGuard` + `useEffect` redirect for non-driver roles.
+
+### Implementation trail
+1. Created PLMS layers in order: types → lib (earningsApi) → hooks (useEarnings) → components (SummaryCards, EarningsChart, RecentTransactions, PayoutInfoCard, SupportCard) → page.
+2. Resolved route collision: existing `(main)/driver/earnings/page.tsx` (payout history) conflicted with the new dashboard path. Moved old page to `(main)/driver/payouts/page.tsx` and updated two `href="/driver/earnings"` links in `Header.tsx` and `not-found.tsx` to `/driver/payouts`.
+3. Moved shared `formatNpr` from component-local definitions into `src/utils/format.ts` per AGENTS.md utility rule.
+4. Removed `status: "paid"` filter from `src/lib/earnings.ts` `$match` stage so earnings totals include all payout statuses (pending, paid, failed) as requested.
+
+### Verification
+- Dev server: `npm run dev` compiles clean; `/driver/earnings` returns 200 with no parallel-pages error.
+- `npx tsc --noEmit` — 0 errors across new files.
+- `npm run lint` on new files — 0 errors.
+- Endpoint responds successfully for driver `6a7587f2aca69b244ff3f491` across `week`, `month`, and `all-time` ranges.
+
+### Follow-ups
+- Wire the chart's range selector to switch between `week`/`month`/`all-time` queries (currently only `week` data feeds the chart).
+- Paginate `/api/drivers/payouts` (existing BUG-06).
+- Close the TOCTOU window in payout creation (D-31).
 
 ---
 

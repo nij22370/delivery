@@ -873,3 +873,43 @@ Fetching a driver's full payout history to compute totals in JS (a) violates "ne
 - Endpoint harness (temp script, direct handler invocation with real signed JWTs): 13/13 checks PASSED — driver-own week 3700/3, month 7700/5, all-time 7700/5; default range = week; driver querying another driver → 403; admin can query any driver (week 4500/2, month 7700/5); breakdown shape valid; `summary` equals the aggregate of `breakdown`; invalid range falls back to week; no token → 401.
 - `npm run lint` — no new problems; the 4 errors are pre-existing (register page unescaped entities, `any` in `errorResponse.ts` and one other file).
 - `npm run build` — clean; `/api/drivers/[id]/earnings` listed in the route manifest.
+
+---
+
+## Phase 7 — Days 51–52 Driver Earnings Dashboard UI
+
+### New Files
+- `src/types/earnings.ts` — re-exports `EarningsRange`, `EarningsSummary`, `EarningsBreakdownItem`, `EarningsResponse` from `src/types/payout/earnings.ts` (single source of truth).
+- `src/api/apis/drivers/earningsApi.ts` — plain async fetcher for `GET /drivers/:id/earnings?range=`, using structured `params` (no string interpolation).
+- `src/hooks/useEarnings.ts` — TanStack Query hook (`useEarnings(driverId, range)`) with `enabled: !!driverId` and 30s staleTime.
+- `src/components/earnings/SummaryCards.tsx` — 3-column grid (This Week / This Month / All Time) rendering `summary.totalAmount` as `NPR X,XXX`.
+- `src/components/earnings/EarningsChart.tsx` — Recharts `BarChart` rendering breakdown data with range selector dropdown, gradient bars, custom tooltip, and empty state.
+- `src/components/earnings/RecentTransactions.tsx` — payout history table with gateway chips and status badges.
+- `src/components/earnings/PayoutInfoCard.tsx` — payout processing info sidebar card.
+- `src/components/earnings/SupportCard.tsx` — need-help support card.
+- `src/app/(dashboard)/driver/earnings/page.tsx` — driver-only dashboard page composing all components above.
+
+### Modified Files
+- `src/lib/earnings.ts` — removed `status: "paid"` filter from the `$match` stage so earnings totals include all payout statuses (`pending`, `paid`, `failed`).
+- `src/utils/format.ts` — added shared `formatNpr(amount)` utility (`NPR X,XXX`), replacing local definitions in components.
+- `src/components/layout/Header.tsx` — changed two `href="/driver/earnings"` links to `/driver/payouts` (route collision fix).
+- `src/app/not-found.tsx` — changed two `href="/driver/earnings"` links to `/driver/payouts` (route collision fix).
+
+### Route Collision Fix
+- Existing `(main)/driver/earnings/page.tsx` (payout history) conflicted with the new dashboard path. Moved to `(main)/driver/payouts/page.tsx` and updated all internal links.
+
+### Architectural Decisions
+- **PLMS order followed:** types (`src/types/earnings.ts`) → lib/api (`src/api/apis/drivers/earningsApi.ts`) → hooks (`src/hooks/useEarnings.ts`) → components (`src/components/earnings/*`) → page (`src/app/(dashboard)/driver/earnings/page.tsx`).
+- **Three separate queries:** one TanStack Query call per range (`week`, `month`, `all-time`). No `queryClient.invalidateQueries` used.
+- **Driver-only access:** `useAuthGuard` + `useEffect` redirect; non-driver roles are sent to `/dashboard`.
+- **NPR formatting centralized:** `formatNpr` lives in `src/utils/format.ts`; all amount displays import from there.
+- **No new dependencies beyond recharts:** `recharts` was the only new package, installed per explicit user request.
+
+### Learning Prompt: Why three separate queries instead of one?
+The backend endpoint accepts a single `range` parameter and returns data for only that range. A single call cannot return week + month + all-time simultaneously without changing the API contract. Three queries keep the client aligned with the server's existing shape, avoid over-fetching, and allow each card to cache independently (30s staleTime).
+
+### Verification
+- `npm run dev` — compiles clean; `/driver/earnings` returns 200 with no parallel-pages build error.
+- `npx tsc --noEmit` — 0 errors.
+- `npm run lint` on new files — 0 errors.
+- `/api/drivers/:id/earnings?range=week|month|all-time` responds successfully for authenticated driver `6a7587f2aca69b244ff3f491`.

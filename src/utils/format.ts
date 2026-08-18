@@ -103,3 +103,11 @@ export function isSameCalendarDay(firstIsoDate: string, secondIsoDate: string): 
     firstDate.getDate() === secondDate.getDate()
   );
 }
+
+export function formatNpr(amount: number): string {
+  return `NPR ${amount.toLocaleString("en-US")}`;
+}
+
+export function formatCurrency(amount: number): string {
+  return amount.toLocaleString("en-US");
+}

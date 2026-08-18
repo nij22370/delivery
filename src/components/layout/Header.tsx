@@ -54,7 +54,7 @@ export default function Header() {
           )}
           {isDriver && (
             <Link
-              href="/driver/earnings"
+              href="/driver/payouts"
               className="text-sm text-on-surface-variant font-medium hover:text-primary transition-colors"
             >
               Earnings
@@ -172,7 +172,7 @@ export default function Header() {
             )}
             {isDriver && (
               <Link
-                href="/driver/earnings"
+                href="/driver/payouts"
                 onClick={handleCloseMobileMenu}
                 className="text-sm text-on-surface font-medium py-3 border-b border-outline-variant/50 hover:text-primary transition-colors"
               >

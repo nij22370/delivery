@@ -23,14 +23,14 @@ const NAV_ITEMS = [
   { href: "/", icon: "dashboard", label: "Dashboard", isActive: false },
   { href: "/jobs/browse", icon: "local_shipping", label: "Shipments", isActive: false },
   { href: "/jobs/browse", icon: "location_on", label: "Tracking", isActive: false },
-  { href: "/driver/earnings", icon: "analytics", label: "Analytics", isActive: false },
+  { href: "/driver/payouts", icon: "analytics", label: "Analytics", isActive: false },
   { href: "/driver/verification", icon: "settings", label: "Settings", isActive: false },
 ] as const;
 
 const QUICK_DESTINATIONS = [
   { href: "/jobs/browse", icon: "list_alt", label: "Active Shipments" },
   { href: "/jobs/browse", icon: "map", label: "Fleet Tracker" },
-  { href: "/driver/earnings", icon: "description", label: "Billing History" },
+  { href: "/driver/payouts", icon: "description", label: "Billing History" },
 ] as const;
 
 const FOOTER_LINKS = [

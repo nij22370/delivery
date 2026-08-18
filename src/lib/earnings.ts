@@ -4,7 +4,6 @@ import type { EarningsBucket } from "@/types/payout/earnings";
 
 const DEFAULT_WEEKS = 8;
 const DEFAULT_MONTHS = 12;
-const PAYOUT_STATUS_PAID = "paid";
 const WEEK_START_DAY = "monday";
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const WEEKLY_PERIOD_FORMAT = "%Y-%m-%d";
@@ -59,7 +58,6 @@ async function getEarningsByPeriod(
 ): Promise<EarningsBucket[]> {
   const match: Record<string, unknown> = {
     driverId: new Types.ObjectId(driverId),
-    status: PAYOUT_STATUS_PAID,
   };
   if (startDate) {
     match.createdAt = { $gte: startDate };
