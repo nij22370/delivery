@@ -41,6 +41,9 @@ Known gaps, future enhancements, things deliberately left out.
 
 | ID | Title | Status | Requested | Shipped in |
 | --- | --- | --- | --- | --- |
+| FEATURE-07 | Admin User Management UI + API | Shipped | Aug 18 | Day 55 |
+| FEATURE-06 | Admin Job Management UI + API | Shipped | Aug 18 | Day 54 |
+| FEATURE-05 | Driver Earnings Dashboard UI (Phase 7 Days 51–52) | Shipped | Aug 18 | Days 51–52 |
 | FEATURE-04 | 404 Not Found & Error Boundary UI Pages | Shipped | Aug 17 | Days 51–52 |
 | FEATURE-03 | Earnings aggregation pipeline + driver earnings endpoint | Shipped | Phase 7 Days 49–50 | Days 49–50 |
 | FEATURE-01 | Read receipts + unread badges + off-screen toasts | Shipped | Aug 13 | Days 35–37 |
@@ -70,6 +73,75 @@ Provide branded, friendly, and responsive 404 and error recovery screens when us
 ### Verification
 - Production build verified (`npm run build`). All pages generated and typechecked cleanly.
 
+
+---
+
+## FEATURE-06 — Admin Job Management UI + API (Day 54)
+
+**Requested:** Aug 18 | **Requested by:** Admin panel build plan
+**Status:** Shipped
+**Scope:** Admin job management page at `/(admin)/admin/jobs` with stat cards, filter tabs, search, paginated table, and status override modal. Includes new API routes for listing jobs and overriding job status. Deliberately does NOT modify the existing job lifecycle endpoints or the Payout model.
+
+### Why (intent)
+Admins need a centralized view of all platform jobs with the ability to intervene on disputed or stuck jobs. The page must surface key metrics, support filtered navigation, and record an audit trail when statuses are overridden.
+
+### Design
+- `src/types/admin/adminJobs.ts` — `AdminJobItem`, `AdminJobsResponse`, `AdminJobsQueryParams`, `AllowedOverrideStatus`, `StatusOverrideInput`.
+- `src/api/apis/admin/adminJobsApi.ts` — `getAdminJobs(params)` and `overrideJobStatus(jobId, data)`.
+- `src/api/hooks/admin/adminJobsApi.ts` — `useAdminJobs()` and `useOverrideJobStatus()`.
+- `src/components/admin/StatusOverrideModal.tsx` — modal with status dropdown, reason field, irreversible-action warning.
+- `src/app/(admin)/admin/jobs/page.tsx` — stat cards, filter tabs (`all`, `in_transit`, `disputed`, `cancelled`, `posted`), debounced search, paginated table, override action.
+- `GET /api/admin/jobs` — paginated, filterable by status and search term.
+- `PATCH /api/admin/jobs/:id/status` — override status with reason, admin-guarded.
+- `src/types/job.ts` — Added `DISPUTED` to `JOB_STATUS` enum.
+- `src/utils/format.ts` — Added `formatNpr()` and `formatShortDate()`.
+
+### Implementation trail
+1. Created PLMS layers: types → apis → hooks → components → page.
+2. Added `DISPUTED` to `JOB_STATUS` enum and replaced magic string in the override route.
+3. Built `StatusOverrideModal` with confirmation flow and audit warning.
+
+### Verification
+- `npm run build` — exit code 0, all routes compiled, type-check clean.
+
+### Follow-ups
+- Wire the override mutation to invalidate the admin jobs query on success (already implemented via `useOverrideJobStatus`).
+- Add CSV export for job records (UI button present, toast-only placeholder).
+
+---
+
+## FEATURE-07 — Admin User Management UI + API (Day 55)
+
+**Requested:** Aug 18 | **Requested by:** Admin panel build plan
+**Status:** Shipped
+**Scope:** Admin user management page at `/(admin)/admin/users` with role tabs, status dropdown, search, paginated table, and user action modal (details/suspend/role-change). Includes three new API routes for user listing, suspension toggle, and role changes. Deliberately does NOT modify auth middleware or the User model beyond adding `updatedAt` to the TypeScript interface.
+
+### Why (intent)
+Admins need to manage platform users — view all users, filter by role/status, search by name/email, suspend abusive accounts, and reassign roles (poster ↔ driver) without touching the database directly.
+
+### Design
+- `src/types/admin/adminUsers.ts` — `AdminUserItem`, `AdminUsersResponse`, `AdminUserRoleFilter`, `AdminUserStatusFilter`.
+- `src/api/apis/admin/adminUsersApi.ts` — `getAdminUsers()`, `toggleSuspendUser()`, `changeUserRole()`.
+- `src/api/hooks/admin/adminUsersApi.ts` — `useAdminUsers()`, `useToggleSuspendUser()`, `useChangeUserRole()`.
+- `src/components/admin/UserActionModal.tsx` — modal with three modes: `details`, `suspend`, `role`.
+- `src/app/(admin)/admin/users/page.tsx` — role tabs, status dropdown, debounced search, paginated table, CSV export button.
+- `GET /api/admin/users` — paginated, filterable by role/status, searchable by name/email.
+- `PATCH /api/admin/users/:id/suspend` — toggle `isActive`.
+- `PATCH /api/admin/users/:id/role` — change role between `poster` and `driver`.
+- `src/models/User.ts` — Added `updatedAt: Date` to `IUser` interface.
+
+### Implementation trail
+1. Created PLMS layers: types → apis → hooks → components → page.
+2. Built three admin API routes with `withRole(["admin"])` guards and structured query params.
+3. Implemented `UserActionModal` with confirmation flow for suspend and role-change actions.
+4. Added `updatedAt: Date` to `IUser` to align the TypeScript interface with Mongoose `timestamps: true`.
+
+### Verification
+- `npm run build` — exit code 0, all 42 pages generated, type-check clean.
+
+### Follow-ups
+- Add email notification when a user is suspended or their role is changed.
+- Restrict role changes so admins cannot demote other admins (currently only poster ↔ driver is allowed).
 
 ---
 

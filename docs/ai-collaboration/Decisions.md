@@ -240,3 +240,44 @@ Format: newest at the top. Every decision gets the **model/session** that made i
 
 
 **Why:** The strict constraints forbid inventing new statuses. `delivered` is the correct existing-value mapping. All checks reference `JOB_STATUS.DELIVERED` (no hardcoded strings).
+
+---
+
+## D-33 — Add `DISPUTED` to `JOB_STATUS` enum instead of using a magic string
+
+**Status:** Accepted · **Model:** project session (Day 54) · **Applies to:** `src/types/job.ts`, `src/app/api/admin/jobs/[id]/status/route.ts`
+
+**Decision:** Added `disputed` as a first-class member of `JOB_STATUS`. The admin status override route now imports and uses `JOB_STATUS.DISPUTED` instead of a raw `"disputed"` string.
+
+**Why:** Magic strings in route handlers drift from the source-of-truth enum and break type safety. Adding `disputed` to the enum makes the status discoverable, typed, and consistent across the admin UI and API.
+
+---
+
+## D-34 — Admin user role changes constrained to poster ↔ driver only
+
+**Status:** Accepted · **Model:** project session (Day 55) · **Applies to:** `PATCH /api/admin/users/:id/role`
+
+**Decision:** The role-change endpoint only accepts `poster` and `driver` as target roles. Admin role assignment/removal is deliberately excluded.
+
+**Why:** Allowing admins to change other admins' roles creates a privilege-escalation surface. Constraining to poster/driver keeps the endpoint safe for day-to-day operations while preserving admin immutability.
+
+---
+
+## D-35 — Align `IUser` TypeScript interface with Mongoose `timestamps: true`
+
+**Status:** Accepted · **Model:** project session (Day 55) · **Applies to:** `src/models/User.ts`
+
+**Decision:** Added `updatedAt: Date` to the `IUser` interface so TypeScript knows about the field Mongoose adds automatically via `timestamps: true`.
+
+**Why:** Without the interface field, any consumer reading `user.updatedAt` gets a TypeScript error even though the field exists at runtime. Adding it to the interface keeps the types and schema in sync without runtime changes.
+
+---
+
+## D-32 — `$dateTrunc` buckets for earnings; week start uses `startOfWeek`, not `weekStartDay`
+
+**Status:** Accepted · **Model:** project session (Phase 7) · **Applies to:** `src/lib/earnings.ts`
+
+**Decision:** Weekly earnings aggregation uses `$dateTrunc` with `startOfWeek: "monday"` (not `weekStartDay`). Atlas rejects `weekStartDay` with an "Unrecognized argument" error.
+
+**Why:** `startOfWeek` is the documented MongoDB 5.0+ option name. The original draft used `weekStartDay` (a common confusion from SQL week functions) and failed at runtime against Atlas.
+

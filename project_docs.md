@@ -873,3 +873,85 @@ Fetching a driver's full payout history to compute totals in JS (a) violates "ne
 - Endpoint harness (temp script, direct handler invocation with real signed JWTs): 13/13 checks PASSED — driver-own week 3700/3, month 7700/5, all-time 7700/5; default range = week; driver querying another driver → 403; admin can query any driver (week 4500/2, month 7700/5); breakdown shape valid; `summary` equals the aggregate of `breakdown`; invalid range falls back to week; no token → 401.
 - `npm run lint` — no new problems; the 4 errors are pre-existing (register page unescaped entities, `any` in `errorResponse.ts` and one other file).
 - `npm run build` — clean; `/api/drivers/[id]/earnings` listed in the route manifest.
+
+---
+
+## Days 54–55 — Admin Job & User Management
+
+### Day 54 — Admin Job Management
+
+#### New Files
+- `src/types/admin/adminJobs.ts` — Admin job domain types: `AdminJobItem`, `AdminJobsResponse`, `AdminJobsQueryParams`, `AllowedOverrideStatus`, `StatusOverrideInput`.
+- `src/api/apis/admin/adminJobsApi.ts` — Plain fetchers: `getAdminJobs(params)` (GET `/api/admin/jobs` with status/search/page/limit), `overrideJobStatus(jobId, data)` (PATCH `/api/admin/jobs/:id/status`).
+- `src/api/hooks/admin/adminJobsApi.ts` — `useAdminJobs(queryParams)` and `useOverrideJobStatus()` (invalidates admin jobs query on success, toasts).
+- `src/components/admin/StatusOverrideModal.tsx` — Modal for overriding job status: dropdown of allowed target statuses, reason textarea, audit warning about irreversible action, confirm/cancel buttons.
+- `src/app/(admin)/admin/jobs/page.tsx` — Admin job management page with stat cards (total, in-transit, disputed, cancelled), filter tabs, debounced search, paginated table, status override action.
+
+#### Modified Files
+- `src/types/job.ts` — Added `DISPUTED` to `JOB_STATUS` enum.
+- `src/app/api/admin/jobs/[id]/status/route.ts` — Replaced magic string `"disputed"` with `JOB_STATUS.DISPUTED`.
+- `src/utils/format.ts` — Added `formatNpr()` and `formatShortDate()` utilities.
+
+#### API Routes
+| Method | Route | Auth | Purpose |
+|--------|-------|------|---------|
+| GET | `/api/admin/jobs` | `withRole(["admin"])` | Paginated job list with `status`, `search`, `page`, `limit` |
+| PATCH | `/api/admin/jobs/:id/status` | `withRole(["admin"])` | Override job status with audit reason |
+
+#### Architectural Decisions
+- **PLMS layering:** types → apis → hooks → components → page.
+- **Status override is admin-only:** both endpoints wrapped in `withRole(["admin"])`.
+- **Audit trail:** override route requires a `reason` string; the modal surfaces an irreversible-action warning before confirming.
+- **`DISPUTED` status added to enum:** replaces the previous magic string `"disputed"` in the status override route.
+- **Pagination from day one:** `PAGE_SIZE = 10` enforced on the admin jobs list.
+
+---
+
+### Day 55 — Admin User Management
+
+#### New Files
+- `src/types/admin/adminUsers.ts` — Admin user domain types: `AdminUserItem`, `AdminUsersResponse`, `AdminUserRoleFilter`, `AdminUserStatusFilter`.
+- `src/types/adminUsers.ts` — Barrel re-export for admin user types.
+- `src/app/api/admin/users/route.ts` — `GET /api/admin/users` (paginated, role/status filters, search).
+- `src/app/api/admin/users/[id]/suspend/route.ts` — `PATCH /api/admin/users/:id/suspend` (toggle suspend, admin guard).
+- `src/app/api/admin/users/[id]/role/route.ts` — `PATCH /api/admin/users/:id/role` (poster ↔ driver, admin guard).
+- `src/api/apis/admin/adminUsersApi.ts` — `getAdminUsers()`, `toggleSuspendUser()`, `changeUserRole()`.
+- `src/api/hooks/admin/adminUsersApi.ts` — `useAdminUsers()`, `useToggleSuspendUser()`, `useChangeUserRole()`.
+- `src/components/admin/UserActionModal.tsx` — Modal for user details/suspend/role-change with confirmation flow.
+- `src/app/(admin)/admin/users/page.tsx` — User management page with role tabs, status dropdown, search, table, pagination.
+
+#### Modified Files
+- `src/models/User.ts` — Added `updatedAt: Date` to `IUser` interface to align with `timestamps: true`.
+
+#### API Routes
+| Method | Route | Auth | Purpose |
+|--------|-------|------|---------|
+| GET | `/api/admin/users` | `withRole(["admin"])` | Paginated user list with role/status filters + search |
+| PATCH | `/api/admin/users/:id/suspend` | `withRole(["admin"])` | Toggle user suspend/active |
+| PATCH | `/api/admin/users/:id/role` | `withRole(["admin"])` | Change user role (poster ↔ driver) |
+
+#### Architectural Decisions
+- **PLMS layering:** types → apis → hooks → components → page.
+- **Admin-only access:** all three endpoints wrapped in `withRole(["admin"])`.
+- **Role change is constrained:** only poster ↔ driver transitions allowed; admin role cannot be self-assigned.
+- **Suspend is a toggle:** the endpoint flips `isActive` rather than accepting a boolean, preventing accidental desync.
+- **TypeScript aligned with Mongoose timestamps:** added `updatedAt: Date` to `IUser` so the interface matches the runtime schema (`timestamps: true`).
+
+#### Verification
+- `npm run build` — exit code 0, all 42 pages generated, type-check clean.
+
+---
+
+## Days 56 — Driver Earnings and Payouts Restructuring
+
+### Summary of Changes
+Restructured the driver earnings and payouts pages to resolve layout/intent mismatch between the premium analytics dashboard and the detailed transactions ledger:
+- Move original Payout history listing page to `/driver/payouts`.
+- Rebuilt `/driver/earnings` page to match the premium "Driver Earnings Dashboard" with analytics grid, custom SVG-based weekly chart, and right-hand processing time panels.
+
+#### New Files
+- `src/app/(main)/driver/payouts/page.tsx` — Ledger view showing total paid, pending payouts, total payout transactions, and payout history list.
+
+#### Modified Files
+- `src/app/(main)/driver/earnings/page.tsx` — Premium analytics page with total earnings, weekly earnings + indicator, pending payouts, custom SVG weekly earnings bar chart, recent transactions, payout info processing times panel, and support block.
+

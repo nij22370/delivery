@@ -7,6 +7,7 @@ export const JOB_STATUS = {
   IN_TRANSIT: "in_transit",
   DELIVERED: "delivered",
   CANCELLED: "cancelled",
+  DISPUTED: "disputed",
 } as const;
 
 export type JobStatus = (typeof JOB_STATUS)[keyof typeof JOB_STATUS];

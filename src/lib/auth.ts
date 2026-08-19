@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import connectDB from "@/lib/db";
+import User from "@/models/User";
 import type { JwtAccessPayload, JwtRefreshPayload } from "@/types/auth/auth";
 
 const ACCESS_TOKEN_EXPIRY = "15m";
@@ -56,6 +58,17 @@ export function withAuth(
       }
 
       const user = verifyAccessToken(token);
+
+      await connectDB();
+      const dbUser = await User.findById(user.userId).select("isSuspended").lean();
+      if (!dbUser) {
+        return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+      }
+
+      if (dbUser.isSuspended) {
+        return NextResponse.json({ message: "Account is suspended" }, { status: 403 });
+      }
+
       return await handler(req, user);
     } catch (error) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
