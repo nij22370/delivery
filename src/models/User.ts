@@ -8,7 +8,9 @@ export interface IUser extends Document {
   oauthProvider?: string | null;
   oauthId?: string | null;
   refreshTokenHash?: string | null;
+  isSuspended?: boolean;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 const userSchema = new Schema<IUser>(
@@ -25,6 +27,7 @@ const userSchema = new Schema<IUser>(
     oauthProvider: { type: String, default: null },
     oauthId: { type: String, default: null },
     refreshTokenHash: { type: String, default: null },
+    isSuspended: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
