@@ -117,3 +117,11 @@ export function formatShortDate(dateStrOrDate: string | Date): string {
   });
 }
 
+export function formatTime(dateStrOrDate: string | Date): string {
+  const date = typeof dateStrOrDate === "string" ? new Date(dateStrOrDate) : dateStrOrDate;
+  return date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}

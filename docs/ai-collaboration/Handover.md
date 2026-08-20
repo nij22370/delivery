@@ -4,7 +4,7 @@
 
 **App:** SwiftShip — Driver Delivery Platform
 **Stack:** Next.js 16 (App Router) · MongoDB Atlas (Mongoose 9) · Tailwind v4 · React Query · Zustand · Pusher · Leaflet
-**Last updated:** Aug 18 — Days 54–55 complete (Admin Job + User Management)
+**Last updated:** Aug 18 — Days 56–58 complete (Dispute Management + Analytics)
 
 ---
 
@@ -28,6 +28,9 @@
 | Aug 18 | **Phase 7 Driver Earnings Dashboard UI:** Redesigned `/driver/earnings` to match the Stitch design reference (Image 2). Updated `SummaryCards` (Total Earnings, This Week with trend badge, Pending Payouts), rebuilt `EarningsChart` with interactive range switching (`Last 8 Weeks` / `Last 12 Months` / `All Time`), custom SVG gradients, rounded bars, custom glassmorphism tooltip, and empty state. Added `RecentTransactions` table (Date, Job ID, Gateway badge, NPR amount, status pill), `PayoutInfoCard` (processing times callout + settings link), and `SupportCard`. Verified production build `npm run build` exit code 0. Traced as FEATURE-05. | — | None |
 | Aug 18 | **Day 54 — Admin Job Management:** Created `/(admin)/admin/jobs` page with stat cards, filter tabs, search, paginated table, and `StatusOverrideModal` for status overrides with audit reasons. Added `GET /api/admin/jobs` and `PATCH /api/admin/jobs/:id/status`. Added `DISPUTED` to `JOB_STATUS` enum. Build clean. Traced as FEATURE-06. | — | None |
 | Aug 18 | **Day 55 — Admin User Management:** Created `/(admin)/admin/users` page with role tabs, status dropdown, search, paginated table, and `UserActionModal` (details/suspend/role-change). Added `GET /api/admin/users`, `PATCH /api/admin/users/:id/suspend`, and `PATCH /api/admin/users/:id/role`. Added `updatedAt: Date` to `IUser` interface to match Mongoose `timestamps: true`. Build clean (`npm run build` exit code 0, all 42 pages generated). Traced as FEATURE-07. | — | None |
+| Aug 18 | **Day 56 — Dispute Flag + Resolution (updated):** Added `evidenceImages`, lifecycle timestamps (`acceptedAt`, `inTransitAt`, `deliveredAt`, `disputedAt`) to Job schema. Built `POST /api/jobs/:id/dispute` (participant-only), `POST /api/jobs/:id/evidence` (Cloudinary uploads to `dispute-evidence/{jobId}`), `GET /api/admin/disputes` (admin-only paginated queue with evidence + timestamps), `PATCH /api/admin/jobs/:id/resolve` (admin-only with optional payout status update). Updated accept/transit/deliver routes to populate timestamps atomically. Admin dispute detail panel now renders real evidence images (Cloudinary URLs), real chat transcript (fetched from `GET /api/jobs/:id/messages`), and real delivery timeline from lifecycle timestamps. Updated seed script with evidence URLs and messages. Build clean (`npm run build` exit code 0). Traced as FEATURE-08. | — | None |
+| Aug 18 | **Day 57 — Analytics Endpoint:** Built `GET /api/admin/analytics` returning `jobsPerDay` (30-day `$dateTrunc` daily buckets), `gmv` (`$sum` of delivered `offeredPrice`), and `activeDrivers` (`countDocuments` on approved profiles). Traced as FEATURE-09. | — | None |
+| Aug 18 | **Day 58 — Analytics Dashboard UI:** Built `/(admin)/admin/analytics` page with three KPI cards (GMV, active drivers, total jobs 30d) and Recharts BarChart for daily job volume. Added Disputes and Analytics links to admin sidebar. Build clean (`npm run build` exit code 0). Traced as FEATURE-09. | — | None |
 
 
 ---

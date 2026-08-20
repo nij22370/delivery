@@ -955,3 +955,94 @@ Restructured the driver earnings and payouts pages to resolve layout/intent mism
 #### Modified Files
 - `src/app/(main)/driver/earnings/page.tsx` — Premium analytics page with total earnings, weekly earnings + indicator, pending payouts, custom SVG weekly earnings bar chart, recent transactions, payout info processing times panel, and support block.
 
+---
+
+## Days 56–58 — Dispute Management & Analytics
+
+### Day 56 — Dispute Flag + Resolution
+
+#### Modified Files
+- `src/models/Job.ts` — Added `disputeReason`, `flaggedBy`, `resolutionNote`, `evidenceImages: string[]`, `acceptedAt`, `inTransitAt`, `deliveredAt`, `disputedAt` to schema and `IJob` interface.
+- `src/app/api/jobs/[id]/accept/route.ts` — Sets `acceptedAt` on atomic accept.
+- `src/app/api/jobs/[id]/transit/route.ts` — Sets `inTransitAt` on atomic transit.
+- `src/app/api/jobs/[id]/deliver/route.ts` — Sets `deliveredAt` on atomic deliver.
+- `src/app/api/jobs/[id]/dispute/route.ts` — Sets `disputedAt` on dispute flag.
+
+#### New Files
+- `src/types/admin/adminDisputes.ts` — Dispute domain types: `DisputedJobItem` (now includes `evidenceImages`, `acceptedAt`, `inTransitAt`, `deliveredAt`, `disputedAt`), `DisputesQuery`, `DisputesResponse`, `ResolveJobInput`, `ResolveJobResponse`.
+- `src/api/apis/admin/adminDisputesApi.ts` — `getAdminDisputes(query)` and `resolveJobDispute(jobId, data)`.
+- `src/api/hooks/admin/adminDisputesApi.ts` — `useAdminDisputes()` and `useResolveJobDispute()`.
+- `src/components/admin/ResolveDisputeModal.tsx` — Modal for resolving a dispute with `resolvedStatus` dropdown, admin note textarea, payout status selector, and confirm/cancel buttons.
+- `src/app/api/jobs/[id]/dispute/route.ts` — `POST /api/jobs/:id/dispute`. Participant-only (`withAuth`); validates participant, checks disputable statuses (`accepted`, `in_transit`, `delivered`), sets `status` to `disputed`, stores `disputeReason` and `flaggedBy`, sets `disputedAt`, triggers Pusher `status-change`.
+- `src/app/api/admin/disputes/route.ts` — `GET /api/admin/disputes`. Admin-only (`withRole(["admin"])`); returns paginated disputed jobs with populated poster/driver names, dispute reason, flagged-by role, route, amount, evidence images, and lifecycle timestamps.
+- `src/app/api/admin/jobs/[id]/resolve/route.ts` — `PATCH /api/admin/jobs/:id/resolve`. Admin-only; accepts `resolvedStatus` (`posted`/`cancelled`), `note`, and optional `payoutStatus` (`paid`/`failed`). Updates job status, clears `driverId` if reopened, saves `resolutionNote`, optionally updates linked `Payout` status, triggers Pusher `status-change`.
+- `src/app/api/jobs/[id]/evidence/route.ts` — `POST /api/jobs/:id/evidence`. Participant-only (`withAuth`); accepts `multipart/form-data` image uploads, validates MIME type (jpeg/png/webp) and size (max 5MB), uploads to Cloudinary under `dispute-evidence/{jobId}` folder, appends `secure_url` values to Job `evidenceImages` array.
+- `src/app/(admin)/admin/disputes/page.tsx` — Admin dispute queue with search, disputed jobs table (reason, flagged-by badge, parties, amount), resolve action, and pagination. Detail panel includes:
+  - Evidence Image Grid rendered from real `evidenceImages` URLs (Cloudinary, via `next/image`).
+  - Chat Transcript Snippet fetched from `GET /api/jobs/:id/messages` in real time.
+  - Delivery Timeline built from real `acceptedAt` → `inTransitAt` → `deliveredAt` → `disputedAt` timestamps.
+- `src/app/(main)/jobs/[id]/page.tsx` — Added participant-only dispute flag button with confirmation modal for jobs in `accepted`/`in_transit`/`delivered` status.
+
+#### API Routes
+| Method | Route | Auth | Purpose |
+|--------|-------|------|---------|
+| POST | `/api/jobs/:id/dispute` | `withAuth` (participant only) | Flag job as disputed with reason |
+| POST | `/api/jobs/:id/evidence` | `withAuth` (participant only) | Upload evidence images to Cloudinary |
+| GET | `/api/admin/disputes` | `withRole(["admin"])` | Paginated disputed jobs with participant info, evidence, and lifecycle timestamps |
+| PATCH | `/api/admin/jobs/:id/resolve` | `withRole(["admin"])` | Resolve dispute, update status + note, optional payout update |
+
+#### Architectural Decisions
+- **Dispute fields on Job model:** `disputeReason`, `flaggedBy`, `resolutionNote`, `evidenceImages`, and lifecycle timestamps (`acceptedAt`, `inTransitAt`, `deliveredAt`, `disputedAt`) added directly to Job so the dispute state travels with the job document.
+- **Participant-only flagging:** the dispute route checks `posterId` or `driverId` against the JWT `userId`; only disputable statuses (`accepted`, `in_transit`, `delivered`) are allowed.
+- **Pusher event on dispute flag and resolve:** both routes fire `status-change` on `private-job-{jobId}` so real-time subscribers update immediately.
+- **Payout status update on resolve:** optional `payoutStatus` in the resolve body updates the linked `Payout` document in the same transaction, keeping financial state consistent.
+- **Evidence images via Cloudinary:** `POST /api/jobs/:id/evidence` uploads to Cloudinary `dispute-evidence/{jobId}` folder, returns `secure_url` array, and appends to Job `evidenceImages`. Admin panel renders these via `next/image`.
+- **Real chat transcript:** admin dispute detail fetches `GET /api/jobs/:id/messages` for the disputed job and renders sender-colored bubbles with real timestamps.
+- **Real delivery timeline:** built from `acceptedAt`, `inTransitAt`, `deliveredAt`, and `disputedAt` fields populated at each lifecycle transition (accept/transit/deliver/dispute).
+
+### Day 57 — Analytics Endpoints
+
+#### New Files
+- `src/types/admin/adminAnalytics.ts` — `JobsPerDayItem` and `AdminAnalyticsResponse`.
+- `src/app/api/admin/analytics/route.ts` — `GET /api/admin/analytics`. Admin-only; returns three metrics:
+  1. `jobsPerDay`: `$dateTrunc` daily buckets for the last 30 days (`%Y-%m-%d` format).
+  2. `gmv`: `$sum` of `offeredPrice` where `status === JOB_STATUS.DELIVERED`.
+  3. `activeDrivers`: `countDocuments` on `DriverProfile` where `status === "approved"`.
+- `src/api/apis/admin/adminAnalyticsApi.ts` — `getAdminAnalytics()`.
+- `src/api/hooks/admin/adminAnalyticsApi.ts` — `useAdminAnalytics()` (30s staleTime, 60s refetch interval).
+
+#### API Routes
+| Method | Route | Auth | Purpose |
+|--------|-------|------|---------|
+| GET | `/api/admin/analytics` | `withRole(["admin"])` | Returns `jobsPerDay`, `gmv`, `activeDrivers` |
+
+#### Architectural Decisions
+- **`$dateTrunc` with day unit:** daily bucketing uses `$dateToString` on `createdAt` with `%Y-%m-%d` format — no `weekStartDay` used.
+- **Single response shape:** all three metrics are returned in one call to avoid multiple round-trips.
+- **GMV uses `offeredPrice` on delivered jobs:** matches the existing revenue aggregation pattern in the admin jobs endpoint.
+
+### Day 58 — Analytics Dashboard UI
+
+#### New Files
+- `src/app/(admin)/admin/analytics/page.tsx` — Admin analytics page with:
+  - Three KPI cards: Total GMV (NPR formatted), Active Drivers, Jobs (Last 30 Days).
+  - Recharts `BarChart` for `jobsPerDay` trend (30-day daily volume).
+  - Loading and empty states handled.
+
+#### Modified Files
+- `src/components/admin/AdminSidebar.tsx` — Added "Disputes" and "Analytics" nav links.
+- `next.config.ts` — Added `res.cloudinary.com` to `images.remotePatterns` so Next.js `<Image />` can render Cloudinary URLs in the dispute evidence grid.
+
+#### New Seed Scripts
+- `scripts/seed-disputes.ts` — Seeds 5 disputed jobs with evidence images (Cloudinary demo URLs), chat messages, and lifecycle timestamps (`acceptedAt`, `inTransitAt`, `deliveredAt`, `disputedAt`). Run with `npx tsx scripts/seed-disputes.ts`.
+
+#### Architectural Decisions
+- **Recharts BarChart (not Line):** bars make per-day volume easier to read at a glance per the design reference.
+- **KPI cards mirror existing admin dashboard styling:** same card structure, icon containers, and typography tokens.
+- **TanStack Query with refetch:** `useAdminAnalytics` uses 30s staleTime and 60s refetchInterval for near-live metrics.
+
+### Verification
+- `npx tsc --noEmit` — 0 errors.
+- `npx eslint` on all changed files — 0 errors.
+- Build verified clean (`npm run build` exit code 0, all routes compiled).
+

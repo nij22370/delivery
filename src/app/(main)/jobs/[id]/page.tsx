@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useCallback } from "react";
+import { use, useCallback, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -19,6 +19,11 @@ const ACCEPT_ENDPOINT_BASE = "/api/jobs";
 const POSTER_ROLE = "poster";
 const DASHBOARD_PATH = "/dashboard";
 const CHAT_VISIBLE_STATUSES: Set<string> = new Set([
+  JOB_STATUS.ACCEPTED,
+  JOB_STATUS.IN_TRANSIT,
+  JOB_STATUS.DELIVERED,
+]);
+const DISPUTABLE_STATUSES: Set<string> = new Set([
   JOB_STATUS.ACCEPTED,
   JOB_STATUS.IN_TRANSIT,
   JOB_STATUS.DELIVERED,
@@ -153,6 +158,52 @@ export default function JobDetailPage({
   const handleAccept = useCallback(() => {
     acceptMutation.mutate();
   }, [acceptMutation]);
+
+  const [isDisputeModalOpen, setIsDisputeModalOpen] = useState(false);
+  const [disputeReason, setDisputeReason] = useState("");
+
+  const disputeMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiFetch(`${ACCEPT_ENDPOINT_BASE}/${id}/dispute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: disputeReason }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          (errorData as { error?: string }).error ?? "Failed to flag dispute."
+        );
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [JOB_DETAIL_QUERY_KEY, id] });
+      setIsDisputeModalOpen(false);
+      setDisputeReason("");
+    },
+  });
+
+  const handleOpenDispute = useCallback(() => {
+    setIsDisputeModalOpen(true);
+  }, []);
+
+  const handleCloseDispute = useCallback(() => {
+    setIsDisputeModalOpen(false);
+    setDisputeReason("");
+  }, [setIsDisputeModalOpen, setDisputeReason]);
+
+  const handleConfirmDispute = useCallback(() => {
+    if (!disputeReason.trim()) return;
+    disputeMutation.mutate();
+  }, [disputeReason, disputeMutation]);
+
+  const isDisputable =
+    !isAuthLoading &&
+    (isPoster || isDriver) &&
+    job &&
+    DISPUTABLE_STATUSES.has(job.status) &&
+    job.status !== JOB_STATUS.DISPUTED;
 
   const isContactRevealed = job?.status !== JOB_STATUS.POSTED;
 
@@ -505,6 +556,68 @@ export default function JobDetailPage({
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* ── Participant: Flag Dispute ───────────────────────────────*/}
+            {isDisputable && (
+              <div className="bg-surface-white border border-outline-variant rounded-xl p-6">
+                <h2 className="text-base font-semibold text-on-surface mb-2">
+                  Raise a Dispute
+                </h2>
+                <p className="text-sm text-secondary mb-4">
+                  Flag this job for admin review if there is an issue with the delivery.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleOpenDispute}
+                  className="w-full h-12 flex items-center justify-center gap-2 bg-error-container text-error-red border border-error-red/30 rounded-lg text-sm font-bold hover:bg-error-red/10 transition-colors cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-xl">warning</span>
+                  Flag Dispute
+                </button>
+              </div>
+            )}
+
+            {/* ── Dispute Confirmation Modal ──────────────────────────────*/}
+            {isDisputeModalOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <div
+                  className="absolute inset-0 bg-black/50"
+                  onClick={handleCloseDispute}
+                />
+                <div className="relative bg-surface-white border border-outline-variant rounded-xl shadow-lg p-6 w-full max-w-md">
+                  <h3 className="text-lg font-bold text-on-surface mb-2">
+                    Flag Dispute
+                  </h3>
+                  <p className="text-sm text-secondary mb-4">
+                    This will mark the job as disputed and notify the admin team. Please provide a reason.
+                  </p>
+                  <textarea
+                    value={disputeReason}
+                    onChange={(e) => setDisputeReason(e.target.value)}
+                    placeholder="Describe the issue..."
+                    rows={4}
+                    className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest p-3 text-sm focus:outline-none focus:border-2 focus:border-primary resize-none"
+                  />
+                  <div className="flex items-center justify-end gap-3 mt-4">
+                    <button
+                      type="button"
+                      onClick={handleCloseDispute}
+                      className="h-10 px-4 rounded-lg border border-outline-variant text-sm font-semibold text-on-surface hover:bg-surface-container-low transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleConfirmDispute}
+                      disabled={!disputeReason.trim() || disputeMutation.isPending}
+                      className="h-10 px-4 bg-error-red text-white rounded-lg text-sm font-bold hover:bg-error-red/90 transition-colors disabled:opacity-75 disabled:cursor-not-allowed cursor-pointer"
+                    >
+                      {disputeMutation.isPending ? "Flagging..." : "Flag Dispute"}
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>

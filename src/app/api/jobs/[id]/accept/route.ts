@@ -22,7 +22,7 @@ async function handleAcceptJob(
 
     const acceptedJob = await Job.findOneAndUpdate(
       { _id: id, status: JOB_STATUS.POSTED },
-      { $set: { status: JOB_STATUS.ACCEPTED, driverId: user.userId } },
+      { $set: { status: JOB_STATUS.ACCEPTED, driverId: user.userId, acceptedAt: new Date() } },
       { new: true }
     ).lean();
 
