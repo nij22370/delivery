@@ -26,7 +26,7 @@ async function handleTransitJob(
 
     const transitingJob = await Job.findOneAndUpdate(
       { _id: id, driverId: user.userId, status: JOB_STATUS.ACCEPTED },
-      { $set: { status: JOB_STATUS.IN_TRANSIT } },
+      { $set: { status: JOB_STATUS.IN_TRANSIT, inTransitAt: new Date() } },
       { new: true }
     ).lean();
 

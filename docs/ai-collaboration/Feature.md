@@ -41,12 +41,14 @@ Known gaps, future enhancements, things deliberately left out.
 
 | ID | Title | Status | Requested | Shipped in |
 | --- | --- | --- | --- | --- |
+| FEATURE-09 | Admin Analytics Dashboard UI + API | Shipped | Aug 18 | Day 58 |
+| FEATURE-08 | Dispute Flag + Resolution UI + API | Shipped | Aug 18 | Day 56 |
 | FEATURE-07 | Admin User Management UI + API | Shipped | Aug 18 | Day 55 |
 | FEATURE-06 | Admin Job Management UI + API | Shipped | Aug 18 | Day 54 |
 | FEATURE-05 | Driver Earnings Dashboard UI (Phase 7 Days 51–52) | Shipped | Aug 18 | Days 51–52 |
 | FEATURE-04 | 404 Not Found & Error Boundary UI Pages | Shipped | Aug 17 | Days 51–52 |
 | FEATURE-03 | Earnings aggregation pipeline + driver earnings endpoint | Shipped | Phase 7 Days 49–50 | Days 49–50 |
-| FEATURE-01 | Read receipts + unread badges + off-screen toasts | Shipped | Aug 13 | Days 35–37 |
+| FEATURE-01 | Read receipts + unread badges + off-screen message toasts | Shipped | Aug 13 | Days 35–37 |
 | FEATURE-02 | Nepal payment pipeline: Khalti + eSewa, idempotent verify, payout status UI | Shipped | build plan Days 38-48 | Days 38-48 |
 
 ---
@@ -142,6 +144,84 @@ Admins need to manage platform users — view all users, filter by role/status, 
 ### Follow-ups
 - Add email notification when a user is suspended or their role is changed.
 - Restrict role changes so admins cannot demote other admins (currently only poster ↔ driver is allowed).
+
+---
+
+## FEATURE-08 — Dispute Flag + Resolution UI + API (Day 56)
+
+**Requested:** Aug 18 | **Requested by:** Phase 8 build plan
+**Status:** Shipped
+**Scope:** Participant-only dispute flagging on job detail page, admin dispute queue with resolve modal, evidence image upload via Cloudinary, real chat transcript fetching, and real delivery timeline from lifecycle timestamps. Includes four API routes for flagging, uploading evidence, listing, and resolving disputes. Deliberately does NOT modify auth middleware, payment routes, or Pusher helper.
+
+### Why (intent)
+Participants (poster/driver) need a way to flag delivery disputes for admin review with supporting evidence. Admins need a centralized queue to review flagged jobs, inspect uploaded evidence images, read the real chat transcript, see the actual delivery timeline, and resolve them by reopening or cancelling the job, with an optional payout status update.
+
+### Design
+- `src/models/Job.ts` — Added `disputeReason`, `flaggedBy`, `resolutionNote`, `evidenceImages: string[]`, `acceptedAt`, `inTransitAt`, `deliveredAt`, `disputedAt`.
+- `src/types/admin/adminDisputes.ts` — `DisputedJobItem` (includes `evidenceImages`, lifecycle timestamps), `DisputesResponse`, `ResolveJobInput`, `ResolveJobResponse`.
+- `src/api/apis/admin/adminDisputesApi.ts` — `getAdminDisputes()`, `resolveJobDispute()`.
+- `src/api/hooks/admin/adminDisputesApi.ts` — `useAdminDisputes()`, `useResolveJobDispute()`.
+- `src/components/admin/ResolveDisputeModal.tsx` — resolve modal with `resolvedStatus` dropdown, note textarea, payout status selector.
+- `src/app/(admin)/admin/disputes/page.tsx` — dispute queue table with search, pagination, resolve action. Detail panel includes:
+  - Evidence Image Grid rendered from real `evidenceImages` URLs (Cloudinary, via `next/image`).
+  - Chat Transcript Snippet fetched from `GET /api/jobs/:id/messages` in real time.
+  - Delivery Timeline built from real `acceptedAt` → `inTransitAt` → `deliveredAt` → `disputedAt` timestamps.
+- `src/app/(main)/jobs/[id]/page.tsx` — participant-only flag button with confirmation modal for `accepted`/`in_transit`/`delivered` jobs.
+- `POST /api/jobs/:id/dispute` — participant-only, sets status to `disputed`, stores reason + flaggedBy + disputedAt, triggers Pusher.
+- `POST /api/jobs/:id/evidence` — participant-only, accepts `multipart/form-data` image uploads, uploads to Cloudinary `dispute-evidence/{jobId}` folder, appends URLs to Job `evidenceImages`.
+- `GET /api/admin/disputes` — admin-only, paginated disputed jobs with populated poster/driver info, evidence images, and lifecycle timestamps.
+- `PATCH /api/admin/jobs/:id/resolve` — admin-only, resolves to `posted`/`cancelled`, saves note, optional payout update.
+
+### Implementation trail
+1. Added dispute fields and lifecycle timestamps to Job schema + `IJob` interface.
+2. Updated accept/transit/deliver/dispute routes to populate timestamps atomically.
+3. Created PLMS layers: types → apis → hooks → components → page.
+4. Built evidence upload endpoint with Cloudinary integration.
+5. Built four API routes with proper auth guards (`withAuth` for participants, `withRole(["admin"])` for admin routes).
+6. Added flag button + confirmation modal to job detail page.
+7. Built admin dispute queue table + resolve modal + real evidence/chat/timeline panels.
+
+### Verification
+- `npx tsc --noEmit` — 0 errors.
+- `npx eslint` on all changed files — 0 errors.
+- `npm run build` — exit code 0.
+
+### Follow-ups
+- Wire the evidence upload UI to the job detail page (endpoint exists, participant UI not yet wired).
+- Add dispute status filter tabs (All / Under Review / Pending Info).
+
+---
+
+## FEATURE-09 — Admin Analytics Dashboard UI + API (Days 57–58)
+
+**Requested:** Aug 18 | **Requested by:** Phase 8 build plan
+**Status:** Shipped
+**Scope:** Analytics aggregation endpoint (`GET /api/admin/analytics`) returning 30-day jobs-per-day trend, total GMV, and active driver count. Admin analytics dashboard page with KPI cards and Recharts BarChart. Deliberately does NOT modify existing admin pages or auth files.
+
+### Why (intent)
+Admins need a single-page overview of platform health: delivery volume over time, total revenue from completed jobs, and how many drivers are currently approved and active.
+
+### Design
+- `src/types/admin/adminAnalytics.ts` — `JobsPerDayItem`, `AdminAnalyticsResponse`.
+- `src/app/api/admin/analytics/route.ts` — `GET /api/admin/analytics`. Uses `$dateTrunc` daily bucketing for last 30 days, `$sum` of `offeredPrice` for GMV on delivered jobs, `countDocuments` for approved drivers.
+- `src/api/apis/admin/adminAnalyticsApi.ts` — `getAdminAnalytics()`.
+- `src/api/hooks/admin/adminAnalyticsApi.ts` — `useAdminAnalytics()` with 30s staleTime and 60s refetchInterval.
+- `src/app/(admin)/admin/analytics/page.tsx` — three KPI cards (GMV, active drivers, total jobs 30d) + Recharts BarChart for daily job volume.
+
+### Implementation trail
+1. Created analytics types and API route with three parallel aggregations.
+2. Built plain async fetcher and TanStack Query hook.
+3. Created analytics dashboard page with KPI cards and BarChart, matching existing admin design tokens.
+
+### Verification
+- `npx tsc --noEmit` — 0 errors.
+- `npx eslint` on all changed files — 0 errors.
+- `npm run build` — exit code 0.
+
+### Follow-ups
+- Add GMV trend line (daily GMV, not just count).
+- Add platform revenue breakdown by payment method (eSewa/Khalti).
+- Add CSV export for analytics data.
 
 ---
 

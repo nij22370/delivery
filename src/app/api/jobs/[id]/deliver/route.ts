@@ -31,7 +31,7 @@ async function handleDeliverJob(
 
     const deliveredJob = await Job.findOneAndUpdate(
       { _id: id, driverId: user.userId, status: JOB_STATUS.IN_TRANSIT },
-      { $set: { status: JOB_STATUS.DELIVERED } },
+      { $set: { status: JOB_STATUS.DELIVERED, deliveredAt: new Date() } },
       { new: true }
     ).lean();
 

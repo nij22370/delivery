@@ -24,6 +24,14 @@ export interface IJob extends Document {
   paymentPidx?: string;
   paymentTransactionUuid?: string;
   paymentStatus?: PaymentStatus;
+  disputeReason?: string;
+  flaggedBy?: "poster" | "driver";
+  resolutionNote?: string;
+  evidenceImages?: string[];
+  acceptedAt?: Date;
+  inTransitAt?: Date;
+  deliveredAt?: Date;
+  disputedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -73,6 +81,18 @@ const jobSchema = new Schema<IJob>(
       type: String,
       enum: ["initiated", "paid", "failed"],
     },
+    disputeReason: { type: String, default: null },
+    flaggedBy: {
+      type: String,
+      enum: ["poster", "driver"],
+      default: null,
+    },
+    resolutionNote: { type: String, default: null },
+    evidenceImages: [{ type: String }],
+    acceptedAt: { type: Date, default: null },
+    inTransitAt: { type: Date, default: null },
+    deliveredAt: { type: Date, default: null },
+    disputedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

@@ -273,6 +273,86 @@ Format: newest at the top. Every decision gets the **model/session** that made i
 
 ---
 
+## D-36 — Dispute fields stored on the Job document, not a separate collection
+
+**Status:** Accepted · **Model:** project session (Day 56) · **Applies to:** `src/models/Job.ts`
+
+**Decision:** Added `disputeReason`, `flaggedBy`, and `resolutionNote` directly to the Job schema rather than creating a separate Dispute collection.
+
+**Why:** Dispute state is tightly coupled to a single job — it always reads and writes together with the job document. A separate collection would require an extra lookup on every job detail render and complicate the resolve flow. Keeping it on Job keeps the read path O(1) and the resolve transaction atomic.
+
+---
+
+## D-37 — Dispute flag restricted to accepted/in_transit/delivered by participants only
+
+**Status:** Accepted · **Model:** project session (Day 56) · **Applies to:** `POST /api/jobs/:id/dispute`
+
+**Decision:** Only the poster or assigned driver can flag a dispute, and only when the job status is `accepted`, `in_transit`, or `delivered`.
+
+**Why:** A dispute is a claim about an active delivery. Allowing it on `posted` jobs (before assignment) or by non-participants would create noise and abuse. The status guard ensures every flag has real delivery context behind it.
+
+---
+
+## D-38 — Resolve endpoint optionally updates linked Payout status in the same transaction
+
+**Status:** Accepted · **Model:** project session (Day 56) · **Applies to:** `PATCH /api/admin/jobs/:id/resolve`
+
+**Decision:** The resolve body accepts an optional `payoutStatus` (`paid` | `failed`). When provided, the route runs `Payout.updateOne({ jobId }, { status: payoutStatus })` in the same request handler after saving the job.
+
+**Why:** Disputes often surface because a payout was incorrect. Updating the Payout in the same transaction keeps the financial state consistent without requiring the admin to visit two separate pages.
+
+---
+
+## D-39 — Analytics uses `$dateTrunc` daily bucketing for the last 30 days
+
+**Status:** Accepted · **Model:** project session (Day 57) · **Applies to:** `GET /api/admin/analytics`
+
+**Decision:** The `jobsPerDay` array uses `$group` with `$dateToString({ format: "%Y-%m-%d", date: "$createdAt" })` to bucket jobs by day for the last 30 days.
+
+**Why:** `$dateTrunc` with `unit: "day"` would also work, but `$dateToString` is already used elsewhere in the codebase (earnings aggregation) and produces the exact `YYYY-MM-DD` labels the chart expects. No `weekStartDay` is used.
+
+---
+
+## D-40 — Analytics GMV calculated from `offeredPrice` of delivered jobs only
+
+**Status:** Accepted · **Model:** project session (Day 57) · **Applies to:** `GET /api/admin/analytics`
+
+**Decision:** GMV sums `offeredPrice` where `status === JOB_STATUS.DELIVERED`. This matches the existing revenue aggregation pattern in the admin jobs endpoint.
+
+**Why:** Using delivered jobs only prevents counting revenue from cancelled or disputed jobs that never completed. It also aligns with how the existing admin dashboard calculates revenue, keeping the two endpoints consistent.
+
+---
+
+## D-41 — Lifecycle timestamps stored on Job document for dispute timeline
+
+**Status:** Accepted · **Model:** project session (Day 56) · **Applies to:** `src/models/Job.ts`, accept/transit/deliver/dispute routes
+
+**Decision:** Added `acceptedAt`, `inTransitAt`, `deliveredAt`, and `disputedAt` fields to the Job schema. Each lifecycle route (accept, transit, deliver, dispute) sets its corresponding timestamp atomically in the same `$set` as the status transition.
+
+**Why:** The admin dispute detail panel needs a real delivery timeline. Storing timestamps on the Job document avoids an extra `JobEvent` collection and keeps the timeline query O(1). The atomic `findOneAndUpdate` ensures the timestamp and status transition are never out of sync.
+
+---
+
+## D-42 — Evidence images stored on Job document, uploaded via Cloudinary
+
+**Status:** Accepted · **Model:** project session (Day 56) · **Applies to:** `src/models/Job.ts`, `POST /api/jobs/:id/evidence`
+
+**Decision:** Added `evidenceImages: string[]` to the Job schema. A new `POST /api/jobs/:id/evidence` endpoint accepts `multipart/form-data` image uploads, uploads them to Cloudinary under `dispute-evidence/{jobId}` folder, and appends the returned `secure_url` values to the Job's `evidenceImages` array.
+
+**Why:** Evidence is tightly coupled to a single job. Storing URLs on the Job document keeps the read path simple (no join required) and the upload transaction atomic. Cloudinary handles image optimization and CDN delivery. The 5MB per-file limit and MIME-type whitelist (jpeg/png/webp) prevent abuse.
+
+---
+
+## D-43 — Admin dispute detail fetches real chat messages from existing messages API
+
+**Status:** Accepted · **Model:** project session (Day 56) · **Applies to:** `src/app/(admin)/admin/disputes/page.tsx`
+
+**Decision:** The admin dispute detail panel fetches `GET /api/jobs/:id/messages?limit=50` for the disputed job and renders sender-colored chat bubbles with real timestamps, instead of showing hardcoded transcript text.
+
+**Why:** The chat transcript is the most important evidence in a delivery dispute. Hardcoded text is useless to admins. The existing messages API already supports participant-only access and pagination, so reusing it avoids building a new endpoint. The admin dispute page uses `useQuery` with `enabled: Boolean(selectedDispute)` to fetch messages only when a dispute is selected.
+
+---
+
 ## D-32 — `$dateTrunc` buckets for earnings; week start uses `startOfWeek`, not `weekStartDay`
 
 **Status:** Accepted · **Model:** project session (Phase 7) · **Applies to:** `src/lib/earnings.ts`
