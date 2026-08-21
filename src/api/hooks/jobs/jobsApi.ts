@@ -4,6 +4,7 @@ import {
   createJob,
   fetchUnreadCounts,
   markJobMessagesRead,
+  fetchMyJobs,
 } from '../../apis/jobs/jobApi';
 import type { CreateJobPayload, CreateJobResponse } from '@/types/jobs/jobs';
 import type { UnreadCountsByJob } from '@/types/message/message';
@@ -19,7 +20,7 @@ export function useJobCreate() {
 
   return useMutation<CreateJobResponse, AxiosError, CreateJobPayload>({
     mutationFn: createJob,
-    onSuccess: (data) => {
+    onSuccess: () => {
       // Invalidate jobs list queries if needed
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
       toast.success('Job created successfully');
@@ -55,5 +56,20 @@ export function useMarkMessagesRead() {
         }
       );
     },
+  });
+}
+
+const MY_JOBS_QUERY_KEY = 'myJobs';
+
+interface MyJobsQuery {
+  page?: number;
+  limit?: number;
+}
+
+export function useMyJobs(query: MyJobsQuery = {}) {
+  return useQuery({
+    queryKey: [MY_JOBS_QUERY_KEY, query],
+    queryFn: () => fetchMyJobs(query),
+    staleTime: 30_000,
   });
 }

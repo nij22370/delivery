@@ -47,3 +47,10 @@ export interface GetJobsResponse {
   page: number;
   totalPages: number;
 }
+
+export interface MyJobsResponse {
+  jobs: Array<Job & { driver?: { name?: string } | null }>;
+  total: number;
+  page: number;
+  totalPages: number;
+}
