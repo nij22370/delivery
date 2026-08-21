@@ -41,6 +41,8 @@ Known gaps, future enhancements, things deliberately left out.
 
 | ID | Title | Status | Requested | Shipped in |
 | --- | --- | --- | --- | --- |
+| FEATURE-11 | Admin Payout Management Queue | Shipped | Aug 20 | Day 62 |
+| FEATURE-10 | Poster Activity Dashboard | Shipped | Aug 20 | Day 61 |
 | FEATURE-09 | Admin Analytics Dashboard UI + API | Shipped | Aug 18 | Day 58 |
 | FEATURE-08 | Dispute Flag + Resolution UI + API | Shipped | Aug 18 | Day 56 |
 | FEATURE-07 | Admin User Management UI + API | Shipped | Aug 18 | Day 55 |
@@ -222,6 +224,81 @@ Admins need a single-page overview of platform health: delivery volume over time
 - Add GMV trend line (daily GMV, not just count).
 - Add platform revenue breakdown by payment method (eSewa/Khalti).
 - Add CSV export for analytics data.
+
+---
+
+## FEATURE-10 — Poster Activity Dashboard (Day 61)
+
+**Requested:** Aug 20 | **Requested by:** Post-v1 poster dashboard build plan
+**Status:** Shipped
+**Scope:** Unified `/dashboard` entry point with RBAC. Poster role sees a dashboard with four summary cards (Active Jobs, Pending Acceptance, Completed Jobs, Total Spent) derived from Job aggregation, plus a Recent Deliveries table (real job data via `useMyJobs`), Quick Actions sidebar, and Efficiency Score card. Admin is redirected to `/admin`, driver to `/driver/earnings`.
+
+### Why (intent)
+Posters need a single-page overview of their delivery activity: how many jobs are in flight, waiting for drivers, completed, and how much they have spent on completed deliveries. All numbers must be derived from real Job data, not mocked. The dashboard must also serve as a role-aware entry point so users land on the right experience for their role.
+
+### Design
+- `src/types/poster/posterDashboard.ts` — `PosterSummaryStats`, `PosterSummaryData`, `PosterSummaryResponse`.
+- `src/app/api/posters/[id]/summary/route.ts` — `GET /api/posters/:id/summary`. Aggregates Job counts by status group (active = accepted + in_transit, pending = posted, completed = delivered, cancelled) and sums `offeredPrice` for `DELIVERED` jobs only into `totalSpent`. Restricted to poster themselves or admin role.
+- `src/api/apis/posters/posterDashboardApi.ts` — `getPosterSummary(posterId)`.
+- `src/api/hooks/posters/posterDashboardApi.ts` — `usePosterSummary(posterId)` with 30s staleTime.
+- `src/app/(dashboard)/dashboard/page.tsx` — unified dashboard page with `useAuthGuard` + `useEffect` role redirects. Poster content includes four summary cards, Recent Deliveries table populated via `useMyJobs` (existing `GET /api/jobs` endpoint), Quick Actions, and Efficiency Score.
+- `src/api/apis/jobs/jobApi.ts` — Added `fetchMyJobs(query)` calling existing role-scoped `GET /api/jobs`.
+- `src/api/hooks/jobs/jobsApi.ts` — Added `useMyJobs(query)` hook.
+- `src/types/jobs/jobs.ts` — Added `MyJobsResponse` type.
+
+### Implementation trail
+1. Created PLMS layers: types → api → hooks → page.
+2. Built `GET /api/posters/:id/summary` with `countDocuments` + `$group` aggregation.
+3. Built unified `/dashboard` page with `useAuthGuard` role redirect (admin → `/admin`, driver → `/driver/earnings`).
+4. Wired Recent Deliveries table to `useMyJobs` (existing jobs endpoint, poster-scoped).
+5. Fixed Total Spent subtitle contrast (`text-surface-white/80` on `bg-primary`).
+
+### Verification
+- `npx tsc --noEmit` — 0 errors.
+- `npx eslint` on all changed files — 0 errors.
+- `npm run build` — exit code 0, 49 pages generated.
+
+### Follow-ups
+- Add pagination to Recent Deliveries table.
+- Add date-range filter for deliveries.
+
+---
+
+## FEATURE-11 — Admin Payout Management Queue (Day 62)
+
+**Requested:** Aug 20 | **Requested by:** Post-v1 admin payout queue build plan
+**Status:** Shipped
+**Scope:** Admin-only payout management page at `/(admin)/admin/payouts` with paginated table, status filter, summary cards, and manual override action for pending payouts. Includes GET list endpoint and PATCH override endpoint. Deliberately does NOT modify the Payout model schema.
+
+### Why (intent)
+Admins need a centralized queue to review all driver payout records, see driver info and linked jobs, filter by status, and manually override pending payouts to paid or failed with an audit note.
+
+### Design
+- `src/types/admin/adminPayouts.ts` — `AdminPayoutItem`, `AdminPayoutsQuery`, `AdminPayoutsResponse`, `PayoutOverrideInput`, `PayoutOverrideResponse`.
+- `src/app/api/admin/payouts/route.ts` — `GET /api/admin/payouts`. Admin-only; paginated, filterable by `status` and `driverId`, populated with driver name/email and linked job ID.
+- `src/app/api/admin/payouts/[id]/route.ts` — `PATCH /api/admin/payouts/:id`. Admin-only; accepts `{ status: "paid" | "failed", note: string }`. Only allowed when current status is `pending`. Saves `note` on the Payout document.
+- `src/api/apis/admin/adminPayoutsApi.ts` — `getAdminPayouts(query)`, `overridePayoutStatus(id, data)`.
+- `src/api/hooks/admin/adminPayoutsApi.ts` — `useAdminPayouts(query)`, `useOverridePayoutStatus()`.
+- `src/components/admin/PayoutOverrideModal.tsx` — modal with status dropdown and admin note textarea.
+- `src/app/(admin)/admin/payouts/page.tsx` — admin payout queue with summary cards (Pending total, Paid count, Failed count), status filter dropdown, paginated table (Date, Driver, Job ID, Gateway, Amount, Status, Actions), and override action on pending rows.
+- `src/components/admin/AdminSidebar.tsx` — Added "Payout Management" nav link.
+
+### Implementation trail
+1. Created PLMS layers: types → apis → hooks → components → page.
+2. Built GET endpoint with populate driver + job, pagination, and status/driverId filters.
+3. Built PATCH endpoint with pending-only guard and note persistence.
+4. Built `PayoutOverrideModal` with confirmation flow.
+5. Wired override mutation to invalidate `adminPayouts` query on success.
+
+### Verification
+- `npx tsc --noEmit` — 0 errors.
+- `npx eslint` on all changed files — 0 errors.
+- `npm run build` — exit code 0, 49 pages generated.
+
+### Follow-ups
+- Add CSV export for payout records.
+- Add date-range filter.
+- Add driver name search.
 
 ---
 

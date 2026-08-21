@@ -20,6 +20,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Job Management", href: "/admin/jobs", icon: "work" },
   { label: "Disputes", href: "/admin/disputes", icon: "gavel" },
   { label: "User Management", href: "/admin/users", icon: "people" },
+  { label: "Payout Management", href: "/admin/payouts", icon: "account_balance_wallet" },
   { label: "Verifications", href: "/admin/verification", icon: "shield" },
 ];
 

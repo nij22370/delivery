@@ -1046,3 +1046,55 @@ Restructured the driver earnings and payouts pages to resolve layout/intent mism
 - `npx eslint` on all changed files — 0 errors.
 - Build verified clean (`npm run build` exit code 0, all routes compiled).
 
+---
+
+## Day 61 — Poster Dashboard
+
+### New Files
+- `src/types/poster/posterDashboard.ts` — `PosterSummaryStats`, `PosterSummaryData`, `PosterSummaryResponse`.
+- `src/app/api/posters/[id]/summary/route.ts` — `GET /api/posters/:id/summary`. Aggregates Job counts by status group (active, pending, completed, cancelled) and sums `offeredPrice` for `DELIVERED` jobs only into `totalSpent`. Restricted to the poster themselves or admin role.
+- `src/api/apis/posters/posterDashboardApi.ts` — `getPosterSummary(posterId)`.
+- `src/api/hooks/posters/posterDashboardApi.ts` — `usePosterSummary(posterId)`.
+- `src/app/(dashboard)/dashboard/page.tsx` — Unified `/dashboard` entry point. Poster role sees poster summary dashboard with four summary cards (Active Jobs, Pending Acceptance, Completed Jobs, Total Spent), Recent Deliveries table (real job data via `useMyJobs`), Quick Actions, and Efficiency Score. Admin redirects to `/admin`, driver redirects to `/driver/earnings`.
+
+### Modified Files
+- `src/api/apis/jobs/jobApi.ts` — Added `fetchMyJobs(query)` calling existing `GET /api/jobs`.
+- `src/api/hooks/jobs/jobsApi.ts` — Added `useMyJobs(query)` hook.
+- `src/types/jobs/jobs.ts` — Added `MyJobsResponse` type.
+
+### Architectural Decisions
+- **Aggregation uses `$match` + `countDocuments` + `$group`:** simple, readable, no `$dateTrunc` needed for status counts.
+- **`totalSpent` sums only `DELIVERED` jobs:** cancelled job prices are explicitly excluded.
+- **Role guard on API:** `withAuth` checks `userId === params.id` or `role === "admin"`.
+- **Unified `/dashboard` with RBAC:** `useAuthGuard` + `useEffect` redirects admin to `/admin` and driver to `/driver/earnings`. Poster sees the dashboard content.
+- **Recent Deliveries from existing `GET /api/jobs`:** the existing jobs endpoint is already role-scoped (poster sees own jobs), so `useMyJobs` reuses it instead of building a new endpoint.
+- **Total Spent subtitle contrast:** uses `text-surface-white/80` on `bg-primary` for visibility.
+
+---
+
+## Day 62 — Admin Payout Management Queue
+
+### New Files
+- `src/types/admin/adminPayouts.ts` — `AdminPayoutItem`, `AdminPayoutsQuery`, `AdminPayoutsResponse`, `PayoutOverrideInput`, `PayoutOverrideResponse`.
+- `src/app/api/admin/payouts/route.ts` — `GET /api/admin/payouts`. Admin-only; returns paginated payout records with populated driver name/email and linked job ID. Filterable by `status` and `driverId`.
+- `src/app/api/admin/payouts/[id]/route.ts` — `PATCH /api/admin/payouts/:id`. Admin-only; accepts `{ status: "paid" | "failed", note: string }`. Rejects updates when current status is not `pending`. Saves `note` on the Payout document.
+- `src/api/apis/admin/adminPayoutsApi.ts` — `getAdminPayouts(query)`, `overridePayoutStatus(id, data)`.
+- `src/api/hooks/admin/adminPayoutsApi.ts` — `useAdminPayouts(query)`, `useOverridePayoutStatus()`.
+- `src/components/admin/PayoutOverrideModal.tsx` — Modal for overriding payout status with status dropdown and admin note textarea.
+- `src/app/(admin)/admin/payouts/page.tsx` — Admin payout queue with summary cards (Pending, Paid, Failed), status filter dropdown, paginated table (Date, Driver, Job ID, Gateway, Amount, Status, Actions), and override action on pending rows.
+
+### Modified Files
+- `src/components/admin/AdminSidebar.tsx` — Added "Payout Management" nav link.
+
+### Architectural Decisions
+- **Override only on pending:** the PATCH route checks `payout.status === "pending"` before allowing any update. Paid or failed records cannot be re-overridden.
+- **Note field:** the existing `notes` field on the Payout model is used to store the admin override reason.
+- **Cache invalidation:** `useOverridePayoutStatus` invalidates the `adminPayouts` query on success so the queue reflects changes immediately.
+- **Paginated from day one:** `PAGE_SIZE = 10` enforced on the admin payouts list.
+- **No new Payout model fields:** the existing `notes` field is reused; no schema changes required.
+
+### Verification
+- `npx tsc --noEmit` — 0 errors.
+- `npx eslint` on all changed files — 0 errors.
+- Build verified clean (`npm run build` exit code 0, 49 pages generated).
+

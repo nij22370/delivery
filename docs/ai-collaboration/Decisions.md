@@ -353,6 +353,76 @@ Format: newest at the top. Every decision gets the **model/session** that made i
 
 ---
 
+## D-44 — Poster summary aggregation uses `countDocuments` + `$group` for status counts and totalSpent
+
+**Status:** Accepted · **Model:** project session (Day 61) · **Applies to:** `GET /api/posters/:id/summary`
+
+**Decision:** Active/pending/completed/cancelled counts use `countDocuments` with `$in` filters. `totalSpent` uses a single `$group` aggregation summing `offeredPrice` where `status === JOB_STATUS.DELIVERED`.
+
+**Why:** `countDocuments` is the simplest, most readable way to get status counts. The `$group` aggregation for `totalSpent` avoids an extra `$match` stage and keeps the query O(1) for the poster. Using `DELIVERED` only ensures cancelled job prices never leak into the total.
+
+---
+
+## D-45 — Poster dashboard restricted to poster role via unified `/dashboard` RBAC entry point
+
+**Status:** Accepted · **Model:** project session (Day 61) · **Applies to:** `src/app/(dashboard)/dashboard/page.tsx`
+
+**Decision:** The `/dashboard` page uses `useAuthGuard` and `useEffect` role redirects: admin → `/admin`, driver → `/driver/earnings`, poster sees the dashboard content. The poster content calls `usePosterSummary(user._id)`.
+
+**Why:** A single `/dashboard` entry point prevents users from guessing URLs and landing on the wrong role view. Defense in depth: the API guard prevents data leakage, and the client guard prevents UI flash for non-posters.
+
+---
+
+## D-46 — Recent Deliveries table reuses existing `GET /api/jobs` via `useMyJobs`
+
+**Status:** Accepted · **Model:** project session (Day 61) · **Applies to:** `src/app/(dashboard)/dashboard/page.tsx`, `src/api/hooks/jobs/jobsApi.ts`
+
+**Decision:** The Recent Deliveries table is populated by `useMyJobs({ page: 1, limit: 5 })`, which calls the existing role-scoped `GET /api/jobs` endpoint. No new jobs list endpoint was built.
+
+**Why:** The existing jobs endpoint already applies poster scoping (`filter.posterId = user.userId`) and returns all fields needed for the table. Reusing it avoids duplicating logic and keeps the data layer consistent.
+
+---
+
+## D-47 — Total Spent subtitle contrast fixed with `text-surface-white/80`
+
+**Status:** Accepted · **Model:** project session (Day 61) · **Applies to:** `src/app/(dashboard)/dashboard/page.tsx`
+
+**Decision:** The primary Total Spent card uses `text-surface-white` for the value and `text-surface-white/80` for the subtitle/label, replacing the previous `text-on-primary` tokens which had insufficient contrast on the `bg-primary` background.
+
+**Why:** Design-system color tokens must be legible on their backgrounds. `text-on-primary` was designed for dark-on-primary contexts, not white-primary cards. `text-surface-white` and its opacity variants ensure WCAG-readable contrast on the primary blue card.
+
+---
+
+## D-46 — Payout override restricted to `pending` status only
+
+**Status:** Accepted · **Model:** project session (Day 62) · **Applies to:** `PATCH /api/admin/payouts/:id`
+
+**Decision:** The route loads the Payout first and returns 400 if `payout.status !== "pending"`. Only `paid` or `failed` are accepted as override targets.
+
+**Why:** A payout that is already paid or failed is an immutable financial record. Allowing re-override would corrupt the audit trail. The pending-only guard makes the Payout lifecycle unidirectional: `pending → paid|failed`.
+
+---
+
+## D-47 — Payout override stores reason in existing `notes` field
+
+**Status:** Accepted · **Model:** project session (Day 62) · **Applies to:** `PATCH /api/admin/payouts/:id`
+
+**Decision:** The override body `{ status, note }` maps to `Payout.updateOne({ $set: { status, notes: note, paidAt? } })`. No new schema fields were added.
+
+**Why:** The Payout model already has a `notes` field intended for admin audit context. Reusing it avoids a schema migration and keeps the model stable. `paidAt` is set automatically when status is `paid`.
+
+---
+
+## D-48 — Payout route date serialization guards against missing timestamps
+
+**Status:** Accepted · **Model:** project session (Day 62) · **Applies to:** `src/app/api/admin/payouts/route.ts`, `src/app/api/admin/payouts/[id]/route.ts`
+
+**Decision:** Both payout routes use a `toIsoString` helper that validates the input with `new Date(value)` and falls back to `new Date().toISOString()` if the timestamp is invalid, instead of calling `.toISOString()` directly on potentially missing `createdAt`/`updatedAt` fields.
+
+**Why:** Some legacy/seeded Payout documents had missing or invalid timestamp fields. Calling `.toISOString()` on `undefined` throws `RangeError: Invalid time value`, crashing the endpoint. The helper makes the serialization resilient without altering the schema or query logic.
+
+---
+
 ## D-32 — `$dateTrunc` buckets for earnings; week start uses `startOfWeek`, not `weekStartDay`
 
 **Status:** Accepted · **Model:** project session (Phase 7) · **Applies to:** `src/lib/earnings.ts`
