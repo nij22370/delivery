@@ -41,6 +41,7 @@ Known gaps, future enhancements, things deliberately left out.
 
 | ID | Title | Status | Requested | Shipped in |
 | --- | --- | --- | --- | --- |
+| FEATURE-12 | Dispute Flag Button & Driver Activity Dashboard | Shipped | Aug 24 | Post-v1 |
 | FEATURE-11 | Admin Payout Management Queue | Shipped | Aug 20 | Day 62 |
 | FEATURE-10 | Poster Activity Dashboard | Shipped | Aug 20 | Day 61 |
 | FEATURE-09 | Admin Analytics Dashboard UI + API | Shipped | Aug 18 | Day 58 |
@@ -299,6 +300,40 @@ Admins need a centralized queue to review all driver payout records, see driver 
 - Add CSV export for payout records.
 - Add date-range filter.
 - Add driver name search.
+
+---
+
+## FEATURE-12 — Dispute Flag Button & Driver Activity Dashboard
+
+**Requested:** Aug 24 | **Requested by:** Build Plan / User Request
+**Status:** Shipped
+**Scope:** Participant-facing dispute flag button on poster and driver job detail pages (`accepted`, `in_transit`, `delivered` statuses only; participant-gated, min 10 chars reason validation, error banner inside modal); `GET /api/drivers/:id/summary` endpoint returning driver stats (active count, monthly count, total completed, total earned NPR for DELIVERED jobs only, rating avg/count, profile status); driver activity dashboard page at `/driver/dashboard` matching design specs.
+
+### Why (intent)
+Participants need a direct way to flag active/delivered job disputes for admin review from their job detail view. Drivers need a dedicated activity dashboard summarizing active deliveries, monthly progress, lifetime completed count, earnings, ratings, and recent activity.
+
+### Design
+- `src/types/drivers/driverDashboard.ts` — `DriverSummaryStats`, `DriverSummaryResponse`.
+- `src/app/api/drivers/[id]/summary/route.ts` — `GET /api/drivers/:id/summary`. Authenticated & restricted to driver or admin.
+- `src/api/apis/drivers/driverDashboardApi.ts` — `fetchDriverSummary(driverId)`.
+- `src/api/hooks/drivers/driverDashboardApi.ts` — `useDriverSummary(driverId)` with 30s staleTime.
+- `src/app/(dashboard)/driver/dashboard/page.tsx` — Driver activity dashboard with RBAC protection, 6 summary cards, and Recent Activity table.
+- `src/app/(main)/jobs/[id]/dispute/page.tsx` — Dedicated 3-step Dispute Reporting page (`Report a Dispute - Unified Style`) matching `design-reference/dispute-flag-dialog.md` specs.
+- `src/app/(main)/disputes/page.tsx` — User-facing Disputes page (`/disputes`) listing flagged jobs under admin review with empty state and direct detail links.
+- `src/app/(dashboard)/layout.tsx` & `src/components/layout/Header.tsx` — Added prominent **"Disputes"** navigation link with `gavel` icon.
+
+### Implementation trail
+1. Fetched Stitch design specs for dispute flag dialog and driver dashboard into `design-reference/`.
+2. Created PLMS layers for driver dashboard: types → apis → hooks → route → page.
+3. Updated `src/app/(main)/jobs/[id]/page.tsx` with participant check, admin hide guard, status restriction (`accepted`, `in_transit`, `delivered`), 10-char reason validation, and inline error banner in modal.
+4. Created route aliases `/poster/jobs/[id]` and `/driver/jobs/[id]`.
+5. Updated `/dashboard` redirect so drivers land on `/driver/dashboard`.
+6. Ran full Next.js build verification (`npm run build`).
+
+### Verification
+- `npm run build` — exit code 0, 50 pages generated, 0 TypeScript errors.
+
+---
 
 ---
 

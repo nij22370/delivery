@@ -34,12 +34,16 @@ export async function fetchMyActiveJobIds(): Promise<string[]> {
 export interface MyJobsQuery {
   page?: number;
   limit?: number;
+  driverId?: string;
+  status?: string;
 }
 
 export async function fetchMyJobs(query: MyJobsQuery = {}): Promise<MyJobsResponse> {
   const params: Record<string, string> = {};
   if (query.page) params.page = String(query.page);
   if (query.limit) params.limit = String(query.limit);
+  if (query.driverId) params.driverId = query.driverId;
+  if (query.status) params.status = query.status;
 
   const response = await api.get<MyJobsResponse>('/jobs', { params });
   return {

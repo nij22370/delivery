@@ -1098,3 +1098,62 @@ Restructured the driver earnings and payouts pages to resolve layout/intent mism
 - `npx eslint` on all changed files — 0 errors.
 - Build verified clean (`npm run build` exit code 0, 49 pages generated).
 
+---
+
+## Day 62 — Driver Activity Dashboard
+
+### New Files
+- `src/types/drivers/driverDashboard.ts` — `DriverSummaryStats`, `DriverSummaryResponse`.
+- `src/app/api/drivers/[id]/summary/route.ts` — `GET /api/drivers/:id/summary`. Authenticated & restricted to driver (`user.userId === id`) or admin role. Calculates active jobs (`accepted` | `in_transit`), completed total (`DELIVERED`), completed this month (`DELIVERED` within current calendar month), total earned NPR (`DELIVERED` jobs only), rating average/count (`DriverProfile`), and verification status (`DriverProfile.status`).
+- `src/api/apis/drivers/driverDashboardApi.ts` — `fetchDriverSummary(driverId)`.
+- `src/api/hooks/drivers/driverDashboardApi.ts` — `useDriverSummary(driverId)` with 30s staleTime.
+- `src/app/(dashboard)/driver/dashboard/page.tsx` — Driver activity dashboard matching design specs (`design-reference/driver-dashboard.md`). Role-protected (posters/admins redirected away). Contains welcome header, online status toggle, 6 summary metric cards (Active Jobs, Monthly Goal with progress bar, Lifetime Deliveries, Total Earnings NPR, Driver Rating, Account Status), and Recent Activity table populated via `useMyJobs`.
+
+### Modified Files
+- `src/app/(dashboard)/dashboard/page.tsx` — Updated `DRIVER_REDIRECT` constant to `/driver/dashboard`.
+- `src/api/apis/jobs/jobApi.ts` — Added `driverId` and `status` optional parameters to `MyJobsQuery` and `fetchMyJobs()`.
+- `src/api/hooks/jobs/jobsApi.ts` — Imported `MyJobsQuery` from `jobApi` to support query params.
+- `src/types/jobs/jobs.ts` — Updated `Job` interface status to use `JobStatus` (includes `disputed`).
+
+### API Routes Added
+| Method | Route | Auth | Purpose |
+|--------|-------|------|---------|
+| GET | `/api/drivers/:id/summary` | `withAuth()` | Returns driver activity summary (active count, monthly count, total completed, total earned NPR, rating, verification status) |
+
+### Architectural Decisions
+- **Total Earned includes `DELIVERED` jobs only:** `offeredPrice` is summed strictly for jobs where `status === JOB_STATUS.DELIVERED`. Cancelled, disputed, or in-transit jobs are explicitly excluded.
+- **Calendar Month Calculation:** `completedJobsThisMonth` calculates start of month via `Date.UTC(year, month, 1)` and checks `deliveredAt >= startOfMonth` (or `updatedAt >= startOfMonth` fallback).
+- **Role Guard on Summary API:** Returns 403 Forbidden if `user.role !== "admin"` and `user.userId !== id`.
+- **Driver Dashboard Redirect:** Logged-in drivers landing on `/dashboard` are automatically redirected to `/driver/dashboard`.
+
+---
+
+## Day 63 — Participant Dispute System & Dedicated 3-Step Dispute Page
+
+### New Files
+- `src/app/(main)/jobs/[id]/dispute/page.tsx` — Dedicated full-page 3-step Dispute Reporting page (`Report a Dispute - Unified Style`) matching `design-reference/dispute-flag-dialog.md`. Includes:
+  - **Job Summary Panel (Left Column):** Job ID, Pickup timeline, Dropoff timeline, Agreed Price (NPR), 72-hour filing deadline notice.
+  - **Step 1 (Dispute Category):** 4 radio cards (`damaged`, `late`, `payment`, `behavior`).
+  - **Step 2 (Detailed Description):** Textarea with minimum 10-character validation and character counter.
+  - **Step 3 (Evidence Upload):** File drag & drop supporting PNG, JPG, WEBP (uploads directly to Cloudinary via `POST /api/jobs/:id/evidence`).
+  - **Submit Flow:** Uploads evidence images, submits dispute reason via `POST /api/jobs/:id/dispute`, updates job status to `DISPUTED`, dispatches Pusher `status-change` event, and redirects to job detail page.
+- `src/app/(main)/disputes/page.tsx` — User-facing Disputes page (`/disputes`) listing flagged jobs under admin review for both posters and drivers with status badges, issue details, and empty states.
+- `src/app/(dashboard)/poster/jobs/[id]/page.tsx` — Poster job detail page route alias re-exporting `JobDetailPage`.
+- `src/app/(dashboard)/driver/jobs/[id]/page.tsx` — Driver job detail page route alias re-exporting `JobDetailPage`.
+
+### Modified Files
+- `src/app/(main)/jobs/[id]/page.tsx` — Added participant-only check (`posterId` or `driverId` matching user), hidden for admins/non-participants, added "Raise a Dispute" card linking to `/jobs/[id]/dispute`, and added "Job Flagged Under Dispute" status callout banner for disputed jobs.
+- `src/app/(dashboard)/layout.tsx` — Added **"Disputes"** navigation link with `gavel` icon to desktop and mobile sidebar.
+- `src/components/layout/Header.tsx` — Added **"Disputes"** navigation link with `gavel` icon to desktop header and mobile drawer.
+- `src/app/(dashboard)/dashboard/page.tsx` & `src/app/(dashboard)/driver/dashboard/page.tsx` — Added `[JOB_STATUS.DISPUTED]` red status badge mapping to recent activity tables.
+
+### Architectural Decisions
+- **Participant-Gated Disputes:** Flagging a dispute is restricted to the poster or assigned driver (`user._id === posterId || user._id === driverId`). Admins review and resolve disputes via `/admin/disputes`.
+- **Status Restriction:** Disputes can only be raised when job status is `accepted`, `in_transit`, or `delivered`.
+- **Role-Aware `/disputes` Query:** `GET /api/jobs?driverId=me&status=disputed` for drivers and `GET /api/jobs?status=disputed` for posters ensuring each participant sees their own disputed jobs.
+- **Evidence Upload Integration:** Evidence files are uploaded to Cloudinary `dispute-evidence/{jobId}` folder via `POST /api/jobs/:id/evidence` before the dispute status is updated.
+
+### Verification
+- `npm run build` — exit code 0, 51 pages generated, 0 TypeScript errors.
+
+

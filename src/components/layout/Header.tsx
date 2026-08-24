@@ -68,6 +68,15 @@ export default function Header() {
               Post Delivery
             </Link>
           )}
+          {user && (
+            <Link
+              href="/disputes"
+              className="text-sm text-on-surface-variant font-medium hover:text-primary transition-colors flex items-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-lg">gavel</span>
+              Disputes
+            </Link>
+          )}
           <Link
             href="#"
             className="text-sm text-on-surface-variant font-medium hover:text-primary transition-colors"
