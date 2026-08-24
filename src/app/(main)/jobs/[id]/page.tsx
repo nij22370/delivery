@@ -28,6 +28,7 @@ const DISPUTABLE_STATUSES: Set<string> = new Set([
   JOB_STATUS.IN_TRANSIT,
   JOB_STATUS.DELIVERED,
 ]);
+const MIN_DISPUTE_REASON_LENGTH = 10;
 
 const VEHICLE_LABELS: Record<JobVehicleType, string> = {
   bicycle: "Bicycle / Scooter",
@@ -41,6 +42,7 @@ const STATUS_STYLES: Record<string, string> = {
   accepted: "bg-success-green/10 text-success-green",
   in_transit: "bg-warning-amber/10 text-warning-amber",
   delivered: "bg-success-green/10 text-success-green",
+  disputed: "bg-error-container text-error-red",
   cancelled: "bg-error-container text-error-red",
 };
 
@@ -66,6 +68,8 @@ interface JobDetail {
   paymentGateway?: string;
   paymentPidx?: string;
   paymentTransactionUuid?: string;
+  disputeReason?: string;
+  flaggedBy?: string;
   createdAt: string;
 }
 
@@ -194,16 +198,23 @@ export default function JobDetailPage({
   }, [setIsDisputeModalOpen, setDisputeReason]);
 
   const handleConfirmDispute = useCallback(() => {
-    if (!disputeReason.trim()) return;
+    if (disputeReason.trim().length < MIN_DISPUTE_REASON_LENGTH) return;
     disputeMutation.mutate();
   }, [disputeReason, disputeMutation]);
 
+  const isParticipant = Boolean(
+    user &&
+      job &&
+      (user._id === job.posterId || (job.driverId && user._id === job.driverId))
+  );
+
+  const isAdmin = user?.role === "admin";
+
   const isDisputable =
     !isAuthLoading &&
-    (isPoster || isDriver) &&
-    job &&
-    DISPUTABLE_STATUSES.has(job.status) &&
-    job.status !== JOB_STATUS.DISPUTED;
+    !isAdmin &&
+    isParticipant &&
+    Boolean(job && DISPUTABLE_STATUSES.has(job.status) && job.status !== JOB_STATUS.DISPUTED);
 
   const isContactRevealed = job?.status !== JOB_STATUS.POSTED;
 
@@ -568,14 +579,41 @@ export default function JobDetailPage({
                 <p className="text-sm text-secondary mb-4">
                   Flag this job for admin review if there is an issue with the delivery.
                 </p>
-                <button
-                  type="button"
-                  onClick={handleOpenDispute}
+                <Link
+                  href={`/jobs/${job._id}/dispute`}
                   className="w-full h-12 flex items-center justify-center gap-2 bg-error-container text-error-red border border-error-red/30 rounded-lg text-sm font-bold hover:bg-error-red/10 transition-colors cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-xl">warning</span>
-                  Flag Dispute
-                </button>
+                  Report a Dispute
+                </Link>
+              </div>
+            )}
+
+            {/* ── Disputed Status Banner ───────────────────────────────*/}
+            {job.status === JOB_STATUS.DISPUTED && (
+              <div className="bg-error-container/40 border border-error-red/40 rounded-xl p-6 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <span className="material-symbols-outlined text-error-red text-2xl mt-0.5">
+                    report
+                  </span>
+                  <div className="flex-1">
+                    <h3 className="text-base font-bold text-error-red">
+                      Job Flagged Under Dispute
+                    </h3>
+                    <p className="text-xs text-on-surface mt-1 leading-relaxed">
+                      {job.disputeReason || "This delivery has been flagged for admin review."}
+                    </p>
+                    <div className="mt-3 pt-3 border-t border-error-red/20 flex items-center justify-between text-xs text-on-surface-variant">
+                      <span>
+                        Flagged by: <strong className="capitalize text-on-surface">{job.flaggedBy || "Participant"}</strong>
+                      </span>
+                      <span className="flex items-center gap-1 text-primary font-semibold">
+                        <span className="material-symbols-outlined text-sm">verified_user</span>
+                        Under Admin Review
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -588,18 +626,41 @@ export default function JobDetailPage({
                 />
                 <div className="relative bg-surface-white border border-outline-variant rounded-xl shadow-lg p-6 w-full max-w-md">
                   <h3 className="text-lg font-bold text-on-surface mb-2">
-                    Flag Dispute
+                    Report a Dispute
                   </h3>
                   <p className="text-sm text-secondary mb-4">
-                    This will mark the job as disputed and notify the admin team. Please provide a reason.
+                    Please provide a detailed description of the issue (minimum 10 characters).
                   </p>
+
+                  {disputeMutation.isError && (
+                    <div className="mb-4 p-3 bg-error-container border border-error-red/40 rounded-lg text-xs font-medium text-error-red">
+                      {disputeMutation.error instanceof Error
+                        ? disputeMutation.error.message
+                        : "Failed to flag dispute."}
+                    </div>
+                  )}
+
                   <textarea
                     value={disputeReason}
                     onChange={(e) => setDisputeReason(e.target.value)}
-                    placeholder="Describe the issue..."
+                    placeholder="Explain what happened..."
                     rows={4}
                     className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest p-3 text-sm focus:outline-none focus:border-2 focus:border-primary resize-none"
                   />
+                  <div className="flex items-center justify-between mt-2 text-xs text-on-surface-variant">
+                    <span>
+                      {disputeReason.trim().length < MIN_DISPUTE_REASON_LENGTH
+                        ? `At least ${MIN_DISPUTE_REASON_LENGTH - disputeReason.trim().length} more characters needed`
+                        : "Ready to submit"}
+                    </span>
+                    <span>{disputeReason.trim().length} chars</span>
+                  </div>
+
+                  <p className="mt-4 font-label-sm text-xs text-on-surface-variant flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-sm">verified_user</span>
+                    Disputes are reviewed by the SwiftShip Admin team within 24-48 hours.
+                  </p>
+
                   <div className="flex items-center justify-end gap-3 mt-4">
                     <button
                       type="button"
@@ -611,10 +672,10 @@ export default function JobDetailPage({
                     <button
                       type="button"
                       onClick={handleConfirmDispute}
-                      disabled={!disputeReason.trim() || disputeMutation.isPending}
-                      className="h-10 px-4 bg-error-red text-white rounded-lg text-sm font-bold hover:bg-error-red/90 transition-colors disabled:opacity-75 disabled:cursor-not-allowed cursor-pointer"
+                      disabled={disputeReason.trim().length < MIN_DISPUTE_REASON_LENGTH || disputeMutation.isPending}
+                      className="h-10 px-4 bg-error-red text-white rounded-lg text-sm font-bold hover:bg-error-red/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     >
-                      {disputeMutation.isPending ? "Flagging..." : "Flag Dispute"}
+                      {disputeMutation.isPending ? "Submitting..." : "Submit Dispute"}
                     </button>
                   </div>
                 </div>

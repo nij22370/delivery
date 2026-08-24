@@ -5,6 +5,7 @@ import {
   fetchUnreadCounts,
   markJobMessagesRead,
   fetchMyJobs,
+  type MyJobsQuery,
 } from '../../apis/jobs/jobApi';
 import type { CreateJobPayload, CreateJobResponse } from '@/types/jobs/jobs';
 import type { UnreadCountsByJob } from '@/types/message/message';
@@ -60,11 +61,6 @@ export function useMarkMessagesRead() {
 }
 
 const MY_JOBS_QUERY_KEY = 'myJobs';
-
-interface MyJobsQuery {
-  page?: number;
-  limit?: number;
-}
 
 export function useMyJobs(query: MyJobsQuery = {}) {
   return useQuery({

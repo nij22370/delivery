@@ -1,3 +1,5 @@
+import type { JobStatus } from "../job";
+
 export interface JobLocationInput {
   pickupAddress: string;
   pickupContactName: string;
@@ -25,11 +27,13 @@ export interface Job {
   _id: string;
   posterId: string;
   driverId?: string;
-  status: 'posted' | 'accepted' | 'in_transit' | 'delivered' | 'cancelled';
+  status: JobStatus;
   pickupAddress: string;
   dropoffAddress: string;
   vehicleType: string;
   packageDescription?: string;
+  disputeReason?: string;
+  flaggedBy?: string;
   offeredPrice: number;
   pickupDate: string;
   pickupTimeWindow: string;

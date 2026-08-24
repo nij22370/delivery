@@ -14,7 +14,7 @@ const POSTER_ROLE = "poster";
 const DRIVER_ROLE = "driver";
 
 const ADMIN_REDIRECT = "/admin";
-const DRIVER_REDIRECT = "/driver/earnings";
+const DRIVER_REDIRECT = "/driver/dashboard";
 
 const PAGE_SIZE = 4;
 
@@ -32,6 +32,7 @@ const STATUS_BADGE: Record<string, string> = {
   [JOB_STATUS.ACCEPTED]: "bg-primary/10 text-primary",
   [JOB_STATUS.IN_TRANSIT]: "bg-primary/10 text-primary",
   [JOB_STATUS.DELIVERED]: "bg-success-green/10 text-success-green",
+  [JOB_STATUS.DISPUTED]: "bg-error-red/10 text-error-red font-semibold",
   [JOB_STATUS.CANCELLED]: "bg-error-red/10 text-error-red",
 };
 

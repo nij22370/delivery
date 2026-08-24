@@ -8,6 +8,7 @@ const NAV_LINKS = [
   { href: "/jobs/active", icon: "local_shipping", label: "Active Deliveries" },
   { href: "/post-job", icon: "add_box", label: "Post Job" },
   { href: "/fleet", icon: "group", label: "Fleet Management", fillIcon: true },
+  { href: "/disputes", icon: "gavel", label: "Disputes" },
   { href: "/history", icon: "history", label: "History" },
 ];
 
