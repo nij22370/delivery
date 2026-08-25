@@ -4,7 +4,7 @@
 
 **App:** SwiftShip — Driver Delivery Platform
 **Stack:** Next.js 16 (App Router) · MongoDB Atlas (Mongoose 9) · Tailwind v4 · React Query · Zustand · Pusher · Leaflet
-**Last updated:** Aug 20 14:04 NPT — Days 61–62 complete; `/dashboard` unified RBAC entry point; poster dashboard Recent Deliveries table + Total Spent subtitle fixed
+**Last updated:** Aug 25 2026 — Days 61–62 complete; `/dashboard` unified RBAC entry point; poster dashboard with full UI (summary cards, recent deliveries, quick actions, efficiency score); admin payout queue at `/admin/payouts`
 
 ---
 
@@ -33,7 +33,8 @@
 | Aug 18 | **Day 57 — Analytics Endpoint:** Built `GET /api/admin/analytics` returning `jobsPerDay` (30-day `$dateTrunc` daily buckets), `gmv` (`$sum` of delivered `offeredPrice`), and `activeDrivers` (`countDocuments` on approved profiles). Traced as FEATURE-09. | — | None |
 | Aug 18 | **Day 58 — Analytics Dashboard UI:** Built `/(admin)/admin/analytics` page with three KPI cards (GMV, active drivers, total jobs 30d) and Recharts BarChart for daily job volume. Added Disputes and Analytics links to admin sidebar. Build clean (`npm run build` exit code 0). Traced as FEATURE-09. | — | None |
 | Aug 20 | **Day 61 — Poster Dashboard (final):** Built `GET /api/posters/:id/summary` + `usePosterSummary` hook. Built unified `/dashboard` page with RBAC: admin redirects to `/admin`, driver to `/driver/earnings`, poster sees summary dashboard. Poster dashboard has four summary cards (Active Jobs, Pending Acceptance, Completed Jobs, Total Spent), Recent Deliveries table populated via new `useMyJobs` hook (reuses existing `GET /api/jobs`), Quick Actions, and Efficiency Score. Fixed Total Spent subtitle contrast on primary card. Build clean (`npm run build` exit code 0, 49 pages). Traced as FEATURE-10. | — | None |
-| Aug 20 | **Day 62 — Admin Payout Management Queue (final):** Built `GET /api/admin/payouts` + `PATCH /api/admin/payouts/:id` with pending-only guard and `notes` persistence. Built `useAdminPayouts` + `useOverridePayoutStatus` hooks. Built `PayoutOverrideModal` and admin payout queue page at `/admin/payouts` with summary cards, status filter, paginated table, and override action. Added payout nav link to admin sidebar. Fixed payout route date serialization for legacy records with missing timestamps. Build clean (`npm run build` exit code 0, 49 pages). Traced as FEATURE-11. | — | None |
+| Aug 20 | **Day 62 — Admin Payout Management Queue (final):** ... (as above) ... | — | None |
+| Aug 25 | **Poster dashboard UI fix:** Restored full poster dashboard UI at `/dashboard` (welcome header, summary cards, Recent Deliveries table with real job data via `useMyJobs`, Quick Actions, Efficiency Score). Fixed Total Spent subtitle visibility (`text-surface-white/80` on `bg-primary`). Removed unused `Image` import from `(dashboard)/layout.tsx`. Build clean (`npm run build` exit code 0). | — | None |
 
 
 ---

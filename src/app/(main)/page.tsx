@@ -1,5 +1,5 @@
-import RegisterPage from "./register/page";
+import LandingPage from "@/components/landing/LandingPage";
 
 export default function Home() {
-  return <RegisterPage />;
+  return <LandingPage />;
 }
