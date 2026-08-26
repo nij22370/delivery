@@ -4,7 +4,7 @@
 
 **App:** SwiftShip — Driver Delivery Platform
 **Stack:** Next.js 16 (App Router) · MongoDB Atlas (Mongoose 9) · Tailwind v4 · React Query · Zustand · Pusher · Leaflet
-**Last updated:** Aug 25 2026 — Days 61–62 complete; `/dashboard` unified RBAC entry point; poster dashboard with full UI (summary cards, recent deliveries, quick actions, efficiency score); admin payout queue at `/admin/payouts`
+**Last updated:** Aug 26 2026 — Days 61–62 complete; `/dashboard` unified RBAC entry point; poster dashboard with full UI; admin payout queue at `/admin/payouts`; Day 65 walkthrough complete — no admin gaps requiring DB access; README.md written; PRD DoD check 17/19 PASS (FAIL: no public deployment URL)
 
 ---
 
@@ -35,6 +35,7 @@
 | Aug 20 | **Day 61 — Poster Dashboard (final):** Built `GET /api/posters/:id/summary` + `usePosterSummary` hook. Built unified `/dashboard` page with RBAC: admin redirects to `/admin`, driver to `/driver/earnings`, poster sees summary dashboard. Poster dashboard has four summary cards (Active Jobs, Pending Acceptance, Completed Jobs, Total Spent), Recent Deliveries table populated via new `useMyJobs` hook (reuses existing `GET /api/jobs`), Quick Actions, and Efficiency Score. Fixed Total Spent subtitle contrast on primary card. Build clean (`npm run build` exit code 0, 49 pages). Traced as FEATURE-10. | — | None |
 | Aug 20 | **Day 62 — Admin Payout Management Queue (final):** ... (as above) ... | — | None |
 | Aug 25 | **Poster dashboard UI fix:** Restored full poster dashboard UI at `/dashboard` (welcome header, summary cards, Recent Deliveries table with real job data via `useMyJobs`, Quick Actions, Efficiency Score). Fixed Total Spent subtitle visibility (`text-surface-white/80` on `bg-primary`). Removed unused `Image` import from `(dashboard)/layout.tsx`. Build clean (`npm run build` exit code 0). | — | None |
+| Aug 26 | **Day 65 Walkthrough & Polish:** Full admin panel walkthrough (user management, job oversight, dispute handling, analytics, verification, payouts) — no gaps requiring direct DB access found. All API routes use `withRole(["admin"])`. Build check: 51 pages, 0 errors. Secrets audit: clean (all env via `process.env.*`). Env var checklist: all 22 present. README.md written with Stack, Local Setup, Environment Variables table, Architecture (PLMS, roles, payment flow, real-time, uploads), Known Manual Tasks. PRD DoD checklist: 17/19 PASS — FAIL: "App is deployed on a public URL" (no deployment config; `NEXTAUTH_URL=http://localhost:3000`). Known open bugs (BUG-05–08) documented in README. | — | No public deployment configured |
 
 
 ---
