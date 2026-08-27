@@ -25,6 +25,9 @@ interface FooterLink {
 const NAV_LINKS: NavLink[] = [
   { href: "/dashboard", icon: "dashboard", label: "Dashboard", roles: [POSTER_ROLE, DRIVER_ROLE] },
   { href: "/jobs/active", icon: "local_shipping", label: "Active Deliveries", roles: [POSTER_ROLE, DRIVER_ROLE] },
+  { href: "/tracking", icon: "location_on", label: "Tracking", roles: [POSTER_ROLE] },
+  { href: "/analytics", icon: "bar_chart", label: "Analytics", roles: [POSTER_ROLE] },
+  { href: "/billing", icon: "receipt_long", label: "Billing", roles: [POSTER_ROLE] },
   { href: "/post-job", icon: "add_box", label: "Post Job", roles: [POSTER_ROLE] },
   { href: "/driver/earnings", icon: "payments", label: "Earnings", roles: [DRIVER_ROLE] },
   { href: "/driver/payouts", icon: "account_balance_wallet", label: "Wallet", roles: [DRIVER_ROLE] },
