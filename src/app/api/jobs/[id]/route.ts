@@ -18,6 +18,11 @@ async function handleGetJobById(
     await connectDB();
 
     const { id } = await context.params;
+
+    if (!/^[a-f\d]{24}$/i.test(id)) {
+      return NextResponse.json({ message: "Invalid job ID" }, { status: 400 });
+    }
+
     const job = await Job.findById(id).lean();
 
     if (!job) {

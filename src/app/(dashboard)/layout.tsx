@@ -26,7 +26,9 @@ const NAV_LINKS: NavLink[] = [
   { href: "/dashboard", icon: "dashboard", label: "Dashboard", roles: [POSTER_ROLE, DRIVER_ROLE] },
   { href: "/jobs/active", icon: "local_shipping", label: "Active Deliveries", roles: [POSTER_ROLE, DRIVER_ROLE] },
   { href: "/post-job", icon: "add_box", label: "Post Job", roles: [POSTER_ROLE] },
-  { href: "/fleet", icon: "group", label: "Fleet Management", fillIcon: true, roles: [POSTER_ROLE] },
+  { href: "/driver/earnings", icon: "payments", label: "Earnings", roles: [DRIVER_ROLE] },
+  { href: "/driver/payouts", icon: "account_balance_wallet", label: "Wallet", roles: [DRIVER_ROLE] },
+  { href: "/driver/verification", icon: "verified_user", label: "Verification", roles: [DRIVER_ROLE] },
   { href: "/disputes", icon: "gavel", label: "Disputes", roles: [POSTER_ROLE, DRIVER_ROLE] },
   { href: "/history", icon: "history", label: "History", roles: [POSTER_ROLE, DRIVER_ROLE] },
 ];
@@ -51,9 +53,6 @@ export default function DashboardLayout({
   }, [userRole, isAuthLoading]);
 
   const isActive = useCallback((href: string) => {
-    if (href === "/fleet" && (pathname.startsWith("/fleet") || pathname.startsWith("/drivers"))) {
-      return true;
-    }
     return pathname === href;
   }, [pathname]);
 
@@ -87,13 +86,15 @@ export default function DashboardLayout({
           </div>
         </div>
 
-        <Link
-          href="/post-job"
-          className="w-full bg-primary-container hover:bg-primary-container/90 text-on-primary-container text-sm font-medium py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors mb-6"
-        >
-          <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>add_box</span>
-          New Shipment
-        </Link>
+        {userRole === POSTER_ROLE && (
+          <Link
+            href="/post-job"
+            className="w-full bg-primary-container hover:bg-primary-container/90 text-on-primary-container text-sm font-medium py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors mb-6"
+          >
+            <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>add_box</span>
+            New Shipment
+          </Link>
+        )}
 
         <ul className="flex flex-col gap-1 flex-grow">
           {visibleNavLinks.map((link) => {
@@ -166,15 +167,15 @@ export default function DashboardLayout({
           <span className="material-symbols-outlined mb-1">home</span>
           <span className="text-xs font-semibold">Home</span>
         </Link>
-        <Link href="/jobs" className="flex flex-col items-center justify-center text-secondary hover:bg-surface-container-low transition-transform scale-95 active:scale-90 p-2 rounded-lg w-16">
+        <Link href="/jobs/active" className="flex flex-col items-center justify-center text-secondary hover:bg-surface-container-low transition-transform scale-95 active:scale-90 p-2 rounded-lg w-16">
+          <span className="material-symbols-outlined mb-1">local_shipping</span>
+          <span className="text-xs font-semibold">Active</span>
+        </Link>
+        <Link href="/jobs/browse" className="flex flex-col items-center justify-center text-secondary hover:bg-surface-container-low transition-transform scale-95 active:scale-90 p-2 rounded-lg w-16">
           <span className="material-symbols-outlined mb-1">list_alt</span>
-          <span className="text-xs font-semibold">Jobs</span>
+          <span className="text-xs font-semibold">Browse</span>
         </Link>
-        <Link href="/track" className="flex flex-col items-center justify-center text-secondary hover:bg-surface-container-low transition-transform scale-95 active:scale-90 p-2 rounded-lg w-16">
-          <span className="material-symbols-outlined mb-1">distance</span>
-          <span className="text-xs font-semibold">Track</span>
-        </Link>
-        <Link href="/profile" className="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-4 py-1 transition-transform scale-95 active:scale-90 p-2 w-16">
+        <Link href="/driver/dashboard" className="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-4 py-1 transition-transform scale-95 active:scale-90 p-2 w-16">
           <span className="material-symbols-outlined mb-1" style={{ fontVariationSettings: "'FILL' 1" }}>person</span>
           <span className="text-xs font-semibold">Profile</span>
         </Link>
