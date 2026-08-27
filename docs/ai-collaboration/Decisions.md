@@ -431,3 +431,13 @@ Format: newest at the top. Every decision gets the **model/session** that made i
 
 **Why:** `startOfWeek` is the documented MongoDB 5.0+ option name. The original draft used `weekStartDay` (a common confusion from SQL week functions) and failed at runtime against Atlas.
 
+---
+
+## D-33 — Active jobs fetch via my-active-ids + per-job fetch
+
+**Status:** Accepted · **Model:** project session (Day 66) · **Applies to:** `src/app/(dashboard)/jobs/active/page.tsx`, `src/app/(dashboard)/tracking/page.tsx`
+
+**Decision:** Active jobs pages first call `GET /api/jobs/my-active-ids` to get valid job IDs (filtering on the server by `status: { $in: [accepted, in_transit] }`), then fetch each job individually via `GET /api/jobs/[id]` using `Promise.all`.
+
+**Why:** `GET /api/jobs?status=accepted` scoped by role (posters see only their own jobs, but drivers without `driverId=me` are bounded to `posted` status only). The `my-active-ids` endpoint already handles the correct scoping and returns the exact set of active IDs for any role. The per-job fetch ensures full job details (pickup/dropoff addresses, driver assignment) without relying on the list endpoint's role-scoped filtering quirks.
+

@@ -78,7 +78,7 @@ export default function Header() {
             </Link>
           )}
           <Link
-            href="#"
+            href="/#how-it-works"
             className="text-sm text-on-surface-variant font-medium hover:text-primary transition-colors"
           >
             How it Works
@@ -198,7 +198,7 @@ export default function Header() {
               </Link>
             )}
             <Link
-              href="#"
+              href="/#how-it-works"
               onClick={handleCloseMobileMenu}
               className="text-sm text-on-surface font-medium py-3 border-b border-outline-variant/50 hover:text-primary transition-colors"
             >

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
 import { useDriverPayouts } from "@/api/hooks/drivers/payoutsApi";
@@ -26,7 +26,6 @@ export default function DriverEarningsDashboard() {
   const isDriver = !isAuthLoading && user?.role === "driver";
 
   const { data, isLoading } = useDriverPayouts(isDriver);
-  const [isOnline, setIsOnline] = useState(true);
 
   const payouts = useMemo(() => data?.payouts ?? [], [data]);
   const totalEarned = useMemo(() => data?.totalEarned ?? 0, [data]);
@@ -72,14 +71,6 @@ export default function DriverEarningsDashboard() {
     return max > 0 ? max : 5000;
   }, [chartData]);
 
-  const handleToggleOnline = useCallback(() => {
-    setIsOnline((prev) => {
-      const next = !prev;
-      toast.success(next ? "You are now ONLINE. Watching for new jobs!" : "You are now OFFLINE.");
-      return next;
-    });
-  }, []);
-
   const handleUpdatePayment = useCallback(() => {
     toast.info("Navigate to Wallet settings to update bank/wallet details.");
   }, []);
@@ -99,109 +90,9 @@ export default function DriverEarningsDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] flex">
-      {/* 1. LEFT SIDEBAR */}
-      <aside className="w-64 bg-surface-white border-r border-outline-variant flex flex-col shrink-0">
-        {/* Brand */}
-        <div className="p-6 border-b border-outline-variant flex flex-col gap-1">
-          <h2 className="text-xl font-black text-primary tracking-tight">SwiftShip</h2>
-          <p className="text-[10px] font-bold text-secondary uppercase tracking-widest">Driver Portal</p>
-        </div>
-
-        {/* Navigation Links */}
-        <nav className="flex-1 p-4 flex flex-col gap-1.5">
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold text-secondary hover:bg-surface-container hover:text-on-surface transition-colors"
-          >
-            <span className="material-symbols-outlined text-lg">dashboard</span>
-            Dashboard
-          </Link>
-
-          <Link
-            href="/jobs/browse"
-            className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold text-secondary hover:bg-surface-container hover:text-on-surface transition-colors"
-          >
-            <span className="material-symbols-outlined text-lg">local_shipping</span>
-            Deliveries
-          </Link>
-
-          <Link
-            href="/driver/earnings"
-            className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold bg-primary text-white transition-colors"
-          >
-            <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>
-              payments
-            </span>
-            Earnings
-          </Link>
-
-          <Link
-            href="/driver/payouts"
-            className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold text-secondary hover:bg-surface-container hover:text-on-surface transition-colors"
-          >
-            <span className="material-symbols-outlined text-lg">account_balance_wallet</span>
-            Wallet
-          </Link>
-
-          <Link
-            href="/settings"
-            className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold text-secondary hover:bg-surface-container hover:text-on-surface transition-colors"
-          >
-            <span className="material-symbols-outlined text-lg">settings</span>
-            Settings
-          </Link>
-
-          {/* Go Online Button */}
-          <div className="mt-6 px-2">
-            <button
-              type="button"
-              onClick={handleToggleOnline}
-              className={[
-                "w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 cursor-pointer transition-all shadow-sm border",
-                isOnline
-                  ? "bg-success-green text-white border-success-green hover:bg-success-green/90"
-                  : "bg-surface-container text-secondary border-outline-variant hover:bg-surface-container-high",
-              ].join(" ")}
-            >
-              <span className="relative flex h-2.5 w-2.5">
-                {isOnline && (
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
-                )}
-                <span
-                  className={[
-                    "relative inline-flex rounded-full h-2.5 w-2.5",
-                    isOnline ? "bg-white" : "bg-secondary",
-                  ].join(" ")}
-                />
-              </span>
-              {isOnline ? "Go Offline" : "Go Online"}
-            </button>
-          </div>
-        </nav>
-
-        {/* Lower Links */}
-        <div className="p-4 border-t border-outline-variant flex flex-col gap-1">
-          <button
-            type="button"
-            onClick={handleContactSupport}
-            className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-xs font-semibold text-secondary hover:bg-surface-container hover:text-on-surface text-left cursor-pointer w-full"
-          >
-            <span className="material-symbols-outlined text-base">contact_support</span>
-            Help Center
-          </button>
-          <Link
-            href="/api/auth/logout"
-            className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-xs font-semibold text-error-red hover:bg-error-container/20 text-left w-full"
-          >
-            <span className="material-symbols-outlined text-base">logout</span>
-            Logout
-          </Link>
-        </div>
-      </aside>
-
-      {/* 2. MAIN CONTENT AREA */}
-      <main className="flex-1 flex flex-col min-w-0">
+    <div className="min-h-screen bg-[#f8fafc] pb-8">
+      {/* Main Content Area */}
+      <main className="w-full max-w-[1280px] mx-auto flex flex-col min-w-0">
         {/* Top Header */}
         <header className="h-16 bg-surface-white border-b border-outline-variant px-8 flex items-center justify-between">
           <h1 className="text-lg font-bold text-on-surface">Earnings</h1>
