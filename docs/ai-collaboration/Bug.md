@@ -48,6 +48,7 @@ Commands run + results. Must reference `TestChecklist.md` rows.
 | BUG-06 | `GET /api/drivers/payouts` fetches all records (no pagination) | Open | Aug 16 — rules audit | `Payout.find({ driverId })` with no `page`/`limit` violates "never fetch all records" | — |
 | BUG-07 | Verify URLs built with string-interpolated query params | Open | Aug 16 — rules audit | `/payment/success` builds `` `${appUrl}/api/payments/khalti/verify?pidx=${pidx}` `` | — |
 | BUG-08 | Payout split constants + gateway types duplicated across files | Open | Aug 16 — rules audit | 90/10 constants in 3 route files; `PaymentGateway`/`PayoutGateway` types in 4+ files | — |
+| BUG-09 | No PaymentTransaction list/read API endpoint | Open | Aug 27 — FEATURE-13 | `PaymentTransaction` model exists but has no GET endpoint; History Payments tab derives payment records from delivered Jobs (`offeredPrice`, `paymentGateway`, `paymentStatus`) as a workaround | Add `GET /api/payments` returning PaymentTransaction records for the current poster; update Payments tab to use it |
 
 ---
 

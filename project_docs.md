@@ -1212,5 +1212,28 @@ All API routes protected with `withRole(["admin"])`. Admin layout (`(admin)/layo
 
 **Result:** 17/19 PASS. Only "App is deployed on a public URL" is FAIL — no `vercel.json` or deployment configuration exists; all URLs point to localhost.
 
+---
+
+## Day 66-67 — Poster Sidebar Pages & Nav Cleanup
+
+### New Pages
+- `src/app/(dashboard)/jobs/active/page.tsx` — POSTER: active deliveries list (accepted + in_transit). Fetches job IDs from `GET /api/jobs/my-active-ids`, then individual job details from `GET /api/jobs/[id]`. Shows job cards with pickup/dropoff, status badge, NPR price, link to `/jobs/[id]`. Loading skeletons + empty state.
+- `src/app/(dashboard)/history/page.tsx` — POSTER: tabbed page (Jobs / Payments). Jobs tab fetches `GET /api/jobs?status=delivered` and `GET /api/jobs?status=cancelled`, combines and sorts by createdAt desc, rows link to `/jobs/[id]`. Payments tab derives payment records from delivered jobs (offeredPrice, paymentGateway, paymentStatus) since no payment-list endpoint exists. "Load more" pagination. Loading skeletons + empty states.
+- `src/app/(dashboard)/analytics/page.tsx` — POSTER: summary cards (Total Spent, Total Jobs, Completed, Cancelled) from `GET /api/posters/:id/summary`, Recharts BarChart showing jobs by status, efficiency trend from stats.efficiencyTrend. Loading skeletons.
+- `src/app/(dashboard)/billing/page.tsx` — POSTER: delivered jobs as billing records from `GET /api/jobs?status=delivered`. Total Spent card (sum of offeredPrice). Table: Job ID (links to `/jobs/[id]`), Route, PAID status badge, Amount (NPR), Date. Loading skeleton + empty state.
+- `src/app/(dashboard)/tracking/page.tsx` — POSTER: active jobs list. Reuses /jobs/active fetch pattern (my-active-ids + individual fetches). Table: Job ID, Route, Driver, Status badge, Date. Links to `/jobs/[id]` for full detail/map view. Loading skeletons + empty state.
+
+### Modified Files
+- `src/app/api/jobs/[id]/route.ts` — added ObjectId format guard: returns 400 before Job.findById() when id is not a valid ObjectId. Prevents CastError when non-ObjectId values (e.g. "active") reach the route.
+- `src/app/(dashboard)/layout.tsx` — removed /fleet (dead link). Added 3 poster nav links: Tracking, Analytics, Billing. Added 3 driver nav links: Earnings, Wallet, Verification. Made "New Shipment" sidebar button poster-only. Fixed mobile bottom nav links. Removed dead /fleet special-case in isActive().
+
+### API Routes (no new routes created)
+- No API routes created. All new pages use existing endpoints: GET /api/jobs, GET /api/jobs/[id], GET /api/jobs/my-active-ids, GET /api/posters/:id/summary.
+- Known gap (BUG-09): No GET /api/payments list endpoint; PaymentTransaction model exists but has no read API. History Payments tab derives payment data from delivered Jobs as a workaround.
+
+### Build Verification
+- tsc --noEmit: 0 errors
+- npm run build: 56 pages, 0 errors, 0 warnings
+
 
 

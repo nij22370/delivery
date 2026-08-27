@@ -41,6 +41,7 @@ Known gaps, future enhancements, things deliberately left out.
 
 | ID | Title | Status | Requested | Shipped in |
 | --- | --- | --- | --- | --- |
+| FEATURE-13 | Poster sidebar pages: History, Analytics, Billing, Tracking | Shipped | Aug 27 | fix/poster-consistent-layout |
 | FEATURE-12 | Dispute Flag Button & Driver Activity Dashboard | Shipped | Aug 24 | Post-v1 |
 | FEATURE-11 | Admin Payout Management Queue | Shipped | Aug 20 | Day 62 |
 | FEATURE-10 | Poster Activity Dashboard | Shipped | Aug 20 | Day 61 |
@@ -430,3 +431,51 @@ Recipients had no way to know which conversations had unseen messages, and sende
 
 ### Follow-ups
 - Rate-limit chat, "last seen" read receipts per sender, refetch-on-focus staleness policy for `unread-counts`, and a nudge to look at the badge from the campaign/notification bell (dashboard nav is still mockup).
+
+---
+
+## FEATURE-13 — Poster Sidebar Pages (History, Analytics, Billing, Tracking)
+
+**Requested:** Aug 27 | **Requested by:** Branch alignment (missing nav items + broken /jobs/active route)
+**Status:** Shipped
+**Scope:** Add 4 poster-facing pages and 3 sidebar nav links. Fix the `/jobs/active` CastError, remove the dead `/fleet` link, and ensure all poster dashboard routes render with exactly one sidebar. No new API routes created.
+
+### Why (intent)
+The poster sidebar linked to `/jobs/active` (500 CastError), `/fleet` (404), `/history` (empty). The poster had no way to view historical jobs, analytics, billing records, or track active deliveries from dedicated pages.
+
+### Design
+- **API used (no new routes):** `GET /api/jobs/my-active-ids` (returns `{ jobIds }`), `GET /api/jobs/[id]` (returns `{ job }`), `GET /api/jobs?status=...&page=...&limit=...` (returns `{ jobs, total, page, totalPages }`), `GET /api/posters/[id]/summary` (returns `{ data: { stats } }`).
+- **No payment-history endpoint exists** — the `/payments/` API group only has `initiate` + `esewa/verify` + `khalti/verify`. The History Payments tab derives payment records from delivered jobs (`offeredPrice`, `paymentGateway`, `paymentStatus` fields on the Job model — see Bug.md BUG-09 for the follow-up to build a proper PaymentTransaction list endpoint).
+- **Pages created:**
+  - `src/app/(dashboard)/history/page.tsx` — tabbed (Jobs / Payments), "Load more" pagination, `useAuthGuard` + `useQuery`
+  - `src/app/(dashboard)/analytics/page.tsx` — summary cards (Total Spent, Total Jobs, Completed, Cancelled) from poster summary API, Recharts bar chart (jobs by status), efficiency trend from `stats.efficiencyTrend`
+  - `src/app/(dashboard)/billing/page.tsx` — delivered jobs as billing records from `GET /api/jobs?status=delivered`, total spent card (sum of `offeredPrice`), table with link per row
+  - `src/app/(dashboard)/tracking/page.tsx` — reuses `/jobs/active` fetch pattern (`my-active-ids` → `/api/jobs/[id]`), table with Job ID, Route, Driver, Status, Date
+- **Layout changes:** removed `/fleet` nav entry, added `/tracking`, `/analytics`, `/billing` links (poster-only), added `/driver/earnings`, `/driver/payouts`, `/driver/verification` links (driver-only)
+- **Bug fix:** `/api/jobs/[id]/route.ts` — ObjectId format guard returns 400 for non-ObjectId values before `Job.findById()`
+
+### Implementation trail
+1. Read all API routes, models, and types to map available data surface
+2. Created `/jobs/active` page (fetch IDs → fetch each by ID via Promise.all)
+3. Added ObjectId guard to `/api/jobs/[id]/route.ts`
+4. Removed `/fleet` from NAV_LINKS; added Tracking, Analytics, Billing, driver Earnings/Wallet/Verification links
+5. Made "New Shipment" sidebar button poster-only; fixed mobile bottom nav dead links
+6. Removed inline "Driver Portal" sidebar from `driver/earnings/page.tsx` (only page with one)
+7. Created History page (tabbed: Jobs + Payments, load-more pagination)
+8. Created Analytics page (summary cards + Recharts bar chart + efficiency trend)
+9. Created Billing page (delivered jobs table + total spent card)
+10. Created Tracking page (active jobs list with my-active-ids + individual fetches)
+11. `tsc --noEmit` 0 errors → `npm run build` 56 pages, 0 errors, 0 warnings
+
+### Verification
+- `tsc --noEmit` passes with 0 errors
+- `npm run build` passes with 56 pages generated, 0 errors, 0 warnings
+- `/jobs/active` returns 200 (was 500 CastError) — ObjectId guard returns 400 for invalid IDs
+- "Fleet Management" no longer in sidebar
+- Driver pages show exactly one sidebar (the `(dashboard)` layout sidebar)
+- Driver nav links (Earnings, Wallet, Verification) appear for drivers
+- Poster nav links (Tracking, Analytics, Billing) appear for posters
+
+### Follow-ups
+- PaymentTransaction table has no read/list API endpoint — the History Payments tab derives data from delivered Jobs. Future work: add `GET /api/payments` endpoint returning PaymentTransaction records for the current poster. (BUG-09)
+- `/analytics` chart only shows aggregate counts from the poster summary. Per-status breakdown (e.g. Accepted vs In-Transit) requires a new count endpoint or expanded summary. (BUG-10)

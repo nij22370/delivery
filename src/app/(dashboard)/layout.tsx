@@ -7,6 +7,9 @@ import { useAuth } from "@/hooks/useAuth";
 
 const POSTER_ROLE = "poster";
 const DRIVER_ROLE = "driver";
+const ACTIVE_DELIVERIES_PATH = "/jobs/active";
+const BROWSE_JOBS_PATH = "/jobs/browse";
+const TRACKING_PATH = "/tracking";
 
 interface NavLink {
   href: string;
@@ -56,6 +59,20 @@ export default function DashboardLayout({
   }, [userRole, isAuthLoading]);
 
   const isActive = useCallback((href: string) => {
+    if (href === TRACKING_PATH) {
+      return (
+        pathname === TRACKING_PATH ||
+        (pathname.startsWith("/jobs/") &&
+          pathname !== ACTIVE_DELIVERIES_PATH &&
+          pathname !== BROWSE_JOBS_PATH)
+      );
+    }
+    if (href === ACTIVE_DELIVERIES_PATH) {
+      return (
+        pathname === ACTIVE_DELIVERIES_PATH ||
+        (pathname.startsWith("/jobs/") && pathname.endsWith("/active"))
+      );
+    }
     return pathname === href;
   }, [pathname]);
 
