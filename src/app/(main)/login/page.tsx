@@ -10,7 +10,7 @@ import Image from "next/image";
 import { signIn } from "next-auth/react";
 import { useLogin } from "@/api/hooks/auth/authApi";
 
-const POST_LOGIN_REDIRECT = "/dashboard";
+const POST_LOGIN_REDIRECT = "/";
 
 const HERO_IMAGE_URL = "/login.jpg";
 

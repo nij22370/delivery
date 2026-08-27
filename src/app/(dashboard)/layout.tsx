@@ -2,17 +2,36 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useMemo, useCallback } from "react";
+import { useAuth } from "@/hooks/useAuth";
 
-const NAV_LINKS = [
-  { href: "/dashboard", icon: "dashboard", label: "Dashboard" },
-  { href: "/jobs/active", icon: "local_shipping", label: "Active Deliveries" },
-  { href: "/post-job", icon: "add_box", label: "Post Job" },
-  { href: "/fleet", icon: "group", label: "Fleet Management", fillIcon: true },
-  { href: "/disputes", icon: "gavel", label: "Disputes" },
-  { href: "/history", icon: "history", label: "History" },
+const POSTER_ROLE = "poster";
+const DRIVER_ROLE = "driver";
+
+interface NavLink {
+  href: string;
+  icon: string;
+  label: string;
+  fillIcon?: boolean;
+  roles: string[];
+}
+
+interface FooterLink {
+  href: string;
+  icon: string;
+  label: string;
+}
+
+const NAV_LINKS: NavLink[] = [
+  { href: "/dashboard", icon: "dashboard", label: "Dashboard", roles: [POSTER_ROLE, DRIVER_ROLE] },
+  { href: "/jobs/active", icon: "local_shipping", label: "Active Deliveries", roles: [POSTER_ROLE, DRIVER_ROLE] },
+  { href: "/post-job", icon: "add_box", label: "Post Job", roles: [POSTER_ROLE] },
+  { href: "/fleet", icon: "group", label: "Fleet Management", fillIcon: true, roles: [POSTER_ROLE] },
+  { href: "/disputes", icon: "gavel", label: "Disputes", roles: [POSTER_ROLE, DRIVER_ROLE] },
+  { href: "/history", icon: "history", label: "History", roles: [POSTER_ROLE, DRIVER_ROLE] },
 ];
 
-const FOOTER_LINKS = [
+const FOOTER_LINKS: FooterLink[] = [
   { href: "/settings", icon: "settings", label: "Settings" },
   { href: "/support", icon: "contact_support", label: "Support" },
 ];
@@ -23,16 +42,20 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const { user, isLoading: isAuthLoading } = useAuth();
 
-  // Highlight Fleet Management or other routes based on pathname, 
-  // for this mockup we'll just use exact or partial match.
-  const isActive = (href: string) => {
-    // Basic match for mockup, fleet is highlighted if we're on /fleet or /drivers (Driver Profile)
+  const userRole = user?.role;
+  const visibleNavLinks = useMemo(() => {
+    if (isAuthLoading) return NAV_LINKS;
+    return NAV_LINKS.filter((link) => link.roles.includes(userRole as string));
+  }, [userRole, isAuthLoading]);
+
+  const isActive = useCallback((href: string) => {
     if (href === "/fleet" && (pathname.startsWith("/fleet") || pathname.startsWith("/drivers"))) {
       return true;
     }
     return pathname === href;
-  };
+  }, [pathname]);
 
   return (
     <div className="font-body-md text-body-md text-on-surface antialiased bg-background md:pl-64 pt-16 md:pt-0 pb-20 md:pb-0 min-h-screen">
@@ -73,7 +96,7 @@ export default function DashboardLayout({
         </Link>
 
         <ul className="flex flex-col gap-1 flex-grow">
-          {NAV_LINKS.map((link) => {
+          {visibleNavLinks.map((link) => {
             const active = isActive(link.href);
             return (
               <li key={link.href}>
