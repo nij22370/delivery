@@ -16,6 +16,7 @@ export default function Header() {
   const initials = user ? getInitials(displayName) : "";
   const isPoster = user?.role === POSTER_ROLE;
   const isDriver = user?.role === "driver";
+  const isAdmin = user?.role === "admin";
 
   const handleToggleMobileMenu = useCallback(() => {
     setIsMobileMenuOpen((previous) => !previous);
@@ -116,6 +117,14 @@ export default function Header() {
                   Post a Job
                 </Link>
               )}
+              {isAdmin && (
+                <Link
+                  href="/admin"
+                  className="text-sm text-on-surface-variant font-medium hover:text-primary-container transition-colors cursor-pointer"
+                >
+                  Admin Panel
+                </Link>
+              )}
             </>
           ) : (
             <>
@@ -204,6 +213,15 @@ export default function Header() {
             >
               How it Works
             </Link>
+            {isAdmin && (
+              <Link
+                href="/admin"
+                onClick={handleCloseMobileMenu}
+                className="text-sm text-on-surface font-medium py-3 border-b border-outline-variant/50 hover:text-primary-container transition-colors"
+              >
+                Admin Panel
+              </Link>
+            )}
             {isPoster && (
               <div className="pt-3 pb-1">
                 <Link

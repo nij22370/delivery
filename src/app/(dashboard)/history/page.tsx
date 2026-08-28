@@ -76,6 +76,7 @@ interface JobsTableRow {
   status: string;
   price: number;
   date: string;
+  userRole: string;
 }
 
 interface PaymentRecord {
@@ -84,6 +85,7 @@ interface PaymentRecord {
   gateway: string;
   status: string;
   date: string;
+  isDriver: boolean;
 }
 
 function formatShortAddress(address: string): string {
@@ -100,10 +102,11 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function PaymentStatusBadge({ status }: { status?: string }) {
-  const displayStatus = status ?? "paid";
+function PaymentStatusBadge({ status, isDriver }: { status?: string; isDriver: boolean }) {
+  const rawStatus = status ?? "paid";
+  const displayStatus = isDriver && rawStatus === "paid" ? "Received" : rawStatus;
   const className =
-    displayStatus === "paid"
+    rawStatus === "paid"
       ? "bg-success-green/10 text-success-green"
       : "bg-warning-amber/10 text-warning-amber";
   return (
@@ -199,10 +202,47 @@ const JOB_COLUMNS = [
     header: "Actions",
     cell: (info) => {
       const status = info.row.original.status.toLowerCase();
-      const isDelivered = status === "delivered";
-      const isDisputed = status === "disputed";
-      const isPosted = status === "posted";
       const fullId = info.row.original.fullId;
+      const userRole = info.row.original.userRole;
+
+      const isDelivered = status === JOB_STATUS.DELIVERED.toLowerCase();
+      const isDisputed = status === JOB_STATUS.DISPUTED.toLowerCase();
+      const isPosted = status === JOB_STATUS.POSTED.toLowerCase();
+      const isDisputable =
+        status === JOB_STATUS.DELIVERED.toLowerCase() || status === "completed";
+
+      if (userRole === "driver") {
+        return (
+          <div className="flex items-center gap-1.5">
+            <Link
+              href={`/jobs/${fullId}`}
+              title="View job details"
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-secondary hover:text-primary hover:bg-surface-container-high rounded-md transition-colors cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[14px]">visibility</span>
+              Details
+            </Link>
+
+            <Link
+              href={`/jobs/${fullId}#chat`}
+              title="Open chat"
+              className="inline-flex items-center justify-center w-7 h-7 text-xs font-semibold text-secondary hover:text-primary hover:bg-surface-container-high rounded-md transition-colors cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[16px]">chat</span>
+            </Link>
+
+            {isDisputable && (
+              <Link
+                href={`/jobs/${fullId}#dispute`}
+                title="Report an issue or dispute"
+                className="inline-flex items-center justify-center w-7 h-7 text-xs font-semibold text-secondary hover:text-error-red hover:bg-error-red/10 rounded-md transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">gavel</span>
+              </Link>
+            )}
+          </div>
+        );
+      }
 
       return (
         <div className="flex items-center gap-1.5">
@@ -238,13 +278,15 @@ const JOB_COLUMNS = [
             </Link>
           )}
 
-          <Link
-            href={`/jobs/${fullId}/track`}
-            title="Track delivery"
-            className="inline-flex items-center justify-center w-7 h-7 text-xs font-semibold text-secondary hover:text-primary hover:bg-surface-container-high rounded-md transition-colors cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[16px]">location_on</span>
-          </Link>
+          {!isDisputed && !isPosted && (
+            <Link
+              href={`/jobs/${fullId}/track`}
+              title="Track delivery"
+              className="inline-flex items-center justify-center w-7 h-7 text-xs font-semibold text-secondary hover:text-primary hover:bg-surface-container-high rounded-md transition-colors cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[16px]">location_on</span>
+            </Link>
+          )}
 
           {!isDisputed && !isPosted && (
             <Link
@@ -285,7 +327,7 @@ const PAYMENT_COLUMNS = [
   }),
   payColHelper.accessor("status", {
     header: "Status",
-    cell: (info) => <PaymentStatusBadge status={info.getValue()} />,
+    cell: (info) => <PaymentStatusBadge status={info.getValue()} isDriver={info.row.original.isDriver} />,
   }),
   payColHelper.accessor("date", {
     header: "Date",
@@ -638,8 +680,9 @@ export default function HistoryPage() {
         status: job.status,
         price: job.offeredPrice,
         date: formatShortDate(job.createdAt),
+        userRole: user?.role ?? "",
       }));
-  }, [deliveredJobs?.jobs, cancelledJobs?.jobs]);
+  }, [deliveredJobs?.jobs, cancelledJobs?.jobs, user?.role]);
 
   const paymentRecords = useMemo<PaymentRecord[]>(
     () =>
@@ -649,8 +692,9 @@ export default function HistoryPage() {
         gateway: job.paymentGateway ?? "bank",
         status: job.paymentStatus ?? "paid",
         date: formatShortDate(job.createdAt),
+        isDriver: user?.role === "driver",
       })),
-    [paymentJobsData?.jobs]
+    [paymentJobsData?.jobs, user?.role]
   );
 
   const totalPaymentAmount = useMemo(
@@ -725,7 +769,9 @@ export default function HistoryPage() {
         <>
           {paymentRecords.length > 0 && (
             <div className="bg-surface-container-low rounded-xl px-6 py-4 mb-4 flex justify-between items-center">
-              <p className="text-sm text-secondary font-medium">Total Paid</p>
+              <p className="text-sm text-secondary font-medium">
+                {user?.role === "driver" ? "Total Earned" : "Total Paid"}
+              </p>
               <p className="text-xl font-bold text-on-surface">
                 NPR {totalPaymentAmount.toLocaleString("en-NP")}
               </p>
