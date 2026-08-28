@@ -479,3 +479,112 @@ The poster sidebar linked to `/jobs/active` (500 CastError), `/fleet` (404), `/h
 ### Follow-ups
 - PaymentTransaction table has no read/list API endpoint — the History Payments tab derives data from delivered Jobs. Future work: add `GET /api/payments` endpoint returning PaymentTransaction records for the current poster. (BUG-09)
 - `/analytics` chart only shows aggregate counts from the poster summary. Per-status breakdown (e.g. Accepted vs In-Transit) requires a new count endpoint or expanded summary. (BUG-10)
+
+---
+
+## FEATURE-14 — Admin Panel link in navbar
+
+**Requested:** Aug 28 · **Requested by:** user
+**Status:** Shipped · **Scope:** Add an "Admin Panel" navigation link to the top navbar for users with `role === "admin"`. No UI changes for other roles.
+
+### Why (intent)
+Admins need quick access to the admin panel (`/admin`) from any page without navigating manually. The existing Header already gates "Post a Job" behind `isPoster`; this extends the same pattern for admins.
+
+### Design
+- `isAdmin` derived from `user?.role === "admin"` in the existing `useAuth()` hook
+- Desktop CTA: admin sees profile chip + Logout + "Admin Panel" link (text-style, primary container hover)
+- Mobile menu: admin sees "Admin Panel" link alongside existing nav items
+
+### Implementation trail
+- `src/components/layout/Header.tsx`: added `isAdmin` const; added Admin Panel `<Link href="/admin">` in desktop CTA block (after poster's Post a Job) and in mobile nav block (after How it Works)
+
+### Verification
+- `tsc --noEmit` — 0 errors
+- `npm run build` — 56 pages, 0 errors
+- Logged-out visitor: Login + Post a Job (no regression)
+- Logged-in poster: profile chip + Logout + Post a Job (no regression)
+- Logged-in driver: profile chip + Logout only (no Admin Panel, no Post a Job)
+
+---
+
+## FEATURE-15 — Role-aware driver history ACTIONS column
+
+**Requested:** Aug 28 · **Requested by:** user
+**Status:** Shipped · **Scope:** The History page's Jobs tab ACTIONS column currently shows poster-centric buttons (Rate, Pay, Chat, Track) for all users. Drivers need their own action set: Details / Chat / Dispute.
+
+### Why (intent)
+Drivers navigate to job detail pages (`/jobs/[id]`), chat with posters (`/jobs/[id]#chat`), and file disputes (`/jobs/[id]#dispute`). The existing Pay button and Track (location-pin) icon are poster-only actions that don't apply to drivers.
+
+### Design
+- Added `userRole: string` field to the `JobsTableRow` interface
+- ACTIONS cell checks `userRole === "driver"`:
+  - **Driver:** Details link (`/jobs/[id]`) + Chat button (`/jobs/[id]#chat`) + Dispute button (`/jobs/[id]#dispute`, only when status is `delivered` or `completed`)
+  - **Poster:** Rate / Pay / Chat / Track / Dispute (unchanged from original behavior)
+
+### Implementation trail
+- `src/app/(dashboard)/history/page.tsx`:
+  - Added `userRole` to `JobsTableRow` interface
+  - Populated `userRole: user?.role ?? ""` in the `jobTableRows` useMemo
+  - Rewrote ACTIONS column cell with role branching
+  - Used `JOB_STATUS` enum constants instead of magic strings
+
+### Verification
+- `tsc --noEmit` — 0 errors
+- `npm run build` — 56 pages, 0 errors
+- Poster view: Rate/Pay/Chat/Track/Dispute buttons render unchanged
+- Driver view: Details + Chat + Dispute (only for delivered/completed), no Pay or location-pin
+
+---
+
+## FEATURE-16 — Driver-perspective payout labels in History Payments tab
+
+**Requested:** Aug 28 · **Requested by:** user
+**Status:** Shipped · **Scope:** The History page's Payments tab was built for posters (money out: "Total Paid", "Paid"). For drivers it represents earnings received (money in: "Total Earned", "Received").
+
+### Why (intent)
+Posters pay for shipments; drivers receive earnings. The labels must match the user's perspective. "Total Paid" with "Paid" status is confusing for drivers — they earn, not pay.
+
+### Design
+- Added `isDriver: boolean` to `PaymentRecord` interface
+- Label changes only when `user?.role === "driver"`:
+  - "Total Paid" → "Total Earned"
+  - Row status `"paid"` → renders as "Received" (green badge, same color as "Paid")
+  - Row status `"pending"` → renders as "Pending" (unchanged)
+  - Row status `"failed"` → renders as "Failed" (unchanged)
+
+### Implementation trail
+- `src/app/(dashboard)/history/page.tsx`:
+  - Added `isDriver: boolean` to `PaymentRecord` interface
+  - `PaymentStatusBadge` accepts `isDriver` prop; when `isDriver && rawStatus === "paid"`, renders "Received"
+  - Updated `PAYMENT_COLUMNS` status accessor to pass `isDriver={info.row.original.isDriver}`
+  - Updated `paymentRecords` useMemo to include `isDriver: user?.role === "driver"`
+  - Updated "Total Paid" label to conditional `{user?.role === "driver" ? "Total Earned" : "Total Paid"}`
+
+### Verification
+- `tsc --noEmit` — 0 errors
+- `npm run build` — 56 pages, 0 errors
+- Driver Payments tab: summary reads "Total Earned", "paid" status renders as "Received" (green)
+- Poster Payments tab: summary reads "Total Paid" (no regression), "paid" renders as "Paid"
+
+---
+
+## FEATURE-17 — Browse Jobs visible in dashboard sidebar on all screen sizes
+
+**Requested:** Aug 28 · **Requested by:** user
+**Status:** Shipped · **Scope:** The "Browse Jobs" link in the dashboard sidebar was previously hidden on desktop (`md:hidden`), shown only in the mobile bottom nav. Make it visible in the sidebar on all screen sizes.
+
+### Why (intent)
+Users navigating the dashboard sidebar on desktop should see the Browse Jobs link alongside other navigation items, not hidden exclusively to mobile bottom nav.
+
+### Design
+- Removed `md:hidden` class from the Browse Jobs `<li>` in the dashboard sidebar
+- Replaced the role-gated active state check (`pathname === "/jobs/browse"`) with the shared `isActive()` helper
+- Updated the comment from "Mobile: always show Jobs navigation" to "Browse Jobs navigation - visible on all screen sizes"
+
+### Implementation trail
+- `src/app/(dashboard)/layout.tsx`: removed `className="md:hidden"` from Browse Jobs `<li>`, updated to use `isActive("/jobs/browse")`, updated comment
+
+### Verification
+- `tsc --noEmit` — 0 errors
+- `npm run build` — 56 pages, 0 errors
+- Dashboard sidebar shows "Browse Jobs" link on desktop (≥768px) and mobile
