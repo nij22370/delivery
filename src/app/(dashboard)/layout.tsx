@@ -141,12 +141,12 @@ export default function DashboardLayout({
             );
           })}
 
-          {/* Mobile: always show Jobs navigation, Desktop: hide jobs since it's in main navigation */}
-          <li className="md:hidden">
+          {/* Browse Jobs navigation - visible on all screen sizes */}
+          <li>
             <Link
               href="/jobs/browse"
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
-                pathname === "/jobs/browse"
+                isActive("/jobs/browse")
                   ? "bg-primary-container text-on-primary-container font-bold"
                   : "text-secondary hover:bg-surface-container-high"
               }`}

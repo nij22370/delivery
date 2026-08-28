@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/hooks/useAuth";
@@ -19,14 +18,6 @@ const DASHBOARD_HREF = "/";
 const SUPPORT_HREF = "mailto:support@swiftship.com";
 const COPYRIGHT_TEXT = "© 2024 SwiftShip Logistics Inc. All rights reserved.";
 
-const NAV_ITEMS = [
-  { href: "/", icon: "dashboard", label: "Dashboard", isActive: false },
-  { href: "/jobs/browse", icon: "local_shipping", label: "Shipments", isActive: false },
-  { href: "/jobs/browse", icon: "location_on", label: "Tracking", isActive: false },
-  { href: "/driver/earnings", icon: "analytics", label: "Analytics", isActive: false },
-  { href: "/driver/verification", icon: "settings", label: "Settings", isActive: false },
-] as const;
-
 const QUICK_DESTINATIONS = [
   { href: "/jobs/browse", icon: "list_alt", label: "Active Shipments" },
   { href: "/jobs/browse", icon: "map", label: "Fleet Tracker" },
@@ -39,135 +30,24 @@ const FOOTER_LINKS = [
   { href: "https://status.swiftship.com", label: "System Status" },
 ] as const;
 
-function formatRoleLabel(role?: string): string {
-  if (role === "admin") return "Logistics Admin";
-  if (role === "driver") return "Verified Driver";
-  if (role === "poster") return "Logistics Poster";
-  return "Guest User";
-}
-
 export default function NotFound() {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, isLoading: isAuthLoading } = useAuth();
 
   const displayName = user?.name?.trim() || user?.email || "Guest";
   const initials = user ? getInitials(displayName) : "G";
-  const roleLabel = formatRoleLabel(user?.role);
-
-  const handleToggleMobileMenu = useCallback(() => {
-    setIsMobileMenuOpen((previousState) => !previousState);
-  }, []);
-
-  const handleCloseMobileMenu = useCallback(() => {
-    setIsMobileMenuOpen(false);
-  }, []);
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background text-on-background">
-      {/* Mobile Drawer Backdrop */}
-      {isMobileMenuOpen && (
-        <div
-          onClick={handleCloseMobileMenu}
-          className="fixed inset-0 z-40 bg-black/40 md:hidden cursor-pointer backdrop-blur-xs"
-        />
-      )}
-
-      {/* Sidebar Navigation */}
-      <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-outline-variant bg-surface-white transition-transform duration-200 ease-in-out md:static md:translate-x-0 ${
-          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        {/* Brand Logo & Header with Delivery Truck Icon */}
-        <div className="p-6 flex items-center gap-2.5">
-          <Link href="/" className="text-primary flex items-center shrink-0">
-            <span className="material-symbols-outlined text-3xl" style={{ fontVariationSettings: "'wght' 300" }}>
-              local_shipping
-            </span>
-          </Link>
-          <Link href="/" className="text-xl font-bold tracking-tight text-on-surface">
-            {BRAND_NAME}
-          </Link>
-        </div>
-
-        {/* Nav Links */}
-        <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
-          {NAV_ITEMS.map((item) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              onClick={handleCloseMobileMenu}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-                item.isActive
-                  ? "bg-[#e7ebf3] text-primary font-bold"
-                  : "text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
-              }`}
-            >
-              <span className="material-symbols-outlined text-xl">{item.icon}</span>
-              <span>{item.label}</span>
-            </Link>
-          ))}
-        </nav>
-
-        {/* Dynamic Authenticated User Profile Card */}
-        <div className="p-4 border-t border-outline-variant">
-          {isAuthLoading ? (
-            <div className="flex items-center gap-3 p-2 animate-pulse">
-              <div className="size-10 rounded-full bg-surface-container-high shrink-0" />
-              <div className="flex flex-col gap-1 flex-1">
-                <div className="h-3 w-20 bg-surface-container-high rounded" />
-                <div className="h-2.5 w-14 bg-surface-container-high rounded" />
-              </div>
-            </div>
-          ) : user ? (
-            <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-surface-container transition-colors">
-              <div className="size-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-sm shrink-0">
-                {initials}
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-sm font-bold text-on-surface truncate">{displayName}</span>
-                <span className="text-xs text-on-surface-variant truncate">{roleLabel}</span>
-              </div>
-            </div>
-          ) : (
-            <Link
-              href="/login"
-              className="flex items-center gap-3 p-2 rounded-lg text-primary hover:bg-surface-container transition-colors cursor-pointer"
-            >
-              <div className="size-10 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                <span className="material-symbols-outlined text-xl">login</span>
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-sm font-bold text-on-surface">Sign In</span>
-                <span className="text-xs text-on-surface-variant">Log into account</span>
-              </div>
-            </Link>
-          )}
-        </div>
-      </aside>
-
       {/* Main Content Area */}
       <div className="flex flex-1 flex-col overflow-hidden min-w-0">
         {/* Top Header */}
         <header className="flex h-16 shrink-0 items-center justify-between border-b border-outline-variant bg-surface-white px-4 md:px-6">
           <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={handleToggleMobileMenu}
-              className="md:hidden p-2 text-on-surface-variant hover:bg-surface-container rounded-lg cursor-pointer"
-              aria-label="Toggle Navigation"
-            >
-              <span className="material-symbols-outlined text-2xl">menu</span>
-            </button>
-            <div className="relative hidden sm:block">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-xl">
-                search
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary text-[28px]">
+                local_shipping
               </span>
-              <input
-                type="text"
-                placeholder="Search tracking ID..."
-                className="h-10 w-64 rounded-lg border-none bg-surface-container-low pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              />
+              <span className="text-xl font-bold text-primary">{BRAND_NAME}</span>
             </div>
           </div>
 
@@ -186,11 +66,25 @@ export default function NotFound() {
             >
               <span className="material-symbols-outlined text-xl">help</span>
             </button>
+            {isAuthLoading ? (
+              <div className="size-10 rounded-full bg-surface-container-high shrink-0 animate-pulse" />
+            ) : user ? (
+              <div className="size-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-sm shrink-0">
+                {initials}
+              </div>
+            ) : (
+              <Link
+                href="/login"
+                className="size-10 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0 cursor-pointer hover:bg-primary/20 transition-colors"
+              >
+                <span className="material-symbols-outlined text-xl">login</span>
+              </Link>
+            )}
           </div>
         </header>
 
         {/* 404 Central Main Section */}
-        <main className="flex flex-1 flex-col items-center overflow-y-auto p-4 sm:p-6 md:p-8 text-center bg-surface">
+        <main className="flex-1 flex flex-col items-center overflow-y-auto p-4 sm:p-6 md:p-8 text-center bg-surface">
           <div className="max-w-2xl w-full flex flex-col items-center py-4 md:py-6 my-auto">
             {/* Visual Anchor / 3D Isometric Lost Drone Image */}
             <div className="relative w-full max-w-[440px] md:max-w-[500px] aspect-video mb-6 group shrink-0">
