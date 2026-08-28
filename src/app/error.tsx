@@ -16,25 +16,10 @@ const STATUS_PAGE_HREF = "https://status.swiftship.com";
 const HELP_CENTER_HREF = "/support";
 const COPYRIGHT_TEXT = "© 2024 SwiftShip Logistics Solutions. All rights reserved.";
 
-const NAV_ITEMS = [
-  { href: "/", icon: "dashboard", label: "Dashboard", isActive: true },
-  { href: "/jobs/browse", icon: "package_2", label: "Shipments", isActive: false },
-  { href: "/jobs/browse", icon: "location_on", label: "Tracking", isActive: false },
-  { href: "/driver/earnings", icon: "analytics", label: "Analytics", isActive: false },
-  { href: "/driver/verification", icon: "settings", label: "Settings", isActive: false },
-] as const;
-
 const FOOTER_LINKS = [
   { href: "/privacy", label: "Privacy Policy" },
   { href: "/terms", label: "Terms of Service" },
 ] as const;
-
-function formatRoleLabel(role?: string): string {
-  if (role === "admin") return "Logistics Admin";
-  if (role === "driver") return "Verified Driver";
-  if (role === "poster") return "Logistics Poster";
-  return "Guest User";
-}
 
 interface ErrorBoundaryProps {
   error: Error & { digest?: string };
@@ -43,24 +28,14 @@ interface ErrorBoundaryProps {
 
 export default function ErrorBoundary({ error, reset }: ErrorBoundaryProps) {
   const [isResetting, setIsResetting] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, isLoading: isAuthLoading } = useAuth();
 
   const displayName = user?.name?.trim() || user?.email || "Guest";
   const initials = user ? getInitials(displayName) : "G";
-  const roleLabel = formatRoleLabel(user?.role);
 
   useEffect(() => {
     console.error("Application Error Boundary caught error:", error);
   }, [error]);
-
-  const handleToggleMobileMenu = useCallback(() => {
-    setIsMobileMenuOpen((previousState) => !previousState);
-  }, []);
-
-  const handleCloseMobileMenu = useCallback(() => {
-    setIsMobileMenuOpen(false);
-  }, []);
 
   const handleReset = useCallback(() => {
     setIsResetting(true);
@@ -77,134 +52,48 @@ export default function ErrorBoundary({ error, reset }: ErrorBoundaryProps) {
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background text-on-background">
-      {/* Mobile Backdrop */}
-      {isMobileMenuOpen && (
-        <div
-          onClick={handleCloseMobileMenu}
-          className="fixed inset-0 z-40 bg-black/40 md:hidden cursor-pointer backdrop-blur-xs"
-        />
-      )}
-
-      {/* Sidebar Navigation */}
-      <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 shrink-0 flex-col border-r border-outline-variant bg-surface-container-lowest transition-transform duration-200 ease-in-out md:static md:translate-x-0 ${
-          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        {/* Brand Header with Delivery Truck Icon */}
-        <div className="p-6 flex items-center gap-2.5">
-          <Link href="/" className="text-primary flex items-center shrink-0">
-            <span className="material-symbols-outlined text-3xl" style={{ fontVariationSettings: "'wght' 300" }}>
-              local_shipping
-            </span>
-          </Link>
-          <Link href="/" className="text-xl font-bold tracking-tight text-on-surface">
-            {BRAND_NAME}
-          </Link>
-        </div>
-
-        {/* Navigation Items */}
-        <nav className="flex-1 px-4 py-2 space-y-1 overflow-y-auto">
-          {NAV_ITEMS.map((item) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              onClick={handleCloseMobileMenu}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-                item.isActive
-                  ? "bg-primary-fixed text-on-primary-fixed-variant font-semibold"
-                  : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
-              }`}
-            >
-              <span
-                className="material-symbols-outlined text-xl"
-                style={item.isActive ? { fontVariationSettings: "'FILL' 1" } : undefined}
-              >
-                {item.icon}
-              </span>
-              <span>{item.label}</span>
-            </Link>
-          ))}
-        </nav>
-
-        {/* Dynamic Logged-in User Profile Card */}
-        <div className="p-4 border-t border-outline-variant">
-          {isAuthLoading ? (
-            <div className="flex items-center gap-3 p-2 animate-pulse">
-              <div className="size-10 rounded-full bg-surface-container-high shrink-0" />
-              <div className="flex flex-col gap-1 flex-1">
-                <div className="h-3 w-20 bg-surface-container-high rounded" />
-                <div className="h-2.5 w-14 bg-surface-container-high rounded" />
-              </div>
-            </div>
-          ) : user ? (
-            <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-surface-container-high transition-colors">
-              <div className="size-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-sm shrink-0">
-                {initials}
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-sm font-semibold text-on-surface truncate">{displayName}</span>
-                <span className="text-xs text-outline truncate">{roleLabel}</span>
-              </div>
-            </div>
-          ) : (
-            <Link
-              href="/login"
-              className="flex items-center gap-3 p-2 rounded-lg text-primary hover:bg-surface-container-high transition-colors cursor-pointer"
-            >
-              <div className="size-10 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                <span className="material-symbols-outlined text-xl">login</span>
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-sm font-semibold text-on-surface">Sign In</span>
-                <span className="text-xs text-outline">Access account</span>
-              </div>
-            </Link>
-          )}
-        </div>
-      </aside>
-
       {/* Main Content Area */}
       <div className="flex flex-1 flex-col overflow-hidden min-w-0 bg-background relative">
         {/* Top Header */}
-        <header className="h-16 border-b border-outline-variant bg-surface-container-lowest flex items-center justify-between px-4 md:px-8 shrink-0">
-          <div className="flex items-center gap-4 flex-1">
-            <button
-              type="button"
-              onClick={handleToggleMobileMenu}
-              className="md:hidden p-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg cursor-pointer"
-              aria-label="Toggle Navigation"
-            >
-              <span className="material-symbols-outlined text-2xl">menu</span>
-            </button>
-            <div className="relative w-full max-w-md hidden sm:block">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-xl">
-                search
+        <header className="h-16 border-b border-outline_variant bg-surface-white flex items-center justify-between px-4 md:px-8 shrink-0">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary text-[28px]">
+                local_shipping
               </span>
-              <input
-                type="text"
-                placeholder="Search shipments, containers, or assets..."
-                className="w-full pl-10 pr-4 py-2 bg-surface-container-low border-none rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-              />
+              <span className="text-xl font-bold text-primary">{BRAND_NAME}</span>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
             <button
               type="button"
-              className="p-2 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-colors relative cursor-pointer"
+              className="flex size-10 items-center justify-center rounded-lg bg-surface-container-low text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer"
               aria-label="Notifications"
             >
               <span className="material-symbols-outlined text-xl">notifications</span>
-              <span className="absolute top-2 right-2 size-2 bg-[#e11900] rounded-full border-2 border-surface-white" />
             </button>
             <button
               type="button"
-              className="p-2 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-colors cursor-pointer"
+              className="flex size-10 items-center justify-center rounded-lg bg-surface-container-low text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer"
               aria-label="Help"
             >
               <span className="material-symbols-outlined text-xl">help_outline</span>
             </button>
+            {isAuthLoading ? (
+              <div className="size-10 rounded-full bg-surface-container-high animate-pulse shrink-0" />
+            ) : user ? (
+              <div className="size-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-sm shrink-0">
+                {initials}
+              </div>
+            ) : (
+              <Link
+                href="/login"
+                className="size-10 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0 cursor-pointer hover:bg-primary/20 transition-colors"
+              >
+                <span className="material-symbols-outlined text-xl">login</span>
+              </Link>
+            )}
           </div>
         </header>
 

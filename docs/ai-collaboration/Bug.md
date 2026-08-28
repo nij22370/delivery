@@ -49,6 +49,7 @@ Commands run + results. Must reference `TestChecklist.md` rows.
 | BUG-07 | Verify URLs built with string-interpolated query params | Open | Aug 16 — rules audit | `/payment/success` builds `` `${appUrl}/api/payments/khalti/verify?pidx=${pidx}` `` | — |
 | BUG-08 | Payout split constants + gateway types duplicated across files | Open | Aug 16 — rules audit | 90/10 constants in 3 route files; `PaymentGateway`/`PayoutGateway` types in 4+ files | — |
 | BUG-09 | No PaymentTransaction list/read API endpoint | Open | Aug 27 — FEATURE-13 | `PaymentTransaction` model exists but has no GET endpoint; History Payments tab derives payment records from delivered Jobs (`offeredPrice`, `paymentGateway`, `paymentStatus`) as a workaround | Add `GET /api/payments` returning PaymentTransaction records for the current poster; update Payments tab to use it |
+| BUG-10 | Verification document badges show "Pending" when profile is "approved" | Fixed | Aug 28 — driver verification page | `StatusBadge` checked `isPending && isReady` before checking `isApproved`; since `isPending` (= `isLocked`) was true when approved, approved drivers saw "Pending" on all four document badges | Added `isApproved` prop to `StatusBadge`, checked first with green "Verified" badge |
 
 ---
 
@@ -139,3 +140,63 @@ Single `PaymentGateway` type + payout split constants in `src/types/payments/pay
 
 ### Regression guard
 Rules audit pass; grep for duplicate type declarations.
+
+---
+
+## BUG-10 — Verification document badges show "Pending" when profile is "approved"
+
+**Reported:** Aug 28 · **Found by:** user report
+**Status:** Fixed
+**Severity:** Medium
+
+### Symptom
+When a driver's top-level `verificationStatus === "approved"`, the top banner correctly reads "You are verified", but all four document section badges (Driver's Licence, Government ID, Vehicle Insurance, Background Check) show "Pending" instead of "Verified".
+
+### Root cause
+`src/app/(dashboard)/driver/verification/page.tsx:261` — `StatusBadge` checked `if (isPending && isReady)` **before** checking `isApproved`. Since `isPending` was mapped to `isLocked` (which is `isPending || isApproved`, i.e. true when approved), the first condition matched for approved drivers with uploaded files, rendering the "Pending" badge.
+
+### Investigation trail
+- Read the `StatusBadge` component at `page.tsx:261-284` — condition order was: Pending+Ready (first), Ready (second), Not Started (fallback)
+- Confirmed `isApproved` was available in the page scope (line 309: `profile?.status === DRIVER_PROFILE_STATUS.APPROVED`) but not passed to `StatusBadge`
+- No new API call needed — `verificationStatus` (mapped to `profile.status`) was already returned by the existing `GET /api/drivers/verification` endpoint
+
+### Fix
+- Added `isApproved: boolean` to `StatusBadgeProps` interface
+- Added early return `if (isApproved)` that renders a green "Verified" badge with `verified` icon — checked **before** the Pending/Uploaded/Not Started logic
+- Updated all four `StatusBadge` usages to pass `isApproved={isApproved}`
+- When `verificationStatus === "pending"`, badges still show "Pending" (unchanged)
+- When `verificationStatus === "rejected"`, badges still show "Rejected" (unchanged)
+
+### Regression guard
+Manual: approved driver sees 4 green "Verified" badges; pending driver sees "Pending" badges; rejected driver sees "Rejected".
+
+### Verification
+- `tsc --noEmit` — 0 errors
+- `npm run build` — 0 errors, 0 warnings
+
+---
+
+## FEATURE-02 — Remove sidebar from 404 and error pages
+
+**Requested:** Aug 28 · **Requested by:** user
+**Status:** Shipped · **Scope:** The `not-found.tsx` and `error.tsx` pages had inline left sidebars (nav links + user profile card) that are unnecessary on error pages. Remove them and make the content area full-width, while preserving the brand header, top-header buttons, and footer.
+
+### Why (intent)
+Error pages should present the error message clearly without competing sidebar navigation. The sidebar was duplicating navigation that already exists in the main layout.
+
+### Design
+- Both pages already have inline (non-shared) sidebar markup
+- Removed the `<aside>` sidebar, mobile drawer backdrop, hamburger toggle, and search input
+- Replaced with a compact top header: brand logo on the left, notifications/help buttons + auth-aware profile/login avatar on the right
+- Main content and footer already full-width after sidebar removal
+- Cleaned up unused code: `NAV_ITEMS` constant, `formatRoleLabel` function, `roleLabel` variable, mobile menu `useState`/`useCallback` handlers
+
+### Implementation trail
+- `src/app/not-found.tsx`: removed `useState`, `useCallback` imports + mobile menu state; removed `NAV_ITEMS` constant + `formatRoleLabel` function; replaced sidebar with compact header; added auth-aware profile/login button in header
+- `src/app/error.tsx`: same structural changes; preserved `useState` only for `isResetting` (refresh button state); kept `useCallback` only for `handleReset`
+
+### Verification
+- `tsc --noEmit` — 0 errors
+- `npm run build` — 56 pages, 0 errors
+- 404 page renders full-width without sidebar
+- Error page renders full-width without sidebar

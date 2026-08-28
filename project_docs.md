@@ -1235,5 +1235,47 @@ All API routes protected with `withRole(["admin"])`. Admin layout (`(admin)/layo
 - tsc --noEmit: 0 errors
 - npm run build: 56 pages, 0 errors, 0 warnings
 
+---
+
+## Day 68 — Driver UI Improvements & Error Page Cleanup
+
+### New Features
+
+**Admin Panel nav link in Header**
+- `src/components/layout/Header.tsx`: Added `isAdmin` variable from `user?.role === "admin"`. Admin users now see an "Admin Panel" link (`/admin`) in the desktop CTA block (after Post a Job for posters) and in the mobile menu drawer (after How it Works). Post a Job button remains correctly gated to posters only — drivers never see it.
+
+**Role-aware History page ACTIONS column**
+- `src/app/(dashboard)/history/page.tsx`: The ACTIONS column in the Jobs tab is now role-aware:
+  - **Drivers:** Details link (`/jobs/[id]`), Chat button (`/jobs/[id]#chat`), Dispute button (`/jobs/[id]#dispute`) — Dispute only appears when job status is `delivered` or `completed`. No Pay button or location-pin icon.
+  - **Posters:** Unchanged — Rate, Pay, Chat, Track, Dispute buttons.
+- Added `userRole` field to `JobsTableRow` interface, populated from `user?.role`.
+- Replaced hardcoded status strings with `JOB_STATUS` enum constants.
+
+**Driver-perspective payout labels in History Payments tab**
+- `PaymentStatusBadge` component now accepts an `isDriver` prop. When the user is a driver and the payout status is `paid`, the badge renders "Received" (green) instead of "Paid".
+- "Total Paid" summary label → "Total Earned" when `user?.role === "driver"`.
+- Pending and Failed badges remain unchanged for all roles.
+- Added `isDriver` field to `PaymentRecord` interface.
+
+**Verification document badges propagate approved status**
+- `src/app/(dashboard)/driver/verification/page.tsx`: `StatusBadge` component now accepts an `isApproved` prop. When the driver's `verificationStatus === "approved"`, all four document section badges (Driver's Licence, Government ID, Vehicle Insurance, Background Check) render green "Verified" instead of incorrectly showing "Pending".
+- The `isApproved` check is the first condition in the badge, before Pending/Uploaded/Not Started logic.
+
+### Bug Fixes
+
+**BUG-10 — Verification document badges show "Pending" when approved**
+- Root cause: `StatusBadge` checked `isPending && isReady` before checking `isApproved`. Since `isPending` was mapped to `isLocked` (= `isPending || isApproved`), the Pending condition matched for approved drivers.
+- Fix: Added `isApproved` prop, checked first with green "Verified" badge.
+
+**Sidebar removal from error pages**
+- Removed inline left sidebar from both `src/app/not-found.tsx` (404 page) and `src/app/error.tsx` (global error boundary). Pages now use a compact top header with brand logo + auth-aware profile/login avatar, full-width content area.
+- Cleaned up unused code: `NAV_ITEMS` constants, `formatRoleLabel` function, `roleLabel` variable, mobile menu state/handlers.
+
+**Browse Jobs in dashboard sidebar**
+- `src/app/(dashboard)/layout.tsx`: Removed `md:hidden` from the "Browse Jobs" sidebar link so it is visible on all screen sizes, not just mobile bottom nav. Updated the active state check to use the shared `isActive()` helper.
+
+### Build Verification
+- tsc --noEmit: 0 errors
+- npm run build: 56 pages, 0 errors, 0 warnings
 
 

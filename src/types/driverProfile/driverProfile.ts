@@ -66,6 +66,7 @@ export interface DriverProfile {
   userId: string;
   status: DriverProfileStatus;
   vehicleType: DriverVehicleType;
+  phone?: string | null;
   licenceDocUrl?: string | null;
   governmentIdDocUrl?: string | null;
   insuranceDocUrl?: string | null;

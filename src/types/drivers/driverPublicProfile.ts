@@ -4,6 +4,7 @@ export interface DriverPublicUser {
   _id: string;
   name: string;
   role: string;
+  phone?: string | null;
   createdAt: string;
 }
 

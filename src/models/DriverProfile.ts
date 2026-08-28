@@ -10,6 +10,7 @@ export interface IDriverProfile extends Document {
   userId: Types.ObjectId;
   status: DriverProfileStatus;
   vehicleType: DriverVehicleType;
+  phone?: string | null;
   licenceDocUrl?: string | null;
   governmentIdDocUrl?: string | null;
   insuranceDocUrl?: string | null;
@@ -41,6 +42,7 @@ const driverProfileSchema = new Schema<IDriverProfile>(
       required: true,
       default: DRIVER_VEHICLE_TYPE.BIKE,
     },
+    phone: { type: String, default: null },
     licenceDocUrl: { type: String, default: null },
     governmentIdDocUrl: { type: String, default: null },
     insuranceDocUrl: { type: String, default: null },

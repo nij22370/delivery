@@ -256,9 +256,18 @@ function UploadZone({
 interface StatusBadgeProps {
   isReady: boolean;
   isPending: boolean;
+  isApproved: boolean;
 }
 
-function StatusBadge({ isReady, isPending }: StatusBadgeProps) {
+function StatusBadge({ isReady, isPending, isApproved }: StatusBadgeProps) {
+  if (isApproved) {
+    return (
+      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-success-green/10 text-success-green shrink-0">
+        <span className="material-symbols-outlined text-[16px]">verified</span>
+        Verified
+      </span>
+    );
+  }
   if (isPending && isReady) {
     return (
       <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-primary-container/10 text-primary-container shrink-0">
@@ -509,7 +518,7 @@ export default function DriverVerificationPage() {
                   <h2 className="text-2xl font-semibold text-on-surface mb-1">Driver&apos;s Licence</h2>
                   <p className="text-base text-on-surface-variant">Upload your valid Driver&apos;s Licence</p>
                 </div>
-                <StatusBadge isReady={!!licenceFile} isPending={isLocked} />
+                <StatusBadge isReady={!!licenceFile} isPending={isLocked} isApproved={isApproved} />
               </div>
               <UploadZone
                 documentType="licence"
@@ -527,7 +536,7 @@ export default function DriverVerificationPage() {
                   <h2 className="text-2xl font-semibold text-on-surface mb-1">Government ID</h2>
                   <p className="text-base text-on-surface-variant">Upload your valid Government ID</p>
                 </div>
-                <StatusBadge isReady={!!governmentIdFile} isPending={isLocked} />
+                <StatusBadge isReady={!!governmentIdFile} isPending={isLocked} isApproved={isApproved} />
               </div>
               <UploadZone
                 documentType="government_id"
@@ -545,7 +554,7 @@ export default function DriverVerificationPage() {
                   <h2 className="text-2xl font-semibold text-on-surface mb-1">Vehicle Insurance</h2>
                   <p className="text-base text-on-surface-variant">Current proof of commercial or personal auto insurance</p>
                 </div>
-                <StatusBadge isReady={!!insuranceFile} isPending={isLocked} />
+                <StatusBadge isReady={!!insuranceFile} isPending={isLocked} isApproved={isApproved} />
               </div>
               <UploadZone
                 documentType="insurance"
@@ -563,7 +572,7 @@ export default function DriverVerificationPage() {
                   <h2 className="text-2xl font-semibold text-on-surface mb-1">Background Check Authorization</h2>
                   <p className="text-base text-on-surface-variant">Standard motor vehicle record check</p>
                 </div>
-                <StatusBadge isReady={isBackgroundCheckAuthorized} isPending={isLocked} />
+                <StatusBadge isReady={isBackgroundCheckAuthorized} isPending={isLocked} isApproved={isApproved} />
               </div>
               <div className="space-y-4">
                 <p className="text-base text-on-surface-variant">

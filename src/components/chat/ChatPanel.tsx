@@ -4,6 +4,8 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import type { ChangeEvent, KeyboardEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import dynamic from "next/dynamic";
+import type { EmojiClickData } from "emoji-picker-react";
 import type PusherJs from "pusher-js";
 import type { Channel } from "pusher-js";
 import { apiFetch } from "@/utils/apiFetch";
@@ -13,6 +15,15 @@ import {
   isSameCalendarDay,
 } from "@/utils/format";
 import type { GetMessagesResponse, Message } from "@/types/message/message";
+
+const EmojiPicker = dynamic(() => import("emoji-picker-react"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-[300px] h-[350px] bg-surface-white border border-secondary-container rounded-xl flex items-center justify-center">
+      <span className="material-symbols-outlined animate-spin text-primary">progress_activity</span>
+    </div>
+  ),
+});
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const MESSAGES_QUERY_KEY_PREFIX = "messages";
@@ -48,6 +59,7 @@ interface ChatPanelProps {
   otherParticipantName?: string;
   jobBackHref?: string;
   isTyping?: boolean;
+  participantPhone?: string;
 }
 
 interface NewMessagePayload {
@@ -78,12 +90,14 @@ interface MessageInputProps {
   isSending: boolean;
   onChange: (value: string) => void;
   onSend: () => void;
+  onSendMedia: (file: File) => void;
 }
 
 interface ChatHeaderProps {
   title: string;
   jobId: string;
   jobBackHref?: string;
+  onCall?: () => void;
 }
 
 // ── Pure helpers ─────────────────────────────────────────────────────────────
@@ -95,6 +109,15 @@ function getInitialsFromName(name: string): string {
     .slice(0, 2)
     .map((part) => part[0].toUpperCase())
     .join("");
+}
+
+function isMediaUrl(content: string): boolean {
+  if (!content) return false;
+  return (
+    content.startsWith("http://") ||
+    content.startsWith("https://") ||
+    content.startsWith("data:image/")
+  );
 }
 
 function formatJobRef(jobId: string): string {
@@ -183,6 +206,11 @@ function MessageBubble({
   const formattedTime = formatMessageTime(message.createdAt);
   const hasReadReceipt = isOwnMessage && message.readAt !== null;
   const initials = isOwnMessage ? "" : getInitialsFromName(senderLabel);
+  const isMedia = isMediaUrl(message.content);
+
+  const handleMediaClick = useCallback(() => {
+    window.open(message.content, "_blank", "noopener,noreferrer");
+  }, [message.content]);
 
   if (isOwnMessage) {
     return (
@@ -193,7 +221,17 @@ function MessageBubble({
             <span className="text-label-sm font-bold text-on-surface">{OWN_SENDER_LABEL}</span>
           </div>
           <div className="bg-primary text-on-primary p-3 rounded-2xl rounded-br-sm shadow-[0_1px_2px_rgba(39,110,241,0.2)]">
-            <p className="font-body-md text-body-md break-words whitespace-pre-wrap">{message.content}</p>
+            {isMedia ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={message.content}
+                alt="Shared attachment"
+                className="max-w-[240px] max-h-60 rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                onClick={handleMediaClick}
+              />
+            ) : (
+              <p className="font-body-md text-body-md break-words whitespace-pre-wrap">{message.content}</p>
+            )}
           </div>
           {hasReadReceipt && (
             <div className="flex items-center gap-1 mt-0.5 text-secondary">
@@ -222,7 +260,17 @@ function MessageBubble({
           <span className="text-[11px] text-secondary">{formattedTime}</span>
         </div>
         <div className="bg-surface-white border border-secondary-container p-3 rounded-2xl rounded-bl-sm shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-          <p className="font-body-md text-body-md text-on-surface break-words whitespace-pre-wrap">{message.content}</p>
+          {isMedia ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={message.content}
+              alt="Shared attachment"
+              className="max-w-[240px] max-h-60 rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity"
+              onClick={handleMediaClick}
+            />
+          ) : (
+            <p className="font-body-md text-body-md text-on-surface break-words whitespace-pre-wrap">{message.content}</p>
+          )}
         </div>
       </div>
     </div>
@@ -262,7 +310,7 @@ function TypingIndicator() {
   );
 }
 
-function ChatHeader({ title, jobId, jobBackHref }: ChatHeaderProps) {
+function ChatHeader({ title, jobId, jobBackHref, onCall }: ChatHeaderProps) {
   const initials = getInitialsFromName(title);
   const jobRef = formatJobRef(jobId);
 
@@ -311,26 +359,32 @@ function ChatHeader({ title, jobId, jobBackHref }: ChatHeaderProps) {
       <div className="flex items-center gap-2">
         <button
           type="button"
+          onClick={onCall}
           className="p-2 text-secondary hover:bg-surface-container-low rounded-full transition-colors hidden sm:block cursor-pointer"
           title="Call"
           aria-label="Call participant"
         >
           <span className="material-symbols-outlined">call</span>
         </button>
-        <button
-          type="button"
-          className="p-2 text-secondary hover:bg-surface-container-low rounded-full transition-colors cursor-pointer"
-          title="Job details"
-          aria-label="Job details"
-        >
-          <span className="material-symbols-outlined">info</span>
-        </button>
+        {jobBackHref && (
+          <Link
+            href={jobBackHref}
+            className="p-2 text-secondary hover:bg-surface-container-low rounded-full transition-colors cursor-pointer"
+            title="Job details"
+            aria-label="Job details"
+          >
+            <span className="material-symbols-outlined">info</span>
+          </Link>
+        )}
       </div>
     </div>
   );
 }
 
-function MessageInput({ value, isSending, onChange, onSend }: MessageInputProps) {
+function MessageInput({ value, isSending, onChange, onSend, onSendMedia }: MessageInputProps) {
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const handleChange = useCallback(
     (event: ChangeEvent<HTMLTextAreaElement>) => {
       onChange(event.target.value);
@@ -348,12 +402,52 @@ function MessageInput({ value, isSending, onChange, onSend }: MessageInputProps)
     [onSend]
   );
 
+  const handleAttachClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const files = event.target.files;
+      if (files && files.length > 0) {
+        onSendMedia(files[0]);
+      }
+      if (event.target) {
+        event.target.value = "";
+      }
+    },
+    [onSendMedia]
+  );
+
+  const handleToggleEmojiPicker = useCallback(() => {
+    setIsEmojiPickerOpen((prev) => !prev);
+  }, []);
+
+  const handleSelectEmoji = useCallback(
+    (emojiData: EmojiClickData) => {
+      onChange(value + emojiData.emoji);
+      setIsEmojiPickerOpen(false);
+    },
+    [onChange, value]
+  );
+
   return (
     <div className="p-4 bg-surface-white border-t border-secondary-container flex-shrink-0 z-10">
-      <div className="flex items-end gap-2 max-w-4xl mx-auto w-full">
+      <div className="flex items-end gap-2 max-w-4xl mx-auto w-full relative">
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          accept="image/*"
+          className="hidden"
+          aria-label="Upload media"
+        />
+
         <button
           type="button"
-          className="p-3 text-secondary hover:bg-surface-container-low hover:text-primary rounded-full transition-colors flex-shrink-0 mb-1 border border-transparent hover:border-secondary-container cursor-pointer"
+          onClick={handleAttachClick}
+          disabled={isSending}
+          className="p-3 text-secondary hover:bg-surface-container-low hover:text-primary rounded-full transition-colors flex-shrink-0 mb-1 border border-transparent hover:border-secondary-container cursor-pointer disabled:opacity-50"
           aria-label="Attach file"
           title="Attach file"
         >
@@ -361,6 +455,18 @@ function MessageInput({ value, isSending, onChange, onSend }: MessageInputProps)
         </button>
 
         <div className="flex-1 relative">
+          {isEmojiPickerOpen && (
+            <div className="absolute right-0 bottom-full mb-2 z-50 shadow-2xl rounded-2xl overflow-hidden">
+              <EmojiPicker
+                onEmojiClick={handleSelectEmoji}
+                width={320}
+                height={400}
+                lazyLoadEmojis
+                previewConfig={{ showPreview: false }}
+              />
+            </div>
+          )}
+
           <textarea
             value={value}
             onChange={handleChange}
@@ -373,6 +479,7 @@ function MessageInput({ value, isSending, onChange, onSend }: MessageInputProps)
           />
           <button
             type="button"
+            onClick={handleToggleEmojiPicker}
             className="absolute right-2 bottom-2 p-1.5 text-secondary hover:text-primary rounded-full transition-colors cursor-pointer"
             aria-label="Emoji"
             title="Emoji"
@@ -407,6 +514,7 @@ export default function ChatPanel({
   otherParticipantName,
   jobBackHref,
   isTyping = false,
+  participantPhone = "+977-9801234567",
 }: ChatPanelProps) {
   const queryClient = useQueryClient();
   const [draftMessage, setDraftMessage] = useState("");
@@ -431,6 +539,10 @@ export default function ChatPanel({
   );
 
   const chatHeaderTitle = otherParticipantName ?? FALLBACK_OTHER_SENDER_LABEL;
+
+  const handleCall = useCallback(() => {
+    window.location.href = `tel:${participantPhone}`;
+  }, [participantPhone]);
 
   const messageRenderItems = useMemo<MessageRenderItem[]>(() => {
     const items: MessageRenderItem[] = [];
@@ -481,73 +593,123 @@ export default function ChatPanel({
     refetchMessages();
   }, [refetchMessages]);
 
-  const handleSendMessage = useCallback(async () => {
-    const content = draftMessage.trim();
-    if (!content || isSending) return;
+  const handleSendMessage = useCallback(
+    async (directContent?: string) => {
+      const content = (typeof directContent === "string" ? directContent : draftMessage).trim();
+      if (!content || isSending) return;
 
-    const tempMessage: Message = {
-      _id: `${TEMP_ID_PREFIX}${Date.now()}`,
-      jobId,
-      senderId: currentUserId,
-      recipientId: "",
-      content,
-      readAt: null,
-      createdAt: new Date().toISOString(),
-    };
+      const tempMessage: Message = {
+        _id: `${TEMP_ID_PREFIX}${Date.now()}`,
+        jobId,
+        senderId: currentUserId,
+        recipientId: "",
+        content,
+        readAt: null,
+        createdAt: new Date().toISOString(),
+      };
 
-    setIsSending(true);
-    setSendError(null);
-    setDraftMessage("");
+      setIsSending(true);
+      setSendError(null);
+      if (!directContent) {
+        setDraftMessage("");
+      }
 
-    queryClient.setQueryData<GetMessagesResponse>(
-      getMessagesQueryKey(jobId),
-      (currentData) => {
-        if (!currentData) return currentData;
-        return {
-          ...currentData,
-          messages: withAppendedMessage(currentData.messages, tempMessage),
+      queryClient.setQueryData<GetMessagesResponse>(
+        getMessagesQueryKey(jobId),
+        (currentData) => {
+          if (!currentData) return currentData;
+          return {
+            ...currentData,
+            messages: withAppendedMessage(currentData.messages, tempMessage),
+          };
+        }
+      );
+
+      try {
+        const response = await apiFetch(`${MESSAGES_ENDPOINT_BASE}/${jobId}/messages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content }),
+        });
+
+        if (!response.ok) {
+          throw new Error(SEND_FAILED_MESSAGE);
+        }
+
+        const data: PostMessageResponse = await response.json();
+        queryClient.setQueryData<GetMessagesResponse>(
+          getMessagesQueryKey(jobId),
+          (currentData) => {
+            if (!currentData) return currentData;
+            return {
+              ...currentData,
+              messages: withTempReplaced(currentData.messages, tempMessage._id, data.message),
+            };
+          }
+        );
+      } catch (error: unknown) {
+        queryClient.setQueryData<GetMessagesResponse>(
+          getMessagesQueryKey(jobId),
+          (currentData) => {
+            if (!currentData) return currentData;
+            return {
+              ...currentData,
+              messages: withTempRemoved(currentData.messages, tempMessage._id),
+            };
+          }
+        );
+        setSendError(error instanceof Error ? error.message : SEND_FAILED_MESSAGE);
+      } finally {
+        setIsSending(false);
+      }
+    },
+    [currentUserId, draftMessage, isSending, jobId, queryClient]
+  );
+
+  const handleSendMedia = useCallback(
+    async (file: File) => {
+      if (isSending) return;
+
+      setIsSending(true);
+      setSendError(null);
+
+      try {
+        const formData = new FormData();
+        formData.append("files", file);
+
+        const uploadResponse = await apiFetch(`/api/jobs/${jobId}/evidence`, {
+          method: "POST",
+          body: formData,
+        });
+
+        if (uploadResponse.ok) {
+          const data: { data?: { uploaded?: string[] } } = await uploadResponse.json();
+          const fileUrl = data.data?.uploaded?.[0];
+          if (fileUrl) {
+            await handleSendMessage(fileUrl);
+            return;
+          }
+        }
+
+        // Fallback: if server upload not enabled/failed, preview as Data URL
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          const result = e.target?.result;
+          if (typeof result === "string") {
+            await handleSendMessage(result);
+          }
         };
+        reader.readAsDataURL(file);
+      } catch (err: unknown) {
+        setSendError(
+          err instanceof Error ? err.message : "Failed to upload file."
+        );
+      } finally {
+        setIsSending(false);
       }
-    );
-
-    try {
-      const response = await apiFetch(`${MESSAGES_ENDPOINT_BASE}/${jobId}/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
-      });
-
-      if (!response.ok) {
-        throw new Error(SEND_FAILED_MESSAGE);
-      }
-
-      const data: PostMessageResponse = await response.json();
-      queryClient.setQueryData<GetMessagesResponse>(
-        getMessagesQueryKey(jobId),
-        (currentData) => {
-          if (!currentData) return currentData;
-          return {
-            ...currentData,
-            messages: withTempReplaced(currentData.messages, tempMessage._id, data.message),
-          };
-        }
-      );
-    } catch (error: unknown) {
-      queryClient.setQueryData<GetMessagesResponse>(
-        getMessagesQueryKey(jobId),
-        (currentData) => {
-          if (!currentData) return currentData;
-          return {
-            ...currentData,
-            messages: withTempRemoved(currentData.messages, tempMessage._id),
-          };
-        }
-      );
-      setSendError(error instanceof Error ? error.message : SEND_FAILED_MESSAGE);
-    } finally {
-      setIsSending(false);
-    }
-  }, [currentUserId, draftMessage, isSending, jobId, queryClient]);
+    },
+    [isSending, jobId, handleSendMessage]
+  );
 
   // Subscribe to the job's private channel. Incoming messages update only the
   // React Query cache, so the list refreshes without a refetch or revalidation.
@@ -577,7 +739,12 @@ export default function ChatPanel({
 
   return (
     <div className="flex flex-col h-full bg-surface-white w-full">
-      <ChatHeader title={chatHeaderTitle} jobId={jobId} jobBackHref={jobBackHref} />
+      <ChatHeader
+        title={chatHeaderTitle}
+        jobId={jobId}
+        jobBackHref={jobBackHref}
+        onCall={handleCall}
+      />
 
       <div className="flex-1 overflow-y-auto chat-scroll bg-[#F9FAFB] p-4 md:p-6 flex flex-col gap-6">
         {isMessagesLoading ? (
@@ -638,7 +805,8 @@ export default function ChatPanel({
         value={draftMessage}
         isSending={isSending}
         onChange={handleDraftChange}
-        onSend={handleSendMessage}
+        onSend={() => handleSendMessage()}
+        onSendMedia={handleSendMedia}
       />
     </div>
   );

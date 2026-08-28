@@ -30,6 +30,7 @@ interface JobDetail {
   status: string;
   pickupAddress: string;
   pickupContactName: string;
+  pickupPhone?: string;
   dropoffAddress: string;
 }
 
@@ -173,7 +174,8 @@ export default function ChatPage({
               jobId={id}
               currentUserId={user?._id ?? ""}
               otherParticipantName={otherParticipantName}
-              jobBackHref={`/jobs/${id}`}
+              jobBackHref={`/jobs/${id}/track`}
+              participantPhone={job ? (user?._id === job.posterId ? "+977-9801234567" : job.pickupPhone) : undefined}
             />
           </div>
         </div>

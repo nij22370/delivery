@@ -421,17 +421,21 @@ export default function JobDetailPage({
             </div>
 
             {/* ── Poster: Payment Section ──────────────────────────────── */}
-            {isPoster && job.driverId && job.status === JOB_STATUS.ACCEPTED && job.paymentStatus !== "paid" && (
+            {isPoster && job.status !== JOB_STATUS.CANCELLED && job.paymentStatus !== "paid" && (
               <div className="bg-surface-white border border-outline-variant rounded-xl p-6">
-                <h2 className="text-base font-semibold text-on-surface mb-2">Payment Required</h2>
+                <h2 className="text-base font-semibold text-on-surface mb-2">
+                  {job.status === JOB_STATUS.ACCEPTED ? "Payment Required" : "Secure Payment"}
+                </h2>
                 <p className="text-sm text-secondary mb-5">
-                  Your driver is assigned and ready. Complete payment to confirm the delivery.
+                  {job.status === JOB_STATUS.ACCEPTED
+                    ? "Your driver is assigned and ready. Complete payment to confirm the delivery."
+                    : "Pay with eSewa or Khalti to activate escrow protection for this delivery."}
                 </p>
                 <Link
                   href={`/payment?jobId=${job._id}`}
-                  className="w-full h-12 flex items-center justify-center gap-2 bg-primary text-on-primary rounded-lg text-sm font-semibold hover:bg-primary-container transition-all cursor-pointer"
+                  className="w-full h-12 flex items-center justify-center gap-2 bg-primary text-on-primary rounded-lg text-sm font-semibold hover:bg-surface-tint transition-all cursor-pointer shadow-sm"
                 >
-                  <span className="material-symbols-outlined text-xl">payment</span>
+                  <span className="material-symbols-outlined text-xl">credit_card</span>
                   Proceed to Payment
                   <span className="material-symbols-outlined text-xl">arrow_forward</span>
                 </Link>
@@ -567,6 +571,25 @@ export default function JobDetailPage({
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* ── Poster: Rate Driver / Delivery ────────────────────────*/}
+            {isPoster && job.status === JOB_STATUS.DELIVERED && (
+              <div className="bg-surface-white border border-outline-variant rounded-xl p-6">
+                <h2 className="text-base font-semibold text-on-surface mb-2">
+                  Rate Delivery
+                </h2>
+                <p className="text-sm text-secondary mb-4">
+                  How was your experience with this courier? Leave a rating to help our community.
+                </p>
+                <Link
+                  href={`/jobs/${job._id}/rate`}
+                  className="w-full h-12 flex items-center justify-center gap-2 bg-amber-400 text-amber-950 font-bold rounded-lg text-sm hover:bg-amber-300 transition-colors cursor-pointer shadow-sm"
+                >
+                  <span className="material-symbols-outlined text-xl">star</span>
+                  Rate Courier
+                </Link>
               </div>
             )}
 

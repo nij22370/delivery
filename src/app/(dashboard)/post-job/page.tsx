@@ -89,7 +89,7 @@ export default function PostJobPage() {
   const createJobMutation = useMutation({
     mutationFn: (data: JobCreationInput) => createJob(data),
     onSuccess: (data) => {
-      router.push(`/jobs/${data.job._id}`);
+      router.push(`/payment?jobId=${data.job._id}`);
     },
     onError: (error: unknown) => {
       const message =

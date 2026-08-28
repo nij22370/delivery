@@ -6,6 +6,16 @@ Format: newest at the top. Every decision gets the **model/session** that made i
 
 ---
 
+## D-33 — Remove sidebar from 404/error pages; use compact top header instead
+
+**Status:** Accepted · **Model:** kilo-auto/free session (Aug 28) · **Applies to:** `src/app/not-found.tsx`, `src/app/error.tsx`
+
+**Decision:** Both error pages had inline `<aside>` sidebars duplicating dashboard navigation. These sidebars are removed and replaced with a compact top header: brand logo (left) + notifications/help buttons + auth-aware profile/login avatar (right). The main content and footer already fill the viewport once the sidebar is removed. No shared component was introduced — the two pages keep their independent inline headers to avoid coupling.
+
+**Why:** Error pages should communicate the error state, not compete for navigation attention. The sidebar was also duplicating routes available in the main layout. A compact top header preserves brand context and auth state without visual clutter.
+
+---
+
 ## D-32 — `$dateTrunc` buckets for earnings; week start uses `startOfWeek`, not `weekStartDay`
 
 **Status:** Accepted · **Model:** opencode session (Days 49–50) · **Applies to:** `src/lib/earnings.ts`
