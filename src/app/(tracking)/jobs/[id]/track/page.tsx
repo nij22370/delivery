@@ -2,8 +2,9 @@
 
 import { use, useCallback, useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type PusherJs from "pusher-js";
 import type { Channel } from "pusher-js";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
@@ -11,17 +12,18 @@ import { apiFetch } from "@/utils/apiFetch";
 import { useDriverPublicProfile } from "@/api/hooks/drivers/driverPublicProfileApi";
 import { geocodeAddress } from "@/utils/geocode";
 import type { Coordinates } from "@/utils/geocode";
-import { fetchRoute, haversineDistanceMeters } from "@/utils/routing";
+import { fetchRoute, haversineDistanceMeters, interpolateAlongPath } from "@/utils/routing";
+import { createThrottle } from "@/utils/throttle";
 import {
   getInitials,
-  formatAppliedDate,
-  formatCompletedDate,
   formatDistanceMiles,
   formatArrivalTime,
   formatEtaLabel,
 } from "@/utils/format";
 import { JOB_STATUS } from "@/types/job";
 import type { JobVehicleType } from "@/types/job";
+import DriverTrackingPanel from "@/components/tracking/DriverTrackingPanel";
+import PosterTrackingPanel from "@/components/tracking/PosterTrackingPanel";
 
 const LiveTrackingMap = dynamic(() => import("@/components/LiveTrackingMap"), {
   ssr: false,
@@ -42,16 +44,43 @@ const FALLBACK_LAT = 27.7172;
 const FALLBACK_LNG = 85.3240;
 
 const JOB_SHORT_ID_CHARS = 6;
-const ACTIVE_NAV_LABEL = "Deliveries";
-
 const FILLED_ICON_STYLE = { fontVariationSettings: "'FILL' 1" } as const;
+const POSTER_ROLE_CONST = "poster";
+const DRIVER_ROLE_CONST = "driver";
+const TRACK_ACTIVE_HREF = "/tracking";
+const POST_JOB_HREF = "/post-job";
 
-const SIDEBAR_LINKS = [
-  { href: "/dashboard", icon: "dashboard", label: "Dashboard" },
-  { href: "/jobs/browse", icon: "inventory_2", label: "Jobs" },
-  { href: "/jobs/active", icon: "local_shipping", label: "Deliveries" },
-  { href: "/wallet", icon: "account_balance_wallet", label: "Wallet" },
+// Driver GPS simulation constants
+const GPS_PING_INTERVAL_MS = 10_000;
+const SIMULATION_TICK_MS = 1_000;
+const SIMULATION_STEPS = 40;
+
+interface TrackNavLink {
+  href: string;
+  icon: string;
+  label: string;
+  roles: readonly string[];
+}
+
+const TRACK_NAV_LINKS: readonly TrackNavLink[] = [
+  { href: "/dashboard", icon: "dashboard", label: "Dashboard", roles: [POSTER_ROLE_CONST, DRIVER_ROLE_CONST] },
+  { href: "/jobs/active", icon: "local_shipping", label: "Active Deliveries", roles: [POSTER_ROLE_CONST, DRIVER_ROLE_CONST] },
+  { href: "/tracking", icon: "location_on", label: "Tracking", roles: [POSTER_ROLE_CONST] },
+  { href: "/tracking", icon: "location_on", label: "Tracking", roles: [DRIVER_ROLE_CONST] },
+  { href: "/analytics", icon: "bar_chart", label: "Analytics", roles: [POSTER_ROLE_CONST] },
+  { href: "/billing", icon: "receipt_long", label: "Billing", roles: [POSTER_ROLE_CONST] },
+  { href: "/post-job", icon: "add_box", label: "Post Job", roles: [POSTER_ROLE_CONST] },
+  { href: "/driver/earnings", icon: "payments", label: "Earnings", roles: [DRIVER_ROLE_CONST] },
+  { href: "/driver/payouts", icon: "account_balance_wallet", label: "Wallet", roles: [DRIVER_ROLE_CONST] },
+  { href: "/driver/verification", icon: "verified_user", label: "Verification", roles: [DRIVER_ROLE_CONST] },
+  { href: "/disputes", icon: "gavel", label: "Disputes", roles: [POSTER_ROLE_CONST, DRIVER_ROLE_CONST] },
+  { href: "/history", icon: "history", label: "History", roles: [POSTER_ROLE_CONST, DRIVER_ROLE_CONST] },
+];
+
+const TRACK_FOOTER_LINKS = [
   { href: "/settings", icon: "settings", label: "Settings" },
+  { href: "/faq", icon: "help", label: "FAQ" },
+  { href: "/support", icon: "contact_support", label: "Support" },
 ] as const;
 
 // Covers both the Job enum (bicycle) and the DriverProfile enum (bike).
@@ -87,16 +116,6 @@ const STATUS_BADGE_STYLES: Record<string, string> = {
   cancelled: "bg-error-container text-error-red",
 };
 
-const DELIVERY_STAGES = [
-  { id: "confirmed", title: "Confirmed", description: "Driver assigned" },
-  { id: "picked_up", title: "Picked Up", description: "Package with courier" },
-  { id: "on_the_way", title: "On the way", description: "En route to dropoff" },
-  { id: "dropoff", title: "Dropoff", description: "Delivered to recipient" },
-] as const;
-
-type StageId = (typeof DELIVERY_STAGES)[number]["id"];
-type StageState = "completed" | "active" | "pending";
-
 // ── Types ────────────────────────────────────────────────────────────────────
 interface JobDetail {
   _id: string;
@@ -104,7 +123,9 @@ interface JobDetail {
   driverId: string | null;
   status: string;
   pickupAddress: string;
+  pickupPhone?: string;
   dropoffAddress: string;
+  dropoffPhone?: string;
   vehicleType: JobVehicleType;
   offeredPrice: number;
   pickupDate: string;
@@ -157,111 +178,98 @@ function getStatusBadgeClass(status: string): string {
   return STATUS_BADGE_STYLES[status] ?? "bg-surface-container text-on-surface-variant";
 }
 
-function getStageState(status: string, stageId: StageId): StageState {
-  switch (status) {
-    case JOB_STATUS.ACCEPTED:
-      return stageId === "confirmed" ? "completed" : "pending";
-    case JOB_STATUS.IN_TRANSIT:
-      if (stageId === "confirmed" || stageId === "picked_up") return "completed";
-      if (stageId === "on_the_way") return "active";
-      return "pending";
-    case JOB_STATUS.DELIVERED:
-      return "completed";
-    default:
-      return "pending";
-  }
-}
-
-function getStageMeta(stageId: StageId, job: JobDetail): string {
-  switch (stageId) {
-    case "confirmed":
-      return formatAppliedDate(job.createdAt);
-    case "picked_up":
-      return job.pickupAddress;
-    case "on_the_way":
-      return job.dropoffAddress;
-    case "dropoff":
-      return job.status === JOB_STATUS.DELIVERED
-        ? formatCompletedDate(job.updatedAt)
-        : "Awaiting dropoff";
-    default:
-      return "";
-  }
-}
-
 function getTrackingId(jobId: string): string {
   return `SS-${jobId.slice(-JOB_SHORT_ID_CHARS).toUpperCase()}`;
 }
 
 // ── Sub-components ───────────────────────────────────────────────────────────
-function SidebarLink({
-  href,
-  icon,
-  label,
-  isActive,
-}: {
-  href: string;
-  icon: string;
-  label: string;
-  isActive: boolean;
-}) {
-  const linkClassName = [
-    "w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-colors cursor-pointer",
-    isActive
-      ? "bg-primary-container text-on-primary-container"
-      : "text-on-surface-variant hover:bg-surface-container-low",
-  ].join(" ");
-
-  return (
-    <Link href={href} className={linkClassName}>
-      <span className="material-symbols-outlined" style={isActive ? FILLED_ICON_STYLE : undefined}>
-        {icon}
-      </span>
-      {label}
-    </Link>
-  );
-}
-
 function SidebarNav({ userName, userRole }: { userName: string; userRole: string }) {
   const initials = getInitials(userName);
 
-  const linkItems = useMemo(
-    () =>
-      SIDEBAR_LINKS.map((link) => (
-        <SidebarLink
-          key={link.href}
-          href={link.href}
-          icon={link.icon}
-          label={link.label}
-          isActive={link.label === ACTIVE_NAV_LABEL}
-        />
-      )),
-    []
-  );
+  const linkItems = useMemo(() => {
+    const visibleLinks = TRACK_NAV_LINKS.filter((link) =>
+      link.roles.includes(userRole)
+    );
+    return visibleLinks.map((link) => {
+      const isActive = link.href === TRACK_ACTIVE_HREF;
+      return (
+        <li key={link.href}>
+          <Link
+            href={link.href}
+            className={[
+              "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200",
+              isActive
+                ? "bg-primary-container text-on-primary-container font-bold"
+                : "text-secondary hover:bg-surface-container-high",
+            ].join(" ")}
+          >
+            <span
+              className="material-symbols-outlined"
+              style={isActive ? FILLED_ICON_STYLE : undefined}
+            >
+              {link.icon}
+            </span>
+            {link.label}
+          </Link>
+        </li>
+      );
+    });
+  }, [userRole]);
 
   return (
     <aside className="hidden md:flex flex-col w-64 flex-shrink-0 h-full bg-surface-white border-r border-secondary-container z-20">
-      <div className="flex items-center gap-3 px-5 py-5">
-        <div className="w-10 h-10 rounded-lg bg-primary-container text-on-primary-container flex items-center justify-center">
+      <div className="flex items-center gap-3 mb-8 px-5 py-5">
+        <div className="w-10 h-10 rounded-lg bg-primary-container text-on-primary-container flex items-center justify-center font-bold">
           <span className="material-symbols-outlined" style={FILLED_ICON_STYLE}>
             local_shipping
           </span>
         </div>
         <div>
-          <h1 className="text-lg font-bold text-primary leading-tight">SwiftShip</h1>
-          <p className="text-xs font-semibold text-secondary">Delivery Tracker</p>
+          <h1 className="text-[16px] font-bold text-primary leading-tight">SwiftShip Fleet</h1>
+          <p className="text-xs font-semibold text-secondary">Verified Logistics Partner</p>
         </div>
       </div>
 
-      <nav className="flex-1 px-3 space-y-1">{linkItems}</nav>
-
-      <div className="p-4 border-t border-secondary-container flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold">
-          {initials}
+      {userRole === POSTER_ROLE_CONST && (
+        <div className="px-4 mb-6">
+          <Link
+            href={POST_JOB_HREF}
+            className="w-full bg-primary-container hover:bg-primary-container/90 text-on-primary-container text-sm font-medium py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors"
+          >
+            <span className="material-symbols-outlined" style={FILLED_ICON_STYLE}>
+              add_box
+            </span>
+            New Shipment
+          </Link>
         </div>
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-on-surface truncate">{userName}</p>
-          <p className="text-xs text-on-surface-variant capitalize">{userRole}</p>
+      )}
+
+      <nav className="flex-1 px-3">
+        <ul className="flex flex-col gap-1">{linkItems}</ul>
+      </nav>
+
+      <div className="mt-auto border-t border-secondary-container">
+        <ul className="flex flex-col gap-1 px-3 pt-4">
+          {TRACK_FOOTER_LINKS.map((link) => (
+            <li key={link.href}>
+              <Link
+                href={link.href}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-secondary hover:bg-surface-container-high transition-all duration-200"
+              >
+                <span className="material-symbols-outlined">{link.icon}</span>
+                {link.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+        <div className="p-4 border-t border-secondary-container flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold">
+            {initials}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-on-surface truncate">{userName}</p>
+            <p className="text-xs text-on-surface-variant capitalize">{userRole}</p>
+          </div>
         </div>
       </div>
     </aside>
@@ -290,123 +298,6 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function StageNode({
-  stage,
-  state,
-  meta,
-  isLast,
-}: {
-  stage: (typeof DELIVERY_STAGES)[number];
-  state: StageState;
-  meta: string;
-  isLast: boolean;
-}) {
-  const circleClassName =
-    state === "completed"
-      ? "w-6 h-6 rounded-full bg-success-green text-surface-white flex items-center justify-center"
-      : state === "active"
-        ? "w-6 h-6 rounded-full bg-surface-white border-2 border-primary flex items-center justify-center"
-        : "w-6 h-6 rounded-full bg-surface-white border-2 border-secondary-fixed-dim flex items-center justify-center";
-
-  const titleClassName =
-    state === "active"
-      ? "text-sm font-semibold text-primary"
-      : "text-sm font-medium text-on-surface";
-
-  return (
-    <div className="flex gap-3">
-      <div className="flex flex-col items-center">
-        <div className={circleClassName}>
-          {state === "completed" && (
-            <span className="material-symbols-outlined text-sm" style={FILLED_ICON_STYLE}>
-              check
-            </span>
-          )}
-          {state === "active" && (
-            <span className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse" />
-          )}
-        </div>
-        {!isLast && <div className="w-px flex-1 bg-surface-container-high my-1" />}
-      </div>
-      <div className={isLast ? "" : "pb-6"}>
-        <p className={titleClassName}>{stage.title}</p>
-        <p className="text-xs text-on-surface-variant mt-0.5">{meta}</p>
-      </div>
-    </div>
-  );
-}
-
-function DeliveryProgress({ job }: { job: JobDetail }) {
-  const stageItems = useMemo(
-    () =>
-      DELIVERY_STAGES.map((stage, index) => ({
-        stage,
-        state: getStageState(job.status, stage.id),
-        meta: getStageMeta(stage.id, job),
-        isLast: index === DELIVERY_STAGES.length - 1,
-      })),
-    [job]
-  );
-
-  return (
-    <div>
-      <h3 className="text-sm font-semibold text-on-surface mb-4">Delivery Progress</h3>
-      <div className="flex flex-col">
-        {stageItems.map((item) => (
-          <StageNode
-            key={item.stage.id}
-            stage={item.stage}
-            state={item.state}
-            meta={item.meta}
-            isLast={item.isLast}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function CourierCard({
-  driverName,
-  ratingAvgDisplay,
-  vehicleLabel,
-  vehicleIcon,
-}: {
-  driverName: string;
-  ratingAvgDisplay: string;
-  vehicleLabel: string;
-  vehicleIcon: string;
-}) {
-  const initials = getInitials(driverName);
-
-  return (
-    <div className="border border-secondary-container rounded-lg p-4">
-      <div className="flex items-center gap-3">
-        <div className="w-12 h-12 rounded-full bg-primary-container/15 flex items-center justify-center flex-shrink-0">
-          <span className="text-lg font-bold text-primary">{initials}</span>
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-on-surface truncate">{driverName}</p>
-          <p className="text-xs text-on-surface-variant mt-0.5 truncate">
-            {vehicleIcon && (
-              <span className="material-symbols-outlined text-[14px] align-text-bottom mr-1">
-                {vehicleIcon}
-              </span>
-            )}
-            {vehicleLabel} • {ratingAvgDisplay} ★
-          </p>
-        </div>
-        <button
-          type="button"
-          className="w-10 h-10 flex items-center justify-center rounded-lg border border-secondary-container text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer flex-shrink-0"
-        >
-          <span className="material-symbols-outlined">chat</span>
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function MapPlaceholder({
   status,
   isGeocoding,
@@ -420,24 +311,24 @@ function MapPlaceholder({
   const iconName = isGeocoding
     ? "map"
     : isDelivered
-      ? "check_circle"
-      : isCancelled
-        ? "cancel"
-        : "schedule";
+    ? "check_circle"
+    : isCancelled
+    ? "cancel"
+    : "schedule";
   const title = isGeocoding
     ? "Locating pickup point"
     : isDelivered
-      ? "Delivery completed"
-      : isCancelled
-        ? "Delivery cancelled"
-        : "Waiting for a driver";
+    ? "Delivery completed"
+    : isCancelled
+    ? "Delivery cancelled"
+    : "Waiting for a driver";
   const description = isGeocoding
     ? "Preparing the live map..."
     : isDelivered
-      ? "This delivery has been completed."
-      : isCancelled
-        ? "This delivery was cancelled."
-        : "Live tracking starts once a driver accepts the job.";
+    ? "This delivery has been completed."
+    : isCancelled
+    ? "This delivery was cancelled."
+    : "Live tracking starts once a driver accepts the job.";
 
   return (
     <div className="absolute inset-0 bg-surface-container-low flex items-center justify-center z-0">
@@ -459,6 +350,7 @@ export default function TrackJobPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const router = useRouter();
   const queryClient = useQueryClient();
   const { user, isLoading: isAuthLoading } = useAuthGuard();
 
@@ -467,6 +359,14 @@ export default function TrackJobPage({
 
   const lastRouteOriginRef = useRef<Coordinates | null>(null);
   const [debouncedRouteOrigin, setDebouncedRouteOrigin] = useState<Coordinates | null>(null);
+
+  // ── Driver execution state ────────────────────────────────────────────────
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [gpsError, setGpsError] = useState<string | null>(null);
+  const simulationProgressRef = useRef(0);
+  const throttledPing = useMemo(() => createThrottle(GPS_PING_INTERVAL_MS), []);
+  const isGeolocationSupported =
+    typeof navigator !== "undefined" && "geolocation" in navigator;
 
   const {
     data: job,
@@ -525,12 +425,91 @@ export default function TrackJobPage({
   const vehicleLabel = VEHICLE_TYPE_LABELS[courierVehicleType] ?? "";
   const vehicleIcon = VEHICLE_TYPE_ICONS[courierVehicleType] ?? "";
 
+  const handleChatClick = useCallback(() => {
+    router.push(`/jobs/${id}/chat`);
+  }, [router, id]);
+
   const handleCallDriver = useCallback(() => {
-    window.location.href = "tel:";
-  }, []);
+    const driverPhone = driverProfileData?.user?.phone || driverProfileData?.profile?.phone;
+    if (driverPhone) {
+      window.location.href = `tel:${driverPhone}`;
+    } else if (job?.pickupPhone || job?.dropoffPhone) {
+      window.location.href = `tel:${job?.pickupPhone || job?.dropoffPhone}`;
+    }
+  }, [driverProfileData, job?.pickupPhone, job?.dropoffPhone]);
 
   const handleSupport = useCallback(() => {
-    window.location.href = "tel:";
+    router.push("/support");
+  }, [router]);
+
+  // ── Driver GPS ping helper ────────────────────────────────────────────────
+  const sendLocationPing = useCallback(
+    async (position: Coordinates) => {
+      try {
+        await apiFetch(`${JOB_ENDPOINT_BASE}/${id}/location`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lat: position.lat, lng: position.lng }),
+        });
+      } catch {
+        // fire-and-forget
+      }
+    },
+    [id]
+  );
+
+  const handleDriverPositionUpdate = useCallback(
+    (position: Coordinates) => {
+      setLiveDriverLocation(position);
+      throttledPing(() => {
+        void sendLocationPing(position);
+      });
+    },
+    [throttledPing, sendLocationPing]
+  );
+
+  // ── Driver status mutations ───────────────────────────────────────────────
+  const transitMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiFetch(`${JOB_ENDPOINT_BASE}/${id}/transit`, { method: "POST" });
+      if (!response.ok) {
+        const errorData: { message?: string } = await response.json().catch(() => ({}));
+        throw new Error(errorData.message ?? "Failed to start delivery.");
+      }
+      return response.json() as Promise<{ job: JobDetail }>;
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData([JOB_DETAIL_QUERY_KEY, id], data.job);
+    },
+  });
+
+  const deliverMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiFetch(`${JOB_ENDPOINT_BASE}/${id}/deliver`, { method: "POST" });
+      if (!response.ok) {
+        const errorData: { message?: string } = await response.json().catch(() => ({}));
+        throw new Error(errorData.message ?? "Failed to mark delivered.");
+      }
+      return response.json() as Promise<{ job: JobDetail }>;
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData([JOB_DETAIL_QUERY_KEY, id], data.job);
+    },
+  });
+
+  const handleStartDelivery = useCallback(() => {
+    transitMutation.mutate();
+  }, [transitMutation]);
+
+  const handleMarkDelivered = useCallback(() => {
+    deliverMutation.mutate();
+  }, [deliverMutation]);
+
+  const handleToggleSimulation = useCallback(() => {
+    setIsSimulating((prev) => {
+      simulationProgressRef.current = 0;
+      return !prev;
+    });
   }, []);
 
   const handleLocationUpdate = useCallback((data: LocationUpdatePayload) => {
@@ -546,6 +525,52 @@ export default function TrackJobPage({
       }
     }
   }, []);
+
+  // ── Driver live GPS (when driver is viewing their own job in transit) ───────
+  useEffect(() => {
+    const isAssignedDriver =
+      user?.role === DRIVER_ROLE_CONST && user?._id === job?.driverId;
+    if (!isAssignedDriver || job?.status !== JOB_STATUS.IN_TRANSIT || isSimulating) return;
+    if (!isGeolocationSupported) return;
+
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        handleDriverPositionUpdate({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+      },
+      (error) => {
+        setGpsError(`GPS unavailable (${error.message}) — use Simulate GPS.`);
+      },
+      { enableHighAccuracy: true, maximumAge: 5_000, timeout: 10_000 }
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [user, job?.driverId, job?.status, isSimulating, handleDriverPositionUpdate, isGeolocationSupported]);
+
+  // ── GPS simulation for driver ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!isSimulating || !routeData || job?.status !== JOB_STATUS.IN_TRANSIT) return;
+    const intervalId = setInterval(() => {
+      simulationProgressRef.current += 1 / SIMULATION_STEPS;
+      if (simulationProgressRef.current >= 1) {
+        simulationProgressRef.current = 1;
+        clearInterval(intervalId);
+        const endPoint = routeData.path[routeData.path.length - 1];
+        if (endPoint) {
+          const end = { lat: endPoint[0], lng: endPoint[1] };
+          setLiveDriverLocation(end);
+          throttledPing(() => void sendLocationPing(end));
+        }
+        return;
+      }
+      handleDriverPositionUpdate(
+        interpolateAlongPath(routeData.path, simulationProgressRef.current)
+      );
+    }, SIMULATION_TICK_MS);
+    return () => clearInterval(intervalId);
+  }, [isSimulating, routeData, job?.status, handleDriverPositionUpdate, throttledPing, sendLocationPing]);
 
   const statusChangeCallbackRef = useRef<(data: StatusChangePayload) => void>(() => {});
 
@@ -596,6 +621,31 @@ export default function TrackJobPage({
         )}`
       : null;
 
+  // Determine if this user is the assigned driver for this job
+  const isAssignedDriver =
+    !isAuthLoading &&
+    user?.role === DRIVER_ROLE_CONST &&
+    !!job?.driverId &&
+    user?._id === job?.driverId;
+
+  const isAccepted = job?.status === JOB_STATUS.ACCEPTED;
+  const isInTransit = job?.status === JOB_STATUS.IN_TRANSIT;
+  const isDelivered = job?.status === JOB_STATUS.DELIVERED;
+
+  const gpsIndicatorLabel = isSimulating
+    ? "Simulating GPS"
+    : gpsError
+    ? "GPS unavailable"
+    : isInTransit
+    ? "Live GPS active"
+    : "GPS standby";
+
+  const mutationError = transitMutation.isError
+    ? transitMutation.error
+    : deliverMutation.isError
+    ? deliverMutation.error
+    : null;
+
   if (isAuthLoading || isJobLoading) {
     return (
       <div className="min-h-screen bg-surface-container-low flex items-center justify-center">
@@ -615,10 +665,10 @@ export default function TrackJobPage({
           </span>
           <h1 className="text-xl font-semibold text-on-surface mb-2">Job Not Found</h1>
           <Link
-            href="/jobs/active"
+            href="/tracking"
             className="text-sm font-semibold text-primary hover:underline cursor-pointer"
           >
-            ← Back to Deliveries
+            ← Back to Tracking
           </Link>
         </div>
       </div>
@@ -680,14 +730,35 @@ export default function TrackJobPage({
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-8">
-              <CourierCard
-                driverName={driverName}
-                ratingAvgDisplay={ratingAvgDisplay}
-                vehicleLabel={vehicleLabel}
-                vehicleIcon={vehicleIcon}
-              />
-
-              <DeliveryProgress job={job} />
+              {isAssignedDriver ? (
+                <DriverTrackingPanel
+                  jobId={id}
+                  job={job}
+                  isAccepted={isAccepted}
+                  isInTransit={isInTransit}
+                  isDelivered={isDelivered}
+                  gpsIndicatorLabel={gpsIndicatorLabel}
+                  isSimulating={isSimulating}
+                  mutationError={mutationError}
+                  gpsError={gpsError}
+                  handleStartDelivery={handleStartDelivery}
+                  handleMarkDelivered={handleMarkDelivered}
+                  handleToggleSimulation={handleToggleSimulation}
+                  handleSupport={handleSupport}
+                  transitMutationPending={transitMutation.isPending}
+                  deliverMutationPending={deliverMutation.isPending}
+                />
+              ) : (
+                <PosterTrackingPanel
+                  jobId={id}
+                  job={job}
+                  driverName={driverName}
+                  ratingAvgDisplay={ratingAvgDisplay}
+                  vehicleLabel={vehicleLabel}
+                  vehicleIcon={vehicleIcon}
+                  handleChatClick={handleChatClick}
+                />
+              )}
             </div>
 
             <div className="p-6 border-t border-secondary-container bg-surface-white flex gap-3">
@@ -699,14 +770,32 @@ export default function TrackJobPage({
                 <span className="material-symbols-outlined">help</span>
                 Support
               </button>
-              <button
-                type="button"
-                onClick={handleCallDriver}
-                className="flex-1 h-12 flex items-center justify-center gap-2 rounded-lg bg-primary-container text-on-primary-container text-sm font-semibold hover:bg-surface-tint transition-colors cursor-pointer"
-              >
-                <span className="material-symbols-outlined">call</span>
-                Call Driver
-              </button>
+              {isAssignedDriver ? (
+                <Link
+                  href={`/jobs/${id}/chat`}
+                  className="flex-1 h-12 flex items-center justify-center gap-2 rounded-lg bg-primary-container text-on-primary-container text-sm font-semibold hover:bg-surface-tint transition-colors cursor-pointer"
+                >
+                  <span className="material-symbols-outlined">chat</span>
+                  Chat Poster
+                </Link>
+              ) : job.status === JOB_STATUS.DELIVERED ? (
+                <Link
+                  href={`/jobs/${id}/rate`}
+                  className="flex-1 h-12 flex items-center justify-center gap-2 rounded-lg bg-amber-400 text-amber-950 font-bold text-sm hover:bg-amber-300 transition-colors cursor-pointer shadow-sm"
+                >
+                  <span className="material-symbols-outlined text-xl">star</span>
+                  Rate Delivery
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleCallDriver}
+                  className="flex-1 h-12 flex items-center justify-center gap-2 rounded-lg bg-primary-container text-on-primary-container text-sm font-semibold hover:bg-surface-tint transition-colors cursor-pointer"
+                >
+                  <span className="material-symbols-outlined">call</span>
+                  Call Driver
+                </button>
+              )}
             </div>
           </div>
         </main>

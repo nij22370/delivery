@@ -3,6 +3,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 export interface IUser extends Document {
   name: string;
   email: string;
+  phone?: string | null;
   passwordHash?: string | null;
   role: "poster" | "driver" | "admin";
   oauthProvider?: string | null;
@@ -17,6 +18,7 @@ const userSchema = new Schema<IUser>(
   {
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
+    phone: { type: String, default: null },
     passwordHash: { type: String, default: null },
     role: {
       type: String,

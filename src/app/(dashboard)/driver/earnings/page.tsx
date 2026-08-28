@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
 import { useDriverPayouts } from "@/api/hooks/drivers/payoutsApi";
 import { formatNpr, formatShortDate } from "@/utils/format";
@@ -22,6 +23,7 @@ const TXN_STATUS_CLASSES: Record<string, string> = {
 };
 
 export default function DriverEarningsDashboard() {
+  const router = useRouter();
   const { user, isLoading: isAuthLoading } = useAuthGuard();
   const isDriver = !isAuthLoading && user?.role === "driver";
 
@@ -76,8 +78,8 @@ export default function DriverEarningsDashboard() {
   }, []);
 
   const handleContactSupport = useCallback(() => {
-    toast.info("Opening support ticket center...");
-  }, []);
+    router.push("/support");
+  }, [router]);
 
   if (isAuthLoading) {
     return (
@@ -94,25 +96,8 @@ export default function DriverEarningsDashboard() {
       {/* Main Content Area */}
       <main className="w-full max-w-[1280px] mx-auto flex flex-col min-w-0">
         {/* Top Header */}
-        <header className="h-16 bg-surface-white border-b border-outline-variant px-8 flex items-center justify-between">
+        <header className="h-16 bg-surface-white border-b border-outline-variant px-8 flex items-center">
           <h1 className="text-lg font-bold text-on-surface">Earnings</h1>
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              className="p-1.5 rounded-full text-secondary hover:bg-surface-container transition-colors cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-xl">notifications</span>
-            </button>
-            <div className="flex items-center gap-2.5 border-l border-outline-variant pl-4">
-              <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs">
-                {user?.name ? user.name.slice(0, 2).toUpperCase() : "DR"}
-              </div>
-              <div className="hidden sm:block text-left">
-                <p className="text-xs font-bold text-on-surface">{user?.name || "Marcus Johnson"}</p>
-                <p className="text-[10px] text-secondary font-medium">Logistics Partner</p>
-              </div>
-            </div>
-          </div>
         </header>
 
         {/* Dashboard Panels */}

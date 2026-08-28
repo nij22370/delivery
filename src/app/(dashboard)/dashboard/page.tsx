@@ -73,7 +73,7 @@ function PosterDashboardContent({ posterId, posterName }: PosterDashboardContent
   return (
     <div className="max-w-[1280px] mx-auto px-4 md:px-10 py-5 flex flex-col gap-8 min-h-screen bg-[#f8f9fc]">
       {/* Top Header Navigation Bar inside content area */}
-      <header className="flex items-center justify-between whitespace-nowrap border-b border-solid border-b-[#e7ebf3] px-4 py-3 bg-white/50 backdrop-blur-md sticky top-0 z-30 rounded-xl mb-2 shadow-sm">
+      <header className="flex items-center whitespace-nowrap border-b border-solid border-b-[#e7ebf3] px-4 py-3 bg-white/50 backdrop-blur-md sticky top-0 z-30 rounded-xl mb-2 shadow-sm">
         <div className="flex items-center gap-8">
           <div className="flex items-center gap-4 text-[#0d121c]">
             <div className="flex items-center gap-3">
@@ -87,19 +87,6 @@ function PosterDashboardContent({ posterId, posterName }: PosterDashboardContent
                 </p>
               </div>
             </div>
-          </div>
-        </div>
-        <div className="flex flex-1 justify-end gap-4 items-center">
-          <div className="hidden md:flex items-center gap-2">
-            <button className="flex items-center justify-center rounded-lg h-10 w-10 bg-surface-container hover:bg-surface-container-high transition-colors text-on-surface cursor-pointer">
-              <span className="material-symbols-outlined">notifications</span>
-            </button>
-            <button className="flex items-center justify-center rounded-lg h-10 w-10 bg-surface-container hover:bg-surface-container-high transition-colors text-on-surface cursor-pointer">
-              <span className="material-symbols-outlined">account_circle</span>
-            </button>
-          </div>
-          <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-base shadow-sm ring-2 ring-primary/20 shrink-0">
-            {posterName?.charAt(0)?.toUpperCase() ?? "A"}
           </div>
         </div>
       </header>

@@ -18,7 +18,7 @@ export async function GET(
 
     const { id } = await context.params;
 
-    const user = await User.findById(id).select("name role createdAt").lean();
+    const user = await User.findById(id).select("name role createdAt phone").lean();
     if (!user) {
       return NextResponse.json({ message: "Driver not found" }, { status: 404 });
     }

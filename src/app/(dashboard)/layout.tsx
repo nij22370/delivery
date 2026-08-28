@@ -7,9 +7,22 @@ import { useAuth } from "@/hooks/useAuth";
 
 const POSTER_ROLE = "poster";
 const DRIVER_ROLE = "driver";
+const ADMIN_ROLE = "admin";
 const ACTIVE_DELIVERIES_PATH = "/jobs/active";
 const BROWSE_JOBS_PATH = "/jobs/browse";
 const TRACKING_PATH = "/tracking";
+
+const ROLE_BADGE_STYLES: Record<string, string> = {
+  [DRIVER_ROLE]: "bg-blue-100 text-blue-700",
+  [POSTER_ROLE]: "bg-purple-100 text-purple-700",
+  [ADMIN_ROLE]: "bg-amber-100 text-amber-700",
+};
+
+const ROLE_LABELS: Record<string, string> = {
+  [DRIVER_ROLE]: "Driver",
+  [POSTER_ROLE]: "Poster",
+  [ADMIN_ROLE]: "Admin",
+};
 
 interface NavLink {
   href: string;
@@ -26,9 +39,10 @@ interface FooterLink {
 }
 
 const NAV_LINKS: NavLink[] = [
-  { href: "/dashboard", icon: "dashboard", label: "Dashboard", roles: [POSTER_ROLE, DRIVER_ROLE] },
+  { href: "/dashboard", icon: "dashboard", label: "Dashboard", roles: [POSTER_ROLE, DRIVER_ROLE, ADMIN_ROLE] },
   { href: "/jobs/active", icon: "local_shipping", label: "Active Deliveries", roles: [POSTER_ROLE, DRIVER_ROLE] },
-  { href: "/tracking", icon: "location_on", label: "Tracking", roles: [POSTER_ROLE] },
+  { href: "/tracking", icon: "location_on", label: "Tracking", roles: [POSTER_ROLE, DRIVER_ROLE] },
+  { href: "/jobs/browse", icon: "list_alt", label: "Browse Jobs", roles: [DRIVER_ROLE] },
   { href: "/analytics", icon: "bar_chart", label: "Analytics", roles: [POSTER_ROLE] },
   { href: "/billing", icon: "receipt_long", label: "Billing", roles: [POSTER_ROLE] },
   { href: "/post-job", icon: "add_box", label: "Post Job", roles: [POSTER_ROLE] },
@@ -36,13 +50,21 @@ const NAV_LINKS: NavLink[] = [
   { href: "/driver/payouts", icon: "account_balance_wallet", label: "Wallet", roles: [DRIVER_ROLE] },
   { href: "/driver/verification", icon: "verified_user", label: "Verification", roles: [DRIVER_ROLE] },
   { href: "/disputes", icon: "gavel", label: "Disputes", roles: [POSTER_ROLE, DRIVER_ROLE] },
-  { href: "/history", icon: "history", label: "History", roles: [POSTER_ROLE, DRIVER_ROLE] },
+  { href: "/history", icon: "history", label: "History", roles: [POSTER_ROLE, DRIVER_ROLE, ADMIN_ROLE] },
 ];
 
 const FOOTER_LINKS: FooterLink[] = [
   { href: "/settings", icon: "settings", label: "Settings" },
+  { href: "/faq", icon: "help", label: "FAQ" },
   { href: "/support", icon: "contact_support", label: "Support" },
 ];
+
+function resolveUserInitials(name: string | undefined): string {
+  if (!name) return "?";
+  const parts = name.trim().split(" ");
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+}
 
 export default function DashboardLayout({
   children,
@@ -53,6 +75,19 @@ export default function DashboardLayout({
   const { user, isLoading: isAuthLoading } = useAuth();
 
   const userRole = user?.role;
+
+  const userInitials = useMemo(() => resolveUserInitials(user?.name), [user?.name]);
+
+  const roleBadgeStyle = useMemo(
+    () => (userRole ? (ROLE_BADGE_STYLES[userRole] ?? "bg-secondary-container text-secondary") : ""),
+    [userRole]
+  );
+
+  const roleLabel = useMemo(
+    () => (userRole ? (ROLE_LABELS[userRole] ?? userRole) : ""),
+    [userRole]
+  );
+
   const visibleNavLinks = useMemo(() => {
     if (isAuthLoading) return NAV_LINKS;
     return NAV_LINKS.filter((link) => link.roles.includes(userRole as string));
@@ -81,15 +116,19 @@ export default function DashboardLayout({
       {/* Mobile Top App Bar */}
       <header className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-4 h-16 bg-surface-white border-b border-secondary-container md:hidden">
         <span className="text-2xl font-bold text-primary">SwiftShip</span>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <button className="p-2 rounded-full text-secondary hover:bg-surface-container-low transition-colors">
             <span className="material-symbols-outlined">notifications</span>
           </button>
-          <button className="p-2 rounded-full text-secondary hover:bg-surface-container-low transition-colors">
-            <span className="material-symbols-outlined">help</span>
-          </button>
-          <div className="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold">
-            AD
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center text-sm font-bold">
+              {userInitials}
+            </div>
+            {userRole && (
+              <span className={`hidden sm:inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${roleBadgeStyle}`}>
+                {roleLabel}
+              </span>
+            )}
           </div>
         </div>
       </header>
@@ -116,7 +155,7 @@ export default function DashboardLayout({
           </Link>
         )}
 
-        <ul className="flex flex-col gap-1 flex-grow">
+        <ul className="flex flex-col gap-1 flex-grow overflow-y-auto pr-1">
           {visibleNavLinks.map((link) => {
             const active = isActive(link.href);
             return (
@@ -140,23 +179,9 @@ export default function DashboardLayout({
               </li>
             );
           })}
-
-          {/* Browse Jobs navigation - visible on all screen sizes */}
-          <li>
-            <Link
-              href="/jobs/browse"
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
-                isActive("/jobs/browse")
-                  ? "bg-primary-container text-on-primary-container font-bold"
-                  : "text-secondary hover:bg-surface-container-high"
-              }`}
-            >
-              <span className="material-symbols-outlined">list_alt</span>
-              Browse Jobs
-            </Link>
-          </li>
         </ul>
 
+        {/* Sidebar Footer: utility links */}
         <div className="mt-auto pt-4 border-t border-secondary-container">
           <ul className="flex flex-col gap-1">
             {FOOTER_LINKS.map((link) => (
@@ -171,6 +196,24 @@ export default function DashboardLayout({
               </li>
             ))}
           </ul>
+
+          {/* Profile Card — shown for all roles */}
+          {!isAuthLoading && user && (
+            <div className="mt-3 px-3 py-3 rounded-xl bg-surface-container-low flex items-center gap-3">
+              <div className="w-9 h-9 shrink-0 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center text-sm font-bold">
+                {userInitials}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-on-surface truncate">{user.name}</p>
+                <p className="text-xs text-secondary truncate">{user.email}</p>
+              </div>
+              {userRole && (
+                <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${roleBadgeStyle}`}>
+                  {roleLabel}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </nav>
 
@@ -191,14 +234,29 @@ export default function DashboardLayout({
           <span className="material-symbols-outlined mb-1">local_shipping</span>
           <span className="text-xs font-semibold">Active</span>
         </Link>
-        <Link href="/jobs/browse" className="flex flex-col items-center justify-center text-secondary hover:bg-surface-container-low transition-transform scale-95 active:scale-90 p-2 rounded-lg w-16">
-          <span className="material-symbols-outlined mb-1">list_alt</span>
-          <span className="text-xs font-semibold">Browse</span>
-        </Link>
-        <Link href="/driver/dashboard" className="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-4 py-1 transition-transform scale-95 active:scale-90 p-2 w-16">
-          <span className="material-symbols-outlined mb-1" style={{ fontVariationSettings: "'FILL' 1" }}>person</span>
-          <span className="text-xs font-semibold">Profile</span>
-        </Link>
+        {userRole === POSTER_ROLE ? (
+          <>
+            <Link href="/post-job" className="flex flex-col items-center justify-center text-secondary hover:bg-surface-container-low transition-transform scale-95 active:scale-90 p-2 rounded-lg w-16">
+              <span className="material-symbols-outlined mb-1">add_box</span>
+              <span className="text-xs font-semibold">Post Job</span>
+            </Link>
+            <Link href="/history" className="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-4 py-1 transition-transform scale-95 active:scale-90 p-2 w-16">
+              <span className="material-symbols-outlined mb-1" style={{ fontVariationSettings: "'FILL' 1" }}>history</span>
+              <span className="text-xs font-semibold">History</span>
+            </Link>
+          </>
+        ) : (
+          <>
+            <Link href="/jobs/browse" className="flex flex-col items-center justify-center text-secondary hover:bg-surface-container-low transition-transform scale-95 active:scale-90 p-2 rounded-lg w-16">
+              <span className="material-symbols-outlined mb-1">list_alt</span>
+              <span className="text-xs font-semibold">Browse</span>
+            </Link>
+            <Link href="/driver/earnings" className="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-4 py-1 transition-transform scale-95 active:scale-90 p-2 w-16">
+              <span className="material-symbols-outlined mb-1" style={{ fontVariationSettings: "'FILL' 1" }}>payments</span>
+              <span className="text-xs font-semibold">Earnings</span>
+            </Link>
+          </>
+        )}
       </nav>
     </div>
   );
