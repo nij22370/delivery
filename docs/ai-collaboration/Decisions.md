@@ -6,6 +6,18 @@ Format: newest at the top. Every decision gets the **model/session** that made i
 
 ---
 
+## D-49 — Admin messaging uses a separate admin-guarded API route instead of the participant-only messages endpoint
+
+**Status:** Accepted · **Model:** kilo-auto/free session (Aug 29) · **Applies to:** `src/app/api/jobs/[id]/admin-message/route.ts`, `src/components/admin/AdminMessagePanel.tsx`
+
+**Decision:** The existing `GET/POST /api/jobs/:id/messages` route uses `assertParticipant()` which restricts access to the poster or driver of the job. An admin is neither, so they receive 403. Rather than modifying the existing messages route (out of scope and risky — it's used by the participant chat in `ChatPanel`), a new `GET/POST /api/jobs/:id/admin-message` route was created with `withRole(["admin"])` as the guard.
+
+**Why:** The participant-gate on the existing messages route is correct and intentional (D-13: participant-only reads use `withAuth` + explicit participant checks). Admins need to send and read messages on behalf of the platform, not as a job participant. A separate admin-guarded route preserves the security boundary for participant traffic while giving admins the messaging access they need for dispute resolution.
+
+**Tradeoff accepted:** The admin-message GET endpoint does not filter by `recipientId` unless the query param is provided — it returns all messages for the job by default. This is acceptable because the admin-panel UI always passes `recipientId` to filter the visible thread.
+
+---
+
 ## D-33 — Remove sidebar from 404/error pages; use compact top header instead
 
 **Status:** Accepted · **Model:** kilo-auto/free session (Aug 28) · **Applies to:** `src/app/not-found.tsx`, `src/app/error.tsx`

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import { useAdminJobs, useOverrideJobStatus } from "@/api/hooks/admin/adminJobsApi";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { formatNpr, formatShortDate } from "@/utils/format";
@@ -11,6 +13,45 @@ import { toast } from "sonner";
 
 const PAGE_SIZE = 10;
 const SEARCH_DEBOUNCE_MS = 300;
+const PDF_REPORT_TITLE = "Job Management Report";
+const PDF_FILE_NAME = "job-management-report.pdf";
+const CSV_FILE_NAME = "job-management-report.csv";
+
+function escapeCsvCell(value: string): string {
+  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+function jobToCsvRow(job: AdminJobItem): string[] {
+  return [
+    job.jobCode,
+    job.status,
+    job.poster?.name || "",
+    job.poster?.email || "",
+    job.driver?.name || "",
+    job.driver?.email || "",
+    job.pickupAddress,
+    job.dropoffAddress,
+    formatNpr(job.offeredPrice),
+    formatShortDate(job.createdAt),
+  ].map(escapeCsvCell);
+}
+
+function jobToPdfRow(job: AdminJobItem): (string | number)[][] {
+  return [
+    [
+      job.jobCode,
+      job.status,
+      job.poster?.name || "N/A",
+      job.driver?.name || "N/A",
+      `${job.pickupAddress} → ${job.dropoffAddress}`,
+      formatNpr(job.offeredPrice),
+      formatShortDate(job.createdAt),
+    ],
+  ];
+}
 
 type FilterTabKey = "all" | "in_transit" | "disputed" | "cancelled" | "posted" | "accepted";
 type VehicleFilterKey = "all" | JobVehicleType;
@@ -79,14 +120,6 @@ export default function AdminJobManagementPage() {
     setCurrentPage(1);
   }, []);
 
-  const handleExport = useCallback(() => {
-    toast.info("Exporting job records to CSV...");
-  }, []);
-
-  const handleDownloadReport = useCallback(() => {
-    toast.info("Generating downloadable report...");
-  }, []);
-
   const handleVehicleFilterChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     setVehicleFilter(e.target.value as VehicleFilterKey);
     setCurrentPage(1);
@@ -145,6 +178,66 @@ export default function AdminJobManagementPage() {
     if (vehicleFilter === "all") return rawJobs;
     return rawJobs.filter((job) => job.vehicleType === vehicleFilter);
   }, [rawJobs, vehicleFilter]);
+
+  const handleExport = useCallback(() => {
+    if (jobs.length === 0) {
+      toast.info("No job records to export.");
+      return;
+    }
+
+    const headers = [
+      "Job ID",
+      "Status",
+      "Poster Name",
+      "Poster Email",
+      "Driver Name",
+      "Driver Email",
+      "Pickup Address",
+      "Dropoff Address",
+      "Price (NPR)",
+      "Created Date",
+    ];
+
+    const csvRows = jobs.map(jobToCsvRow);
+    const csvContent = [headers.join(","), ...csvRows.map((row) => row.join(","))].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = CSV_FILE_NAME;
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast.success(`Exported ${jobs.length} job records to CSV.`);
+  }, [jobs]);
+
+  const handleDownloadReport = useCallback(() => {
+    if (jobs.length === 0) {
+      toast.info("No job records to export.");
+      return;
+    }
+
+    const doc = new jsPDF();
+    doc.text(PDF_REPORT_TITLE, 14, 15);
+
+    const head = [["Job ID", "Status", "Poster", "Driver", "Pickup", "Dropoff", "Price", "Date"]];
+    const body = jobs.flatMap(jobToPdfRow);
+
+    autoTable(doc, {
+      startY: 25,
+      head,
+      body,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [30, 64, 170] },
+    });
+
+    doc.save(PDF_FILE_NAME);
+    toast.success(`Generated PDF report of ${jobs.length} jobs.`);
+  }, [jobs]);
 
   const startItem = useMemo(() => (currentPage - 1) * PAGE_SIZE + 1, [currentPage]);
   const endItem = useMemo(() => Math.min(currentPage * PAGE_SIZE, total), [currentPage, total]);

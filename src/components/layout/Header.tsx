@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { logoutUser } from "@/api/apis/auth/authApi";
 import { getInitials } from "@/utils/format";
 
+const LOGIN_PATH = "/login";
+const POST_JOB_PATH = "/post-job";
 const POSTER_ROLE = "poster";
 
 export default function Header() {
@@ -17,6 +19,10 @@ export default function Header() {
   const isPoster = user?.role === POSTER_ROLE;
   const isDriver = user?.role === "driver";
   const isAdmin = user?.role === "admin";
+
+  const postJobHref = useMemo(() => {
+    return user ? POST_JOB_PATH : `${LOGIN_PATH}?redirect=${encodeURIComponent(POST_JOB_PATH)}`;
+  }, [user]);
 
   const handleToggleMobileMenu = useCallback(() => {
     setIsMobileMenuOpen((previous) => !previous);
@@ -62,12 +68,12 @@ export default function Header() {
             </Link>
           )}
           {(!user || isPoster) && (
-            <Link
-              href="/post-job"
-              className="text-sm text-on-surface-variant font-medium hover:text-primary transition-colors"
-            >
-              Post Delivery
-            </Link>
+               <Link
+               href={postJobHref}
+               className="text-sm text-on-surface-variant font-medium hover:text-primary transition-colors"
+             >
+               Post Delivery
+             </Link>
           )}
           {user && (
             <Link
@@ -135,7 +141,7 @@ export default function Header() {
                 Login
               </Link>
               <Link
-                href="/post-job"
+                href={postJobHref}
                 className="bg-primary text-on-primary px-5 py-2 rounded-lg text-sm font-semibold hover:bg-primary-container transition-all active:scale-95 cursor-pointer"
               >
                 Post a Job
@@ -199,7 +205,7 @@ export default function Header() {
             )}
             {(!user || isPoster) && (
               <Link
-                href="/post-job"
+                href={postJobHref}
                 onClick={handleCloseMobileMenu}
                 className="text-sm text-on-surface font-medium py-3 border-b border-outline-variant/50 hover:text-primary transition-colors"
               >

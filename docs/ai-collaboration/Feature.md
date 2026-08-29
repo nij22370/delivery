@@ -41,6 +41,10 @@ Known gaps, future enhancements, things deliberately left out.
 
 | ID | Title | Status | Requested | Shipped in |
 | --- | --- | --- | --- | --- |
+| FEATURE-21 | Admin PDF/CSV report export | Shipped | Aug 29 | — |
+| FEATURE-20 | Unified admin sidebar across all routes | Shipped | Aug 29 | — |
+| FEATURE-19 | Admin topbar Settings link + Profile consolidation | Shipped | Aug 29 | — |
+| FEATURE-18 | Public navbar auth guard for Post a Job | Shipped | Aug 29 | — |
 | FEATURE-13 | Poster sidebar pages: History, Analytics, Billing, Tracking | Shipped | Aug 27 | fix/poster-consistent-layout |
 | FEATURE-12 | Dispute Flag Button & Driver Activity Dashboard | Shipped | Aug 24 | Post-v1 |
 | FEATURE-11 | Admin Payout Management Queue | Shipped | Aug 20 | Day 62 |
@@ -588,3 +592,107 @@ Users navigating the dashboard sidebar on desktop should see the Browse Jobs lin
 - `tsc --noEmit` — 0 errors
 - `npm run build` — 56 pages, 0 errors
 - Dashboard sidebar shows "Browse Jobs" link on desktop (≥768px) and mobile
+
+---
+
+## FEATURE-18 — Public navbar auth guard for Post a Job
+
+**Requested:** Aug 29 · **Requested by:** task (unauthenticated access to job-posting flow)
+**Status:** Shipped
+**Scope:** Make "Post a Job" / "Post Delivery" links in the public navbar redirect to `/login?redirect=/post-job` when the user is not authenticated, instead of navigating directly to the form.
+
+### Why (intent)
+Unauthenticated visitors clicking "Post a Job" in the public Header reach the job-posting form directly without an auth check, bypassing the login requirement.
+
+### Design
+- Uses the existing `useAuth()` hook (already imported in Header) to check if `user` is null
+- Mirrors the redirect pattern from `useAuthGuard.ts`: `${LOGIN_PATH}?redirect=${encodeURIComponent(POST_JOB_PATH)}`
+- When authenticated as poster, href remains `/post-job`
+- Module-level constants: `LOGIN_PATH = "/login"`, `POST_JOB_PATH = "/post-job"`
+
+### Implementation trail
+- `src/components/layout/Header.tsx`: added `LOGIN_PATH` and `POST_JOB_PATH` constants; added `postJobHref` via `useMemo`; updated 3 link occurrences (desktop nav, desktop CTA logged-out section, mobile nav) to use `postJobHref`
+- Mobile nav CTA "Post a Job" button (poster-only) left unchanged — only visible to authenticated posters
+
+### Verification
+- `tsc --noEmit` — 0 errors
+- `npm run build` — 58 pages, 0 errors
+
+---
+
+## FEATURE-19 — Admin topbar Settings link + Profile consolidation
+
+**Requested:** Aug 29 · **Requested by:** task (admin navbar settings/profile consistency)
+**Status:** Shipped
+**Scope:** Add a Settings link to the admin topbar (AdminHeader), matching the poster/driver navbar pattern. Ensure Profile appears only once (in the topbar) with no FAQ or Contact links.
+
+### Why (intent)
+The admin topbar had notifications + profile but no Settings link. The poster/driver dashboard sidebar includes Settings as a footer link with a gear icon — the admin should have the same.
+
+### Design
+- Settings link as an icon button (gear icon) in the AdminHeader topbar, between notifications and the profile section
+- Visual pattern mirrors the dashboard layout's Settings footer link: `w-10 h-10` rounded-full, hover:bg-surface-container
+- Profile section (avatar + name + role) stays in the top-right — it was already there
+- No FAQ, no Contact — these were never in the admin layout
+- No duplicate Profile sections — AdminSidebar footer has an "Admin System" badge (not a Profile), so no duplication
+
+### Implementation trail
+- `src/components/admin/AdminHeader.tsx`: added `Link` import; added `getInitials` import; added Settings `<Link href="/settings">` icon button; refactored initials to use `getInitials(displayName)` instead of inline `user.name.slice(0, 2).toUpperCase()`
+
+### Verification
+- `tsc --noEmit` — 0 errors
+- `npm run build` — 58 pages, 0 errors
+- ESLint: 0 errors on AdminHeader.tsx
+
+---
+
+## FEATURE-20 — Unified admin sidebar across all routes
+
+**Requested:** Aug 29 · **Requested by:** task (admin sidebar inconsistency)
+**Status:** Shipped
+**Scope:** Ensure `/admin/verification` renders the same left sidebar as all other admin routes [Dashboard, Job Management, Disputes, User Management, Payout Management, Verifications].
+
+### Why (intent)
+`/admin/verification` was at `src/app/(main)/admin/verification/page.tsx` using the `(main)` layout with a different inline sidebar [Verifications, Active Drivers, Payouts, System Settings]. All other admin routes use `(admin)/layout.tsx` with the canonical `AdminSidebar`.
+
+### Design
+- Canonical admin layout: `src/app/(admin)/layout.tsx` → renders `AdminSidebar` (NAV_ITEMS: Dashboard, Job Management, Disputes, User Management, Payout Management, Verifications) + `AdminHeader` + children
+- Moved verification page to `src/app/(admin)/admin/verification/page.tsx` to inherit the AdminLayout
+- Removed inline sidebar, NAV_ITEMS constant, auth guard (redundant with AdminLayout), and flex wrapper from the page
+- Deleted the old `src/app/(main)/admin/verification/page.tsx` and empty directory
+
+### Implementation trail
+1. Created `src/app/(admin)/admin/verification/page.tsx` — copied page logic, removed inline sidebar/nav/auth-guard, wrapped content in `<div className="flex flex-col gap-6">` matching `AdminJobManagementPage` pattern
+2. Deleted `src/app/(main)/admin/verification/page.tsx` and `src/app/(main)/admin/` directory
+
+### Verification
+- `tsc --noEmit` — 0 errors
+- `npm run build` — 58 pages, 0 errors; `/admin/verification` listed as static page
+
+---
+
+## FEATURE-21 — Admin PDF/CSV report export
+
+**Requested:** Aug 29 · **Requested by:** task (PDF/CSV export on admin pages)
+**Status:** Shipped
+**Scope:** Wire the "Download Report" button on `/admin/jobs` to generate a PDF, and the "Export" button to generate a CSV, using the data already loaded via TanStack Query (no additional API calls).
+
+### Why (intent)
+The "Download Report" (PDF) and "Export" (CSV) buttons on the admin jobs page were toast-only stubs with no actual file generation. Admins need to export the visible job table data.
+
+### Design
+- PDF via `jspdf` + `jspdf-autotable`: renders table headers (Job ID, Status, Poster, Driver, Pickup, Dropoff, Price, Date) + data rows from the `jobs` useMemo (already filtered by status, search, and vehicle type)
+- CSV via browser `Blob` API: flat export of all fields per row (Job ID, Status, Poster Name/Email, Driver Name/Email, Pickup, Dropoff, Price, Date) with RFC 4180 escaping (`escapeCsvCell` handles commas, quotes, newlines)
+- Module-level constants: `PDF_REPORT_TITLE`, `PDF_FILE_NAME`, `CSV_FILE_NAME`
+- Module-level pure functions: `escapeCsvCell`, `jobToCsvRow`, `jobToPdfRow` (no inline logic in callbacks)
+- Both handlers guard against empty data (`jobs.length === 0` → info toast, no file)
+
+### Implementation trail
+1. Installed `jspdf@4.2.1` and `jspdf-autotable@5.0.8` as dependencies
+2. `src/app/(admin)/admin/jobs/page.tsx`: added imports (`jsPDF` from `jspdf`, `autoTable` from `jspdf-autotable`); added module-level constants and pure helper functions; implemented `handleDownloadReport` (PDF) and `handleExport` (CSV) as `useCallback` handlers using the `jobs` variable
+3. Verified `autoTable(doc, options)` function-call API works with jspdf v4 (prototype extension doesn't work with this version combination)
+
+### Verification
+- `tsc --noEmit` — 0 errors
+- `npm run build` — 58 pages, 0 errors
+- ESLint: 0 errors (1 pre-existing `rawJobs` warning unrelated)
