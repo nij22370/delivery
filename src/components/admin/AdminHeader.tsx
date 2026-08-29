@@ -1,7 +1,5 @@
 "use client";
 
-import { useAuth } from "@/hooks/useAuth";
-
 interface AdminHeaderProps {
   title?: string;
   onToggleMobile?: () => void;
@@ -11,8 +9,6 @@ export default function AdminHeader({
   title = "Platform Overview",
   onToggleMobile,
 }: AdminHeaderProps) {
-  const { user } = useAuth();
-
   return (
     <header className="fixed top-0 left-0 md:left-64 right-0 z-30 h-16 bg-surface-white border-b border-outline-variant flex items-center justify-between px-4 md:px-8">
       <div className="flex items-center gap-3">
@@ -40,20 +36,6 @@ export default function AdminHeader({
           <span className="material-symbols-outlined text-xl">notifications</span>
           <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-error-red" />
         </button>
-
-        <div className="flex items-center gap-3 pl-2 border-l border-outline-variant">
-          <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold shrink-0">
-            {user?.name ? user.name.slice(0, 2).toUpperCase() : "AD"}
-          </div>
-          <div className="hidden sm:block text-left">
-            <p className="text-xs font-bold text-on-surface leading-tight">
-              {user?.name || "Admin User"}
-            </p>
-            <p className="text-[10px] font-semibold text-secondary uppercase tracking-wider">
-              {user?.role || "admin"}
-            </p>
-          </div>
-        </div>
       </div>
     </header>
   );

@@ -7,11 +7,17 @@ import { useAdminDisputes, useResolveJobDispute } from "@/api/hooks/admin/adminD
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { formatShortDate, formatNpr, formatTime } from "@/utils/format";
 import ResolveDisputeModal from "@/components/admin/ResolveDisputeModal";
+import AdminMessagePanel from "@/components/admin/AdminMessagePanel";
 import type { DisputedJobItem, ResolveJobInput } from "@/types/admin/adminDisputes";
 
 const PAGE_SIZE = 10;
 const SEARCH_DEBOUNCE_MS = 300;
 const MESSAGES_LIMIT = 50;
+const DISMISS_RESOLVED_STATUS: ResolveJobInput["resolvedStatus"] = "posted";
+const DISMISS_PAYOUT_STATUS: ResolveJobInput["payoutStatus"] = "failed";
+const DISMISS_NOTE = "Dismissed — no action needed";
+const DISMISS_BUTTON_LABEL = "Dismiss (no action needed)";
+const RESOLVE_BUTTON_LABEL = "Resolve Dispute →";
 
 export default function AdminDisputesPage() {
   const [searchInput, setSearchInput] = useState("");
@@ -20,14 +26,7 @@ export default function AdminDisputesPage() {
   const [internalSelectedDispute, setInternalSelectedDispute] = useState<DisputedJobItem | null>(null);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalPreset, setModalPreset] = useState<{
-    resolvedStatus: ResolveJobInput["resolvedStatus"];
-    payoutStatus: ResolveJobInput["payoutStatus"];
-  }>({
-    resolvedStatus: "posted",
-    payoutStatus: "paid",
-  });
-
+  
   const debouncedSearch = useDebouncedValue(searchInput, SEARCH_DEBOUNCE_MS);
 
   const { data, isLoading } = useAdminDisputes({
@@ -82,10 +81,21 @@ export default function AdminDisputesPage() {
     setCurrentPage(1);
   }, []);
 
-  const handleOpenResolve = useCallback((resolvedStatus: ResolveJobInput["resolvedStatus"], payoutStatus: ResolveJobInput["payoutStatus"]) => {
-    setModalPreset({ resolvedStatus, payoutStatus });
+  const handleOpenResolve = useCallback(() => {
     setIsModalOpen(true);
   }, []);
+
+  const handleDismiss = useCallback(() => {
+    if (!selectedDispute) return;
+    resolveMutation.mutate({
+      jobId: selectedDispute._id,
+      data: {
+        resolvedStatus: DISMISS_RESOLVED_STATUS,
+        note: DISMISS_NOTE,
+        payoutStatus: DISMISS_PAYOUT_STATUS,
+      },
+    });
+  }, [resolveMutation, selectedDispute]);
 
   const handleCloseResolve = useCallback(() => {
     setIsModalOpen(false);
@@ -178,17 +188,6 @@ export default function AdminDisputesPage() {
               className="w-full h-12 pl-10 pr-4 rounded-lg border border-outline-variant bg-surface-white text-sm focus:outline-none focus:border-2 focus:border-primary placeholder:text-secondary/50 transition-all shadow-sm"
             />
           </div>
-        </div>
-        <div className="flex items-center gap-4 shrink-0">
-          <button className="text-secondary hover:bg-surface-container-low transition-all p-2 rounded-full active:scale-95 cursor-pointer">
-            <span className="material-symbols-outlined">notifications</span>
-          </button>
-          <button className="text-secondary hover:bg-surface-container-low transition-all p-2 rounded-full active:scale-95 cursor-pointer hidden md:block">
-            <span className="material-symbols-outlined">help</span>
-          </button>
-          <button className="font-semibold text-sm text-primary hover:text-primary-fixed-dim transition-colors cursor-pointer hidden sm:block">
-            Support
-          </button>
         </div>
       </div>
 
@@ -375,9 +374,6 @@ export default function AdminDisputesPage() {
                       <p className="font-semibold text-sm text-on-surface truncate">{selectedDispute.poster.name}</p>
                       <p className="text-[11px] text-secondary truncate">{selectedDispute.poster.email}</p>
                     </div>
-                    <button className="bg-surface-container-high text-on-surface p-2 rounded-lg hover:bg-outline-variant transition-colors cursor-pointer" title="Contact Poster">
-                      <span className="material-symbols-outlined text-base">chat</span>
-                    </button>
                   </div>
 
                   <div className="border border-outline-variant rounded-lg p-4 flex items-center gap-4 bg-surface-container-lowest shadow-sm">
@@ -393,11 +389,6 @@ export default function AdminDisputesPage() {
                         {selectedDispute.driver ? selectedDispute.driver.email : "N/A"}
                       </p>
                     </div>
-                    {selectedDispute.driver && (
-                      <button className="bg-surface-container-high text-on-surface p-2 rounded-lg hover:bg-outline-variant transition-colors cursor-pointer" title="Contact Driver">
-                        <span className="material-symbols-outlined text-base">chat</span>
-                      </button>
-                    )}
                   </div>
                 </div>
 
@@ -442,10 +433,17 @@ export default function AdminDisputesPage() {
                      </div>
                    )}
                  </div>
-                </div>
+                 </div>
 
-                {/* Timeline and Chat snippet */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 {/* Admin Messages */}
+                 <AdminMessagePanel
+                   jobId={selectedDispute._id}
+                   poster={selectedDispute.poster}
+                   driver={selectedDispute.driver}
+                 />
+
+                 {/* Timeline and Chat snippet */}
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Timeline */}
                   <div>
                     <h3 className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider border-b border-outline-variant pb-2 mb-4">
@@ -502,33 +500,19 @@ export default function AdminDisputesPage() {
               </div>
 
               {/* Action Footer */}
-              <div className="p-4 border-t border-outline-variant bg-surface-container-lowest flex flex-wrap gap-3 items-center justify-between shrink-0">
+              <div className="p-4 border-t border-outline-variant bg-surface-container-lowest flex items-center justify-between shrink-0">
                 <button
-                  onClick={() => handleOpenResolve("posted", "failed")}
+                  onClick={handleDismiss}
                   className="bg-surface-white border border-outline-variant text-secondary hover:bg-surface-container-low font-bold text-xs px-4 py-2 h-10 rounded-lg transition-colors cursor-pointer"
                 >
-                  Dismiss Dispute
+                  {DISMISS_BUTTON_LABEL}
                 </button>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleOpenResolve("posted", "paid")}
-                    className="bg-surface-white border border-outline text-on-surface hover:bg-surface-container-low font-bold text-xs px-4 py-2 h-10 rounded-lg transition-colors cursor-pointer"
-                  >
-                    Split / Partial
-                  </button>
-                  <button
-                    onClick={() => handleOpenResolve("posted", "paid")}
-                    className="bg-on-surface text-surface-white hover:bg-on-surface-variant font-bold text-xs px-4 py-2 h-10 rounded-lg transition-colors shadow-sm cursor-pointer"
-                  >
-                    Pay Driver
-                  </button>
-                  <button
-                    onClick={() => handleOpenResolve("cancelled", "failed")}
-                    className="bg-primary-container text-on-primary-container hover:bg-surface-tint hover:text-white font-bold text-xs px-4 py-2 h-10 rounded-lg transition-colors shadow-sm cursor-pointer"
-                  >
-                    Refund Poster
-                  </button>
-                </div>
+                <button
+                  onClick={handleOpenResolve}
+                  className="bg-primary text-surface-white hover:bg-primary/90 font-bold text-xs px-4 py-2 h-10 rounded-lg transition-colors shadow-sm cursor-pointer"
+                >
+                  {RESOLVE_BUTTON_LABEL}
+                </button>
               </div>
             </div>
           ) : (
@@ -544,14 +528,11 @@ export default function AdminDisputesPage() {
       {/* Resolve Modal */}
       {selectedDispute && (
         <ResolveDisputeModal
-          key={`${selectedDispute._id}-${modalPreset.resolvedStatus}-${modalPreset.payoutStatus}`}
           isOpen={isModalOpen}
           isPending={resolveMutation.isPending}
           jobCode={selectedDispute.jobCode}
           onClose={handleCloseResolve}
           onConfirm={handleConfirmResolve}
-          initialResolvedStatus={modalPreset.resolvedStatus}
-          initialPayoutStatus={modalPreset.payoutStatus}
         />
       )}
     </div>

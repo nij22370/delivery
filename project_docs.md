@@ -972,7 +972,7 @@ Restructured the driver earnings and payouts pages to resolve layout/intent mism
 - `src/types/admin/adminDisputes.ts` — Dispute domain types: `DisputedJobItem` (now includes `evidenceImages`, `acceptedAt`, `inTransitAt`, `deliveredAt`, `disputedAt`), `DisputesQuery`, `DisputesResponse`, `ResolveJobInput`, `ResolveJobResponse`.
 - `src/api/apis/admin/adminDisputesApi.ts` — `getAdminDisputes(query)` and `resolveJobDispute(jobId, data)`.
 - `src/api/hooks/admin/adminDisputesApi.ts` — `useAdminDisputes()` and `useResolveJobDispute()`.
-- `src/components/admin/ResolveDisputeModal.tsx` — Modal for resolving a dispute with `resolvedStatus` dropdown, admin note textarea, payout status selector, and confirm/cancel buttons.
+- `src/components/admin/ResolveDisputeModal.tsx` — Modal for resolving a dispute. Rewritten with a step-by-step plain-language flow: Step 1 radio buttons (cancel / re-post), Step 2 radio buttons (refund / pay / split), Step 3 note textarea. Step 2 only shows after Step 1 is chosen; split shows two NPR amount inputs. Single "Confirm Resolution" button. No dropdowns.
 - `src/app/api/jobs/[id]/dispute/route.ts` — `POST /api/jobs/:id/dispute`. Participant-only (`withAuth`); validates participant, checks disputable statuses (`accepted`, `in_transit`, `delivered`), sets `status` to `disputed`, stores `disputeReason` and `flaggedBy`, sets `disputedAt`, triggers Pusher `status-change`.
 - `src/app/api/admin/disputes/route.ts` — `GET /api/admin/disputes`. Admin-only (`withRole(["admin"])`); returns paginated disputed jobs with populated poster/driver names, dispute reason, flagged-by role, route, amount, evidence images, and lifecycle timestamps.
 - `src/app/api/admin/jobs/[id]/resolve/route.ts` — `PATCH /api/admin/jobs/:id/resolve`. Admin-only; accepts `resolvedStatus` (`posted`/`cancelled`), `note`, and optional `payoutStatus` (`paid`/`failed`). Updates job status, clears `driverId` if reopened, saves `resolutionNote`, optionally updates linked `Payout` status, triggers Pusher `status-change`.
@@ -990,6 +990,7 @@ Restructured the driver earnings and payouts pages to resolve layout/intent mism
 | POST | `/api/jobs/:id/evidence` | `withAuth` (participant only) | Upload evidence images to Cloudinary |
 | GET | `/api/admin/disputes` | `withRole(["admin"])` | Paginated disputed jobs with participant info, evidence, and lifecycle timestamps |
 | PATCH | `/api/admin/jobs/:id/resolve` | `withRole(["admin"])` | Resolve dispute, update status + note, optional payout update |
+| GET/POST | `/api/jobs/:id/admin-message` | `withRole(["admin"])` | Admin-only messaging: GET fetches job messages (optionally filtered by `recipientId`), POST sends a message from admin to a job participant (poster or driver)
 
 #### Architectural Decisions
 - **Dispute fields on Job model:** `disputeReason`, `flaggedBy`, `resolutionNote`, `evidenceImages`, and lifecycle timestamps (`acceptedAt`, `inTransitAt`, `deliveredAt`, `disputedAt`) added directly to Job so the dispute state travels with the job document.

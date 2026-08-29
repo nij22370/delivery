@@ -6,6 +6,7 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { formatNpr } from "@/utils/format";
 import PayoutOverrideModal from "@/components/admin/PayoutOverrideModal";
 import type { AdminPayoutItem } from "@/types/admin/adminPayouts";
+import { toast } from "sonner";
 
 const PAGE_SIZE = 10;
 const STATUS_OPTIONS = [
@@ -14,6 +15,30 @@ const STATUS_OPTIONS = [
   { value: "paid", label: "Paid" },
   { value: "failed", label: "Failed" },
 ] as const;
+
+const CSV_FILE_NAME = "payout-management-report.csv";
+
+function escapeCsvCell(value: string): string {
+  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+function payoutToCsvRow(payout: AdminPayoutItem): string[] {
+  return [
+    formatDateTime(payout.createdAt),
+    payout.driverName,
+    payout.driverEmail,
+    payout.jobId,
+    payout.gatewayTransactionId,
+    payout.gateway,
+    formatNpr(payout.amount),
+    payout.platformFee.toString(),
+    payout.status,
+    payout.paidAt ? formatDateTime(payout.paidAt) : "",
+  ].map(escapeCsvCell);
+}
 
 type StatusFilter = (typeof STATUS_OPTIONS)[number]["value"];
 
@@ -56,6 +81,42 @@ export default function AdminPayoutsPage() {
 
   const startItem = useMemo(() => (currentPage - 1) * PAGE_SIZE + 1, [currentPage]);
   const endItem = useMemo(() => Math.min(currentPage * PAGE_SIZE, total), [currentPage, total]);
+
+  const handleExportCsv = useCallback(() => {
+    if (payouts.length === 0) {
+      toast.info("No payout records to export.");
+      return;
+    }
+
+    const headers = [
+      "Date",
+      "Driver Name",
+      "Driver Email",
+      "Job ID",
+      "Transaction ID",
+      "Gateway",
+      "Amount (NPR)",
+      "Platform Fee (NPR)",
+      "Status",
+      "Paid At",
+    ];
+
+    const csvRows = payouts.map(payoutToCsvRow);
+    const csvContent = [headers.join(","), ...csvRows.map((row) => row.join(","))].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = CSV_FILE_NAME;
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast.success(`Exported ${payouts.length} payout records to CSV.`);
+  }, [payouts]);
 
   const handleOpenOverride = useCallback((payout: AdminPayoutItem) => {
     setSelectedPayout(payout);
@@ -146,6 +207,7 @@ export default function AdminPayoutsPage() {
         </div>
         <button
           type="button"
+          onClick={handleExportCsv}
           className="h-10 px-4 bg-surface-white border border-outline-variant text-xs font-bold text-secondary hover:bg-surface-container-low transition-colors flex items-center gap-1.5 cursor-pointer rounded-xl"
         >
           <span className="material-symbols-outlined text-base">download</span>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import type { ResolveJobInput } from "@/types/admin/adminDisputes";
 
 interface ResolveDisputeModalProps {
@@ -9,8 +9,62 @@ interface ResolveDisputeModalProps {
   jobCode: string;
   onClose: () => void;
   onConfirm: (data: ResolveJobInput) => void;
-  initialResolvedStatus?: ResolveJobInput["resolvedStatus"];
-  initialPayoutStatus?: ResolveJobInput["payoutStatus"];
+}
+
+type ResolutionChoice = "cancelled" | "posted" | null;
+type MoneyChoice = "refund" | "pay" | "split" | null;
+
+const STEP1_OPTIONS: ReadonlyArray<{ value: ResolveJobInput["resolvedStatus"]; label: string }> = [
+  { value: "cancelled", label: "Job should be cancelled" },
+  { value: "posted", label: "Job should be re-posted so another driver can take it" },
+];
+
+const STEP2_OPTIONS: ReadonlyArray<{ value: Exclude<MoneyChoice, null>; label: string }> = [
+  { value: "refund", label: "Refund the poster (sender)" },
+  { value: "pay", label: "Pay the driver (courier)" },
+  { value: "split", label: "Split it between both" },
+];
+
+const STEP1_LABEL = "What happened?";
+const STEP2_LABEL = "Who gets the money?";
+const STEP3_LABEL = "Explain your decision";
+const STEP3_HELPER = "This is saved for records";
+const CONFIRM_BUTTON_LABEL = "Confirm Resolution";
+const CANCEL_BUTTON_LABEL = "Cancel";
+const POSTER_AMOUNT_LABEL = "Poster Amount (NPR)";
+const DRIVER_AMOUNT_LABEL = "Driver Amount (NPR)";
+const SPLIT_NOTE_PREFIX = "Split payout";
+const RESOLVING_LABEL = "Resolving...";
+
+function RadioOption({
+  value,
+  isSelected,
+  label,
+  onSelect,
+}: {
+  value: string;
+  isSelected: boolean;
+  label: string;
+  onSelect: (value: string) => void;
+}) {
+  const handleSelect = useCallback(() => onSelect(value), [onSelect, value]);
+  const iconName = isSelected ? "radio_button_checked" : "radio_button_unchecked";
+
+  return (
+    <button
+      type="button"
+      onClick={handleSelect}
+      className={[
+        "flex items-center gap-3 min-h-[48px] py-2 px-4 rounded-lg border text-sm font-bold text-left transition-all cursor-pointer w-full",
+        isSelected
+          ? "border-primary bg-primary/10 text-primary ring-2 ring-primary/20"
+          : "border-outline-variant bg-surface-white text-secondary hover:bg-surface-container-low",
+      ].join(" ")}
+    >
+      <span className="material-symbols-outlined text-lg shrink-0">{iconName}</span>
+      <span className="leading-tight">{label}</span>
+    </button>
+  );
 }
 
 export default function ResolveDisputeModal({
@@ -19,21 +73,75 @@ export default function ResolveDisputeModal({
   jobCode,
   onClose,
   onConfirm,
-  initialResolvedStatus = "posted",
-  initialPayoutStatus = "paid",
 }: ResolveDisputeModalProps) {
-  const [resolvedStatus, setResolvedStatus] = useState<ResolveJobInput["resolvedStatus"]>(initialResolvedStatus);
+  const [resolutionChoice, setResolutionChoice] = useState<ResolutionChoice>(null);
+  const [moneyChoice, setMoneyChoice] = useState<MoneyChoice>(null);
+  const [posterAmount, setPosterAmount] = useState("");
+  const [driverAmount, setDriverAmount] = useState("");
   const [note, setNote] = useState("");
-  const [payoutStatus, setPayoutStatus] = useState<ResolveJobInput["payoutStatus"]>(initialPayoutStatus);
+
+  const handleStep1Select = useCallback((value: ResolutionChoice) => {
+    setResolutionChoice(value);
+  }, []);
+
+  const handleStep2Select = useCallback((value: MoneyChoice) => {
+    setMoneyChoice(value);
+  }, []);
+
+  const handlePosterAmountChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      setPosterAmount(event.target.value);
+    },
+    []
+  );
+
+  const handleDriverAmountChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      setDriverAmount(event.target.value);
+    },
+    []
+  );
+
+  const handleNoteChange = useCallback((event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setNote(event.target.value);
+  }, []);
+
+  const isConfirmDisabled = useMemo(() => {
+    if (resolutionChoice === null || moneyChoice === null || !note.trim()) {
+      return true;
+    }
+    if (isPending) return true;
+    if (moneyChoice === "split") {
+      const isPosterValid =
+        posterAmount.trim() !== "" && !Number.isNaN(Number(posterAmount));
+      const isDriverValid =
+        driverAmount.trim() !== "" && !Number.isNaN(Number(driverAmount));
+      return !isPosterValid || !isDriverValid;
+    }
+    return false;
+  }, [resolutionChoice, moneyChoice, posterAmount, driverAmount, note, isPending]);
 
   const handleConfirm = useCallback(() => {
-    if (!note.trim()) return;
+    if (resolutionChoice === null || moneyChoice === null || !note.trim()) return;
+
+    let payoutStatus: ResolveJobInput["payoutStatus"];
+    let finalNote = note.trim();
+
+    if (moneyChoice === "refund") {
+      payoutStatus = "failed";
+    } else if (moneyChoice === "pay") {
+      payoutStatus = "paid";
+    } else {
+      payoutStatus = "paid";
+      finalNote = `${SPLIT_NOTE_PREFIX} — Poster: NPR ${posterAmount}, Driver: NPR ${driverAmount}. ${finalNote}`;
+    }
+
     onConfirm({
-      resolvedStatus,
-      note: note.trim(),
+      resolvedStatus: resolutionChoice,
+      note: finalNote,
       payoutStatus,
     });
-  }, [note, resolvedStatus, payoutStatus, onConfirm]);
+  }, [resolutionChoice, moneyChoice, posterAmount, driverAmount, note, onConfirm]);
 
   const handleClose = useCallback(() => {
     onClose();
@@ -52,64 +160,105 @@ export default function ResolveDisputeModal({
           Job <span className="font-mono font-bold">{jobCode}</span>
         </p>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-5">
           <div>
-            <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-1.5 block">
-              Resolution
-            </label>
-            <select
-              value={resolvedStatus}
-              onChange={(e) => setResolvedStatus(e.target.value as ResolveJobInput["resolvedStatus"])}
-              className="w-full h-10 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-sm font-medium text-on-surface focus:outline-none focus:border-2 focus:border-primary cursor-pointer"
-            >
-              <option value="posted">Reopen Job (Posted)</option>
-              <option value="cancelled">Cancel Job</option>
-            </select>
+            <p className="text-xs font-bold text-secondary uppercase tracking-wider mb-2">
+              {STEP1_LABEL}
+            </p>
+            <div className="flex flex-col gap-2">
+              {STEP1_OPTIONS.map((option) => (
+                <RadioOption
+                  key={option.value}
+                  value={option.value}
+                  isSelected={resolutionChoice === option.value}
+                  label={option.label}
+                  onSelect={handleStep1Select as (value: string) => void}
+                />
+              ))}
+            </div>
           </div>
 
-          <div>
-            <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-1.5 block">
-              Admin Note
-            </label>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Explain the resolution..."
-              rows={3}
-              className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest p-3 text-sm focus:outline-none focus:border-2 focus:border-primary resize-none"
-            />
-          </div>
+          {resolutionChoice !== null && (
+            <div>
+              <p className="text-xs font-bold text-secondary uppercase tracking-wider mb-2">
+                {STEP2_LABEL}
+              </p>
+              <div className="flex flex-col gap-2">
+                {STEP2_OPTIONS.map((option) => (
+                  <RadioOption
+                    key={option.value}
+                    value={option.value}
+                    isSelected={moneyChoice === option.value}
+                    label={option.label}
+                    onSelect={handleStep2Select as (value: string) => void}
+                  />
+                ))}
+              </div>
 
-          <div>
-            <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-1.5 block">
-              Payout Status
-            </label>
-            <select
-              value={payoutStatus}
-              onChange={(e) => setPayoutStatus(e.target.value as ResolveJobInput["payoutStatus"])}
-              className="w-full h-10 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-sm font-medium text-on-surface focus:outline-none focus:border-2 focus:border-primary cursor-pointer"
-            >
-              <option value="paid">Mark Payout Paid</option>
-              <option value="failed">Mark Payout Failed</option>
-            </select>
-          </div>
+              {moneyChoice === "split" && (
+                <div className="flex flex-col gap-3 mt-3">
+                  <div>
+                    <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-1.5 block">
+                      {POSTER_AMOUNT_LABEL}
+                    </label>
+                    <input
+                      type="number"
+                      value={posterAmount}
+                      onChange={handlePosterAmountChange}
+                      placeholder="0"
+                      className="w-full h-10 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-sm font-medium text-on-surface focus:outline-none focus:border-2 focus:border-primary transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-1.5 block">
+                      {DRIVER_AMOUNT_LABEL}
+                    </label>
+                    <input
+                      type="number"
+                      value={driverAmount}
+                      onChange={handleDriverAmountChange}
+                      placeholder="0"
+                      className="w-full h-10 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-sm font-medium text-on-surface focus:outline-none focus:border-2 focus:border-primary transition-colors"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {moneyChoice !== null && (
+            <div>
+              <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-1.5 block">
+                {STEP3_LABEL}
+              </label>
+              <p className="text-[10px] text-secondary mb-2">{STEP3_HELPER}</p>
+              <textarea
+                value={note}
+                onChange={handleNoteChange}
+                placeholder="Why are you resolving this way..."
+                rows={3}
+                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest p-3 text-sm focus:outline-none focus:border-2 focus:border-primary resize-none transition-colors"
+              />
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-end gap-3 mt-6">
           <button
             type="button"
             onClick={handleClose}
-            className="h-10 px-4 rounded-lg border border-outline-variant text-sm font-semibold text-on-surface hover:bg-surface-container-low transition-colors cursor-pointer"
+            disabled={isPending}
+            className="h-10 px-4 rounded-lg border border-outline-variant text-sm font-semibold text-on-surface hover:bg-surface-container-low transition-colors disabled:opacity-50 cursor-pointer"
           >
-            Cancel
+            {CANCEL_BUTTON_LABEL}
           </button>
           <button
             type="button"
             onClick={handleConfirm}
-            disabled={!note.trim() || isPending}
+            disabled={isConfirmDisabled}
             className="h-10 px-4 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary/90 transition-colors disabled:opacity-75 disabled:cursor-not-allowed cursor-pointer"
           >
-            {isPending ? "Resolving..." : "Resolve Dispute"}
+            {isPending ? RESOLVING_LABEL : CONFIRM_BUTTON_LABEL}
           </button>
         </div>
       </div>

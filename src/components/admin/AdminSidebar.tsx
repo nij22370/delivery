@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { getInitials } from "@/utils/format";
 
 interface AdminSidebarProps {
   isMobileOpen?: boolean;
@@ -29,6 +31,7 @@ export default function AdminSidebar({
   onCloseMobile,
 }: AdminSidebarProps) {
   const pathname = usePathname();
+  const { user, isLoading: isAuthLoading } = useAuth();
 
   const handleLinkClick = useCallback(() => {
     if (onCloseMobile) {
@@ -55,7 +58,7 @@ export default function AdminSidebar({
         ].join(" ")}
       >
         {/* Header / Logo */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-outline-variant">
+        <div className="flex items-center justify-between h-16 px-6 border-b border-outline-variant shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-on-primary shrink-0 shadow-sm">
               <span className="material-symbols-outlined text-[24px]">local_shipping</span>
@@ -114,15 +117,53 @@ export default function AdminSidebar({
 
         {/* Bottom Footer Section */}
         <div className="p-4 border-t border-outline-variant mt-auto">
-          <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-surface-container-low">
-            <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
-              AD
+          <ul className="flex flex-col gap-1">
+            <li>
+              <Link
+                href="/settings"
+                onClick={handleLinkClick}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-secondary hover:bg-surface-container hover:text-on-surface transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[20px]">settings</span>
+                <span>Settings</span>
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/faq"
+                onClick={handleLinkClick}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-secondary hover:bg-surface-container hover:text-on-surface transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[20px]">help</span>
+                <span>FAQ</span>
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/support"
+                onClick={handleLinkClick}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-secondary hover:bg-surface-container hover:text-on-surface transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[20px]">contact_support</span>
+                <span>Support</span>
+              </Link>
+            </li>
+          </ul>
+
+          {!isAuthLoading && user && (
+            <div className="mt-3 px-3 py-3 rounded-xl bg-surface-container-low flex items-center gap-3">
+              <div className="w-9 h-9 shrink-0 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center text-sm font-bold">
+                {getInitials(user.name)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-on-surface truncate">{user.name}</p>
+                <p className="text-xs text-secondary truncate">{user.email}</p>
+              </div>
+              <span className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                Admin
+              </span>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold text-on-surface truncate">Admin System</p>
-              <p className="text-[11px] text-secondary truncate">Superadmin Role</p>
-            </div>
-          </div>
+          )}
         </div>
       </aside>
     </>

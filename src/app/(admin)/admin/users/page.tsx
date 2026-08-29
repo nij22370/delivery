@@ -14,6 +14,25 @@ import { toast } from "sonner";
 
 const PAGE_SIZE = 10;
 const SEARCH_DEBOUNCE_MS = 300;
+const CSV_FILE_NAME = "user-management-report.csv";
+
+function escapeCsvCell(value: string): string {
+  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+function userToCsvRow(user: AdminUserItem): string[] {
+  return [
+    user.userCode,
+    user.name,
+    user.email,
+    user.role,
+    user.isSuspended ? "Suspended" : "Active",
+    user.createdAt,
+  ].map(escapeCsvCell);
+}
 
 const ROLE_TABS: Array<{ key: AdminUserRoleFilter; label: string }> = [
   { key: "all", label: "All" },
@@ -59,12 +78,38 @@ export default function AdminUserManagementPage() {
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchInput(e.target.value);
-    setCurrentPage(1);
   }, []);
 
+  const users = data?.data || [];
+  const total = data?.total || 0;
+  const totalPages = data?.totalPages || 1;
+
+  const startItem = useMemo(() => (currentPage - 1) * PAGE_SIZE + 1, [currentPage]);
+  const endItem = useMemo(() => Math.min(currentPage * PAGE_SIZE, total), [currentPage, total]);
+
   const handleExportCsv = useCallback(() => {
-    toast.info("Exporting user directory to CSV...");
-  }, []);
+    if (users.length === 0) {
+      toast.info("No user records to export.");
+      return;
+    }
+
+    const headers = ["User Code", "Name", "Email", "Role", "Status", "Joined"];
+    const csvRows = users.map(userToCsvRow);
+    const csvContent = [headers.join(","), ...csvRows.map((row) => row.join(","))].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = CSV_FILE_NAME;
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast.success(`Exported ${users.length} user records to CSV.`);
+  }, [users]);
 
   const handleOpenDetails = useCallback((user: AdminUserItem) => {
     setModalTargetUser(user);
@@ -122,13 +167,6 @@ export default function AdminUserManagementPage() {
       setCurrentPage((prev) => prev + 1);
     }
   }, [currentPage, data]);
-
-  const users = data?.data || [];
-  const total = data?.total || 0;
-  const totalPages = data?.totalPages || 1;
-
-  const startItem = useMemo(() => (currentPage - 1) * PAGE_SIZE + 1, [currentPage]);
-  const endItem = useMemo(() => Math.min(currentPage * PAGE_SIZE, total), [currentPage, total]);
 
   return (
     <div className="flex flex-col gap-8">

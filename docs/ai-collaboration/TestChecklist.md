@@ -69,6 +69,15 @@ After starting `npm run dev`, walk these flows against `http://localhost:3000`. 
 | 31 | Driver payout labels (Day 68) | driver opens /history → Payments tab | summary reads "Total Earned"; "paid" status renders as "Received" (green badge); "pending" renders as "Pending" (unchanged); poster still sees "Total Paid" and "Paid" |
 | 32 | Error pages full-width (Day 68) | visit /nonexistent and trigger an error | 404 and error pages render without left sidebar; brand header + auth-aware profile/login button in top header |
 | 33 | Browse Jobs in sidebar (Day 68) | open dashboard on desktop | "Browse Jobs" link visible in left sidebar (not hidden to mobile only); clicking it navigates to /jobs/browse |
+| 34 | Post a Job auth redirect (Day 69) | click "Post a Job" / "Post Delivery" in public navbar while logged out | lands on `/login?redirect=/post-job`, not `/post-job`; after login, redirected to post-job form |
+| 35 | Unified admin sidebar (Day 69) | navigate to `/admin/verification` | renders the same AdminSidebar as `/admin/jobs` [Dashboard, Job Management, Disputes, User Management, Payout Management, Verifications]; no inline sidebar with different items |
+| 36 | Admin PDF export (Day 69) | open `/admin/jobs`, click "Download Report" | downloads `job-management-report.pdf` with table headers + data rows matching what's on screen |
+| 37 | Admin CSV export (Day 69) | open `/admin/jobs`, click "Export" | downloads `job-management-report.csv` with headers + all row fields, valid CSV format |
+| 38 | Resolve modal radio buttons (Dispute UX) | open a dispute, click "Resolve Dispute →" | modal shows Step 1 radio buttons (cancel / re-post); Step 2 (refund / pay / split) appears only after Step 1 chosen; Step 3 note textarea appears after Step 2; split shows two NPR inputs; Confirm button disabled until all steps complete |
+| 39 | Dismiss dispute (Dispute UX) | open a dispute, click "Dismiss (no action needed)" | dispute resolves directly (job re-opened as `posted`, payout marked `failed`, note "Dismissed — no action needed"); no modal opens |
+| 40 | Admin-to-poster messaging (Dispute UX) | open a dispute, open Admin Messages → "Message Poster" tab, type a message, click Send | message saved to `Message` model (senderId=admin, recipientId=poster), Pusher `new-message` triggered on `private-job-{jobId}`, toast "Message sent", message appears in thread history on next fetch |
+| 41 | Admin-to-driver messaging (Dispute UX) | open a dispute with an assigned driver, open Admin Messages → "Message Driver" tab, type a message, click Send | same as row 40 but recipientId=driver; driver-only disputes show no "Message Driver" tab
+| 38 | Admin topbar Settings + Profile (Day 69) | open any `/admin/*` page | topbar shows Settings icon link (`/settings`) + Profile (avatar + name + role); no FAQ, no Contact; no duplicate Profile section in sidebar or elsewhere |
 **Rule:** if a flow you touched is not in the table, add it. The table is the living definition of "works."
 
 ---
