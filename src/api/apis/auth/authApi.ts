@@ -7,7 +7,9 @@ import type {
   RegisterResponse,
   GetMeResponse,
   LogoutResponse,
-  RefreshTokenResponse
+  RefreshTokenResponse,
+  ChangePasswordPayload,
+  ChangePasswordResponse
 } from '@/types/auth/auth';
 
 export async function loginUser(data: LoginPayload): Promise<LoginResponse> {
@@ -32,5 +34,10 @@ export async function getMe(): Promise<GetMeResponse> {
 
 export async function refreshToken(): Promise<RefreshTokenResponse> {
   const response = await api.post<RefreshTokenResponse>('/auth/refresh');
+  return response.data;
+}
+
+export async function changePassword(data: ChangePasswordPayload): Promise<ChangePasswordResponse> {
+  const response = await api.post<ChangePasswordResponse>('/auth/change-password', data);
   return response.data;
 }

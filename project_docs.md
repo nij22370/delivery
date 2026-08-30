@@ -1238,6 +1238,33 @@ All API routes protected with `withRole(["admin"])`. Admin layout (`(admin)/layo
 
 ---
 
+## Day 69b — Admin Dispute Messaging Panel + ResolveDisputeModal Rewrite
+
+### New Files
+- `src/app/api/jobs/[id]/admin-message/route.ts` — Admin-only GET + POST route: `withRole(["admin"])` guards both handlers; GET fetches all job messages (or filters by recipientId via `$or` sender/recipient pairs) without a participant check — admin gets 403 on the standard `/messages` route; POST accepts `{ recipientId, content }`, validates recipient is job poster/driver via `assertRecipientIsParticipant`, saves to `Message` model, triggers `triggerJobEvent(jobId, "new-message", { messageId, senderId, senderName, recipientName, content, createdAt })` on `private-job-{jobId}` channel.
+
+### Modified Files
+- `src/components/admin/AdminMessagePanel.tsx` (created) — Client component with poster/driver tab interface: fetches messages from `/api/jobs/{jobId}/admin-message?recipientId={userId}&limit=50`, sends via POST to `/api/jobs/{jobId}/admin-message`, uses `useAuth()` for admin user ID, `apiFetch` for token-refresh handling, TanStack Query for caching with `invalidateQueries` on send; Pusher subscription to `private-job-{jobId}` channel for real-time incoming message refetches (skips self-authored via `senderId === adminUserId` check).
+- `src/components/admin/ResolveDisputeModal.tsx` (rewritten) — Replaced two dropdowns (resolvedStatus + payoutStatus) with progressive radio-button steps: Step 1 cancel/re-post, Step 2 refund/pay/split (hidden until Step 1 chosen, split shows NPR amount inputs), Step 3 note textarea; maps to `ResolveJobInput` (`resolvedStatus`, `note`, `payoutStatus: "paid"` for split since resolve endpoint is unmodifiable).
+- `src/app/(admin)/admin/disputes/page.tsx` — Fixed "Chat Transcript Snippet" `useQuery`: changed from plain `fetch` on the participant-gated `/api/jobs/{id}/messages` endpoint (returns 403 for admin) to `apiFetch` on the admin-only `/api/jobs/{id}/admin-message` endpoint (no `recipientId` param to fetch all job messages); added `apiFetch` import and `CHAT_TRANSCRIPT_LOAD_ERROR` constant.
+
+### API Routes
+| Method | Route | Auth | Purpose |
+|--------|-------|------|---------|
+| GET | `/api/jobs/[id]/admin-message` | `withRole(["admin"])` | Fetch all messages for a job (no participant check) or filter by `?recipientId=` for admin↔recipient conversations |
+| POST | `/api/jobs/[id]/admin-message` | `withRole(["admin"])` | Send message from admin to a participant; validates recipient via `assertRecipientIsParticipant`, triggers Pusher `new-message` event |
+
+### Key Decisions
+- **Admin message view is separate from participant messaging**: The standard `/api/jobs/[id]/messages` route is guarded by `assertParticipant()` which returns 403 for admin users. The new `/api/jobs/[id]/admin-message` route bypasses this check, allowing admin to audit all messages and initiate admin-to-user conversations.
+- **Pusher real-time via refetch, not cache mutation**: The AdminMessagePanel receives `new-message` Pusher events but cannot reliably determine which tab a message belongs to (the regular messages endpoint doesn't include `recipientId` in its payload). Instead of risking cache corruption, the panel triggers `refetchMessages()` only when `senderId !== adminUserId`, letting the admin-message endpoint's proper filtering handle correctness.
+- **Chat Transcript Snippet uses admin-message endpoint without `recipientId`**: Calling `GET /api/jobs/{id}/admin-message` without a `recipientId` returns all messages for the job (`query = { jobId }`), which is the full poster-driver conversation needed for the audit transcript.
+
+### Build Verification
+- `npx tsc --noEmit` — 0 errors
+- `npx eslint` on all new and modified files — 0 errors, 0 warnings
+
+---
+
 ## Day 68 — Driver UI Improvements & Error Page Cleanup
 
 ### New Features
@@ -1278,5 +1305,32 @@ All API routes protected with `withRole(["admin"])`. Admin layout (`(admin)/layo
 ### Build Verification
 - tsc --noEmit: 0 errors
 - npm run build: 56 pages, 0 errors, 0 warnings
+
+---
+
+## Day 69b — Admin Dispute Messaging Panel + ResolveDisputeModal Rewrite
+
+### New Files
+- `src/app/api/jobs/[id]/admin-message/route.ts` — Admin-only GET + POST route: `withRole(["admin"])` guards both handlers; GET fetches all job messages (or filters by recipientId via `$or` sender/recipient pairs) without a participant check — admin gets 403 on the standard `/messages` route; POST accepts `{ recipientId, content }`, validates recipient is job poster/driver via `assertRecipientIsParticipant`, saves to `Message` model, triggers `triggerJobEvent(jobId, "new-message", { messageId, senderId, senderName, recipientName, content, createdAt })` on `private-job-{jobId}` channel.
+
+### Modified Files
+- `src/components/admin/AdminMessagePanel.tsx` (created) — Client component with poster/driver tab interface: fetches messages from `/api/jobs/{jobId}/admin-message?recipientId={userId}&limit=50`, sends via POST to `/api/jobs/{jobId}/admin-message`, uses `useAuth()` for admin user ID, `apiFetch` for token-refresh handling, TanStack Query for caching with `invalidateQueries` on send; Pusher subscription to `private-job-{jobId}` channel for real-time incoming message refetches (skips self-authored via `senderId === adminUserId` check).
+- `src/components/admin/ResolveDisputeModal.tsx` (rewritten) — Replaced two dropdowns (resolvedStatus + payoutStatus) with progressive radio-button steps: Step 1 cancel/re-post, Step 2 refund/pay/split (hidden until Step 1 chosen, split shows NPR amount inputs), Step 3 note textarea; maps to `ResolveJobInput` (`resolvedStatus`, `note`, `payoutStatus: "paid"` for split since resolve endpoint is unmodifiable).
+- `src/app/(admin)/admin/disputes/page.tsx` — Fixed "Chat Transcript Snippet" `useQuery`: changed from plain `fetch` on the participant-gated `/api/jobs/{id}/messages` endpoint (returns 403 for admin) to `apiFetch` on the admin-only `/api/jobs/{id}/admin-message` endpoint (no `recipientId` param to fetch all job messages); added `apiFetch` import and `CHAT_TRANSCRIPT_LOAD_ERROR` constant.
+
+### API Routes
+| Method | Route | Auth | Purpose |
+|--------|-------|------|---------|
+| GET | `/api/jobs/[id]/admin-message` | `withRole(["admin"])` | Fetch all messages for a job (no participant check) or filter by `?recipientId=` for admin↔recipient conversations |
+| POST | `/api/jobs/[id]/admin-message` | `withRole(["admin"])` | Send message from admin to a participant; validates recipient via `assertRecipientIsParticipant`, triggers Pusher `new-message` event |
+
+### Key Decisions
+- **Admin message view is separate from participant messaging**: The standard `/api/jobs/[id]/messages` route is guarded by `assertParticipant()` which returns 403 for admin users. The new `/api/jobs/[id]/admin-message` route bypasses this check, allowing admin to audit all messages and initiate admin-to-user conversations.
+- **Pusher real-time via refetch, not cache mutation**: The AdminMessagePanel receives `new-message` Pusher events but cannot reliably determine which tab a message belongs to (the regular messages endpoint doesn't include `recipientId` in its payload). Instead of risking cache corruption, the panel triggers `refetchMessages()` only when `senderId !== adminUserId`, letting the admin-message endpoint's proper filtering handle correctness.
+- **Chat Transcript Snippet uses admin-message endpoint without `recipientId`**: Calling `GET /api/jobs/{id}/admin-message` without a `recipientId` returns all messages for the job (`query = { jobId }`), which is the full poster-driver conversation needed for the audit transcript.
+
+### Build Verification
+- `npx tsc --noEmit` — 0 errors
+- `npx eslint` on all new and modified files — 0 errors, 0 warnings
 
 

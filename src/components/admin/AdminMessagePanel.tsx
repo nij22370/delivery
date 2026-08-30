@@ -7,6 +7,8 @@ import { apiFetch } from "@/utils/apiFetch";
 import { toast } from "sonner";
 import { formatTime } from "@/utils/format";
 import type { Message, GetMessagesResponse } from "@/types/message/message";
+import type PusherJs from "pusher-js";
+import type { Channel } from "pusher-js";
 
 interface ParticipantInfo {
   _id: string;
@@ -38,6 +40,8 @@ const STALE_TIME_MS = 30_000;
 const ADMIN_MESSAGES_QUERY_KEY_PREFIX = "adminMessages";
 const ADMIN_MESSAGE_ENDPOINT_PREFIX = "/api/jobs/";
 const ADMIN_MESSAGE_ENDPOINT_SUFFIX = "/admin-message";
+const NEW_MESSAGE_EVENT = "new-message";
+const PRIVATE_CHANNEL_PREFIX = "private-job-";
 
 type ActiveTab = "poster" | "driver";
 type SendMessagePayload = { recipientId: string; content: string };
@@ -102,6 +106,20 @@ async function sendAdminMessage(
 
 function renderSendButtonContent(isSending: boolean): string {
   return isSending ? SENDING_BUTTON_LABEL : SEND_BUTTON_LABEL;
+}
+
+function getJobChannelName(jobId: string): string {
+  return `${PRIVATE_CHANNEL_PREFIX}${jobId}`;
+}
+
+interface IncomingMessagePayload {
+  senderId: string;
+}
+
+function isNewMessagePayload(value: unknown): value is IncomingMessagePayload {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return typeof candidate.senderId === "string";
 }
 
 function MessageBubble({
@@ -198,6 +216,31 @@ export default function AdminMessagePanel({
   useEffect(() => {
     scrollAnchorRef.current?.scrollIntoView({ block: "end" });
   }, [messages]);
+
+  useEffect(() => {
+    if (!adminUserId) return;
+
+    const channelName = getJobChannelName(jobId);
+    let pusherClientRef: PusherJs | null = null;
+    let channel: Channel | null = null;
+
+    import("@/lib/pusherClient").then(({ pusherClient }) => {
+      pusherClientRef = pusherClient;
+      channel = pusherClient.subscribe(channelName);
+      channel.bind(NEW_MESSAGE_EVENT, (payload: unknown) => {
+        if (!isNewMessagePayload(payload)) return;
+        if (payload.senderId === adminUserId) return;
+        void refetchMessages();
+      });
+    });
+
+    return () => {
+      if (channel && pusherClientRef) {
+        channel.unbind_all();
+        pusherClientRef.unsubscribe(channelName);
+      }
+    };
+  }, [adminUserId, jobId, refetchMessages]);
 
   const handleTabChange = useCallback(
     (tab: ActiveTab) => {

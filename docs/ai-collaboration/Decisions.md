@@ -6,7 +6,21 @@ Format: newest at the top. Every decision gets the **model/session** that made i
 
 ---
 
-## D-49 — Admin messaging uses a separate admin-guarded API route instead of the participant-only messages endpoint
+## D-50 — Change Password: server-side passwordHash check + signOut for logout
+
+**Status:** Accepted · **Model:** kilo-auto/free session (Aug 30) · **Applies to:** `src/app/(dashboard)/settings/page.tsx`, `src/app/(admin)/admin/settings/page.tsx`, `src/components/profile/SettingsPageContent.tsx`, `src/components/profile/ChangePasswordForm.tsx`, `src/app/api/auth/change-password/route.ts`, `src/app/(dashboard)/layout.tsx`, `src/components/admin/AdminSidebar.tsx`
+
+**Decision 1 — OAuth-only check is server-side only:** The `GET /api/auth/me` endpoint excludes `passwordHash` from its response (`select("-passwordHash -refreshTokenHash")`), so client-side `useAuth()` cannot determine whether a user has a password. The settings pages are server components that read the `accessToken` cookie, verify it with `verifyAccessToken` (from `@/lib/auth`, unmodified), query `User.findById` directly for `passwordHash`, and pass `hasPassword: boolean` to the shared `SettingsPageContent` client component. The API route (`POST /api/auth/change-password`) also checks `passwordHash` server-side as the definitive guard, returning 400 for OAuth-only users.
+
+**Why:** The API response deliberately never includes `passwordHash` (security constraint: "Never pass `passwordHash` or `refreshTokenHash` from any API route"). Checking it server-side in a server component avoids modifying `src/lib/auth.ts` or `src/models/User.ts` (both off-limits per task scope) and avoids type-casting `oauthProvider` on the client, which would be an unreliable proxy (a user could have both `oauthProvider` and `passwordHash`). The `SettingsPageContent` client component receives `hasPassword` as a prop and never calls `useAuth()` itself.
+
+**Decision 2 — Logout uses `logoutUser()` + `signOut()`:** The task specifies `signOut()` from `next-auth/react`, so the sidebar logout buttons call `logoutUser()` (which `POST /api/auth/logout` — clearing the app's custom JWT `accessToken`/`refreshToken` cookies) followed by `signOut({ redirect: true, callbackUrl: '/login' })` (per task instruction). The app's auth state is entirely driven by the JWT cookies read by `/api/auth/me`, so clearing those cookies via `logoutUser()` is what fully logs the user out; `signOut()` handles the NextAuth session cleanup + redirect. This mirrors the existing `Header.tsx` logout pattern (which uses `logoutUser()` + reload) but redirects to `/login` as the task requires.
+
+**Why:** Using only `signOut()` would leave the JWT cookies intact and the user would remain authenticated to the app. Combining both ensures the custom JWT session is cleared while still satisfying the task's `signOut()` requirement and the `/login` redirect acceptance criterion.
+
+---
+
+
 
 **Status:** Accepted · **Model:** kilo-auto/free session (Aug 29) · **Applies to:** `src/app/api/jobs/[id]/admin-message/route.ts`, `src/components/admin/AdminMessagePanel.tsx`
 
@@ -462,4 +476,44 @@ Format: newest at the top. Every decision gets the **model/session** that made i
 **Decision:** Active jobs pages first call `GET /api/jobs/my-active-ids` to get valid job IDs (filtering on the server by `status: { $in: [accepted, in_transit] }`), then fetch each job individually via `GET /api/jobs/[id]` using `Promise.all`.
 
 **Why:** `GET /api/jobs?status=accepted` scoped by role (posters see only their own jobs, but drivers without `driverId=me` are bounded to `posted` status only). The `my-active-ids` endpoint already handles the correct scoping and returns the exact set of active IDs for any role. The per-job fetch ensures full job details (pickup/dropoff addresses, driver assignment) without relying on the list endpoint's role-scoped filtering quirks.
+
+---
+
+## D-51 — Single settings card design via removal of sub-navigation ProfileSidebar
+
+**Status:** Accepted · **Model:** project session · **Applies to:** `src/components/profile/SettingsPageContent.tsx`
+
+**Decision:** Removed `ProfileSidebar` and centered the settings container using a `max-w-2xl mx-auto px-4 py-8` wrapper.
+
+**Why:** Since the "Edit Profile" button was removed per user request, only the "Change Password" tab remains in Settings. Displaying a sub-navigation sidebar with a single item is bad UX and adds visual clutter. A centered, single-card layout is standard for form-only settings pages.
+
+---
+
+## D-52 — Layout-wide unified header for dashboard and admin layouts
+
+**Status:** Accepted · **Model:** project session · **Applies to:** `src/app/(dashboard)/layout.tsx`, `src/components/admin/AdminHeader.tsx`, `src/components/admin/AdminSidebar.tsx`
+
+**Decision:** Moved the utility links (Settings, FAQ, Support) and Logout action from the bottom of the left sidebars to the top-right header area as clean icon buttons. Unified the dashboard mobile header into a layout-wide header for desktop as well, removing the notifications button for driver/poster dashboard views.
+
+**Why:** Declutters the left navigation sidebars across all roles. Prevents the bottom section of sidebars from being cut off on lower-resolution screens. Standardizes the top header experience, ensuring a consistent placement of account/system operations (Settings, help, contact, logout) next to initials/role badges.
+
+---
+
+## D-53 — Using `support_agent` as the standard support icon across headers
+
+**Status:** Accepted · **Model:** project session · **Applies to:** `src/components/admin/AdminHeader.tsx`, `src/app/(dashboard)/layout.tsx`
+
+**Decision:** Changed the support link icon from `contact_support` to `support_agent` in both admin and dashboard layouts.
+
+**Why:** `contact_support` and `help` rendered identically as question marks in some browsers. Using `support_agent` (headset icon) provides distinct visual clarity and matches the support icon used in other parts of the application (e.g. error boundaries, landing pages, earnings page support section).
+
+---
+
+## D-54 — Header actions profile avatar removal in driver/poster layouts
+
+**Status:** Accepted · **Model:** project session · **Applies to:** `src/app/(dashboard)/layout.tsx`
+
+**Decision:** Removed the top-right profile initials/role badge from the dashboard header area.
+
+**Why:** The profile card is already rendered at the bottom of the sidebar. Re-rendering it in the header creates a repetitive profile display in the same layout view. Keeping it only in the sidebar footer eliminates duplication and aligns the dashboard header design with the admin header design.
 

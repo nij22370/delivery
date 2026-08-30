@@ -41,6 +41,8 @@ Known gaps, future enhancements, things deliberately left out.
 
 | ID | Title | Status | Requested | Shipped in |
 | --- | --- | --- | --- | --- |
+| FEATURE-23 | Header & Settings UI cleanup | Shipped | Aug 30 | — |
+| FEATURE-22 | Change Password flow + Logout buttons for all roles | Shipped | Aug 30 | — |
 | FEATURE-21 | Admin PDF/CSV report export | Shipped | Aug 29 | — |
 | FEATURE-20 | Unified admin sidebar across all routes | Shipped | Aug 29 | — |
 | FEATURE-19 | Admin topbar Settings link + Profile consolidation | Shipped | Aug 29 | — |
@@ -696,3 +698,81 @@ The "Download Report" (PDF) and "Export" (CSV) buttons on the admin jobs page we
 - `tsc --noEmit` — 0 errors
 - `npm run build` — 58 pages, 0 errors
 - ESLint: 0 errors (1 pre-existing `rawJobs` warning unrelated)
+
+---
+
+## FEATURE-22 — Change Password flow + Logout buttons for all roles
+
+**Requested:** Aug 30 | **Requested by:** task spec (profile/settings area for all three roles)
+**Status:** Shipped
+**Scope:** Change Password page with dark sidebar (Profile nav: Edit Profile + Change Password), three-field form with independent eye toggles, Zod validation, TanStack Query mutation to a new `POST /api/auth/change-password` route. Logout button added to dashboard sidebar and AdminSidebar for all three roles. Does NOT modify `src/lib/auth.ts`, `src/models/User.ts`, `.env*`, or any payment/job/chat files.
+
+### Why (intent)
+Users (poster, driver, admin) need a way to change their password from within the app. OAuth-linked (Google) users have no `passwordHash` and must be blocked from the flow. Each role's nav needs a Logout button that clears auth state and redirects to `/login`.
+
+### Design
+- **Types** (`src/types/auth/auth.ts`): Added `ChangePasswordPayload` (`{ currentPassword, newPassword }`) and `ChangePasswordResponse` (`{ message }`).
+- **API route** (`src/app/api/auth/change-password/route.ts`): `withAuth` guard. Zod validates `currentPassword` (min 1) + `newPassword` (min 8). Returns 400 "Password change is not available for Google-linked accounts" when `User.passwordHash` is null. Returns 400 "Current password is incorrect" when `bcrypt.compare` fails. Hashes with `bcrypt.hash(password, 10)` and saves. Returns 200 `{ message }`.
+- **API layer** (`src/api/apis/auth/authApi.ts`): Added `changePassword(data)` plain async function via the axios instance.
+- **Hooks layer** (`src/api/hooks/auth/authApi.ts`): Added `useChangePassword()` mutation — success invalidates `['me']` query + toasts; no `onError` (form handles errors inline via `setError`).
+- **Components**:
+  - `src/components/profile/ProfileSidebar.tsx` — dark sidebar (`bg-[#0f1117]`), "Profile" heading, two nav items (Edit Profile: plain text; Change Password: blue filled pill `bg-blue-600 text-white rounded-lg` when active). Uses Material Symbols Outlined (person/lock icons) per project convention — no Lucide (AGENS rule: one icon library only).
+  - `src/components/profile/ChangePasswordForm.tsx` — `react-hook-form` + `@hookform/resolvers/zod` + local Zod schema (cross-field `.refine` for confirm-matches). Three password fields with independent eye toggle state (`visibility` Record). Eye toggle uses Material Symbols `visibility`/`visibility_off`. Submit button "Update Password" with lock icon (`bg-blue-600 hover:bg-blue-700`). Server errors mapped: "Current password is incorrect" → `setError("currentPassword", ...)`; others → inline `serverError` box. Success: hook's `onSuccess` toasts + `reset()` clears form.
+  - `src/components/profile/SettingsPageContent.tsx` — thin client wrapper rendering `ProfileSidebar` + card (`bg-[#1a1d27] rounded-2xl p-8`) containing `ChangePasswordForm` or an OAuth-only message ("Password change is not available for Google-linked accounts").
+- **Pages** (server components, check `passwordHash` server-side via `verifyAccessToken` + DB query):
+  - `src/app/(dashboard)/settings/page.tsx` — `/settings` for poster + driver; redirects to `/login?redirect=/settings` if unauthenticated.
+  - `src/app/(admin)/admin/settings/page.tsx` — `/admin/settings` for admin; redirects to `/login?redirect=/admin/settings` if unauthenticated.
+- **Logout buttons**:
+  - Dashboard sidebar (`src/app/(dashboard)/layout.tsx`): added Logout button below profile card; calls `logoutUser()` (clears JWT cookies) then `signOut({ redirect: true, callbackUrl: '/login' })` per task spec.
+  - AdminSidebar (`src/components/admin/AdminSidebar.tsx`): added same Logout button pattern; updated Settings link from `/settings` to `/admin/settings` so admin stays in admin layout.
+- **OAuth-only check**: The `GET /api/auth/me` endpoint excludes `passwordHash` from its response (`select("-passwordHash -refreshTokenHash")`), so `passwordHash` cannot be checked on the client. The settings page checks `passwordHash` server-side (direct DB query after `verifyAccessToken`), passing `hasPassword: boolean` to the shared `SettingsPageContent` client component. The API route is the definitive guard — returns 400 if `passwordHash` is null. See D-50.
+- **Icon library**: Material Symbols Outlined used exclusively (no Lucide) — AGENS rule. Eye toggles use `visibility`/`visibility_off`, lock icon `lock`, logout icon `logout`, person icon `person`.
+
+### Implementation trail
+1. Types: added `ChangePasswordPayload` + `ChangePasswordResponse` to `src/types/auth/auth.ts`.
+2. API route: created `src/app/api/auth/change-password/route.ts` with `withAuth`, Zod schema, bcrypt compare + hash, OAuth-only 400 guard.
+3. API layer: added `changePassword` to `src/api/apis/auth/authApi.ts`.
+4. Hooks layer: added `useChangePassword` to `src/api/hooks/auth/authApi.ts` (success toast + query invalidation; no error toast — form handles inline).
+5. Components: created `ProfileSidebar.tsx` (dark sidebar, two nav items), `ChangePasswordForm.tsx` (RHF + Zod + eye toggles + mutation with inline errors), `SettingsPageContent.tsx` (shared client wrapper, conditional OAuth message).
+6. Pages: created `src/app/(dashboard)/settings/page.tsx` and `src/app/(admin)/admin/settings/page.tsx` as server components with `passwordHash` check.
+7. Nav: added Logout button to dashboard sidebar and AdminSidebar; updated AdminSidebar Settings link to `/admin/settings`.
+
+### Verification
+- `npx tsc --noEmit` — 0 errors.
+- `npx eslint` on all new/modified files — 0 errors, 0 warnings.
+- `npm run build` — clean; `/settings` and `/admin/settings` both listed in route manifest.
+
+### Follow-ups
+- The "Edit Profile" nav item links to `?tab=profile` (same page with query param) — a future edit-profile form can be added without UI changes.
+- Consider extracting the shared `getUserHasPassword` server helper to avoid code duplication between the two settings pages if more role-scoped settings pages are added.
+
+---
+
+## FEATURE-23 — Header & Settings UI Cleanup
+
+**Requested:** Aug 30 | **Requested by:** User / Build Plan
+**Status:** Shipped
+**Scope:** Fix Change Password form styling to light theme, remove ProfileSidebar sub-navigation from settings pages, move Settings/FAQ/Support/Logout out of sidebars to top headers, and unify dashboard top app bar layout on mobile and desktop (removing driver/poster notifications).
+
+### Why (intent)
+The sidebars were clustered and overloaded with utility links. Additionally, settings card styling was dark and inconsistent with the rest of the application's clean, light theme.
+
+### Design
+- **Settings page styling**: Removed `ProfileSidebar` entirely in `SettingsPageContent.tsx`. Centered the page container (`max-w-2xl mx-auto px-4 py-8`) and changed card styles to light (`bg-surface-white border border-outline-variant`).
+- **ChangePasswordForm styling**: Updated titles to `text-on-surface`, changed password inputs `PASSWORD_INPUT_CLASS` bg to `bg-surface-white`, and updated submit button to brand-compliant `bg-primary hover:bg-primary/90 text-on-primary`.
+- **Sidebar Cleanup**: Removed Settings, FAQ, Support, and Logout from `AdminSidebar` and `DashboardLayout` sidebars, leaving only the brand headers and user profile cards.
+- **Header Actions Migration**: Added Settings, FAQ, Support, and Logout icon buttons to the top-right header area in both layouts. Unified the driver/poster mobile top app bar into a layout-wide top header on desktop too, and removed notifications button for posters/drivers.
+
+### Implementation trail
+1. Components: updated `SettingsPageContent.tsx` to remove sub-sidebar and center the card, and `ChangePasswordForm.tsx` to use light input styles.
+2. File cleanup: deleted unused `ProfileSidebar.tsx`.
+3. Sidebars: removed utility links from `AdminSidebar.tsx` and `DashboardLayout` in `layout.tsx`.
+4. Headers: added utility action icon buttons to `AdminHeader.tsx` and `layout.tsx` headers.
+5. Feedback fixes: removed the repetitive initials badge from the dashboard header, restored/styled the notification icon button in the dashboard layout, and updated the Support icon from `contact_support` to `support_agent` in both admin and dashboard headers to avoid duplicate question mark icons.
+6. Verification: ran eslint and production next build.
+
+### Verification
+- `npx tsc --noEmit` — 0 errors.
+- `npx eslint` on all modified/new files — 0 errors.
+- `npm run build` — exit code 0; all pages generated successfully.
+

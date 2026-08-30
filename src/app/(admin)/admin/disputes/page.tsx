@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo } from "react";
 import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
+import { apiFetch } from "@/utils/apiFetch";
 import { useAdminDisputes, useResolveJobDispute } from "@/api/hooks/admin/adminDisputesApi";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { formatShortDate, formatNpr, formatTime } from "@/utils/format";
@@ -13,6 +14,7 @@ import type { DisputedJobItem, ResolveJobInput } from "@/types/admin/adminDisput
 const PAGE_SIZE = 10;
 const SEARCH_DEBOUNCE_MS = 300;
 const MESSAGES_LIMIT = 50;
+const CHAT_TRANSCRIPT_LOAD_ERROR = "Failed to load messages";
 const DISMISS_RESOLVED_STATUS: ResolveJobInput["resolvedStatus"] = "posted";
 const DISMISS_PAYOUT_STATUS: ResolveJobInput["payoutStatus"] = "failed";
 const DISMISS_NOTE = "Dismissed — no action needed";
@@ -64,9 +66,14 @@ export default function AdminDisputesPage() {
     queryKey: ["adminDisputeMessages", selectedDispute?._id],
     queryFn: async () => {
       if (!selectedDispute) return { messages: [] };
-      const response = await fetch(`/api/jobs/${selectedDispute._id}/messages?limit=${MESSAGES_LIMIT}`);
+      const params = new URLSearchParams({
+        limit: String(MESSAGES_LIMIT),
+      });
+      const response = await apiFetch(
+        `/api/jobs/${selectedDispute._id}/admin-message?${params}`
+      );
       if (!response.ok) {
-        throw new Error("Failed to load messages");
+        throw new Error(CHAT_TRANSCRIPT_LOAD_ERROR);
       }
       return response.json();
     },
