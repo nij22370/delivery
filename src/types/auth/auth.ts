@@ -50,3 +50,12 @@ export interface JwtAccessPayload {
 export interface JwtRefreshPayload {
   userId: string;
 }
+
+export interface ChangePasswordPayload {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface ChangePasswordResponse {
+  message: string;
+}

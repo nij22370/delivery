@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { signOut } from "next-auth/react";
+import { logoutUser } from "@/api/apis/auth/authApi";
 
 const POSTER_ROLE = "poster";
 const DRIVER_ROLE = "driver";
@@ -11,6 +13,7 @@ const ADMIN_ROLE = "admin";
 const ACTIVE_DELIVERIES_PATH = "/jobs/active";
 const BROWSE_JOBS_PATH = "/jobs/browse";
 const TRACKING_PATH = "/tracking";
+const LOGIN_PATH = "/login";
 
 const ROLE_BADGE_STYLES: Record<string, string> = {
   [DRIVER_ROLE]: "bg-blue-100 text-blue-700",
@@ -32,12 +35,6 @@ interface NavLink {
   roles: string[];
 }
 
-interface FooterLink {
-  href: string;
-  icon: string;
-  label: string;
-}
-
 const NAV_LINKS: NavLink[] = [
   { href: "/dashboard", icon: "dashboard", label: "Dashboard", roles: [POSTER_ROLE, DRIVER_ROLE, ADMIN_ROLE] },
   { href: "/jobs/active", icon: "local_shipping", label: "Active Deliveries", roles: [POSTER_ROLE, DRIVER_ROLE] },
@@ -53,11 +50,7 @@ const NAV_LINKS: NavLink[] = [
   { href: "/history", icon: "history", label: "History", roles: [POSTER_ROLE, DRIVER_ROLE, ADMIN_ROLE] },
 ];
 
-const FOOTER_LINKS: FooterLink[] = [
-  { href: "/settings", icon: "settings", label: "Settings" },
-  { href: "/faq", icon: "help", label: "FAQ" },
-  { href: "/support", icon: "contact_support", label: "Support" },
-];
+
 
 function resolveUserInitials(name: string | undefined): string {
   if (!name) return "?";
@@ -111,25 +104,59 @@ export default function DashboardLayout({
     return pathname === href;
   }, [pathname]);
 
+  const handleLogout = useCallback(async () => {
+    try {
+      await logoutUser();
+    } finally {
+      signOut({ redirect: true, callbackUrl: LOGIN_PATH });
+    }
+  }, []);
+
   return (
-    <div className="font-body-md text-body-md text-on-surface antialiased bg-background md:pl-64 pt-16 md:pt-0 pb-20 md:pb-0 min-h-screen">
-      {/* Mobile Top App Bar */}
-      <header className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-4 h-16 bg-surface-white border-b border-secondary-container md:hidden">
-        <span className="text-2xl font-bold text-primary">SwiftShip</span>
-        <div className="flex items-center gap-3">
-          <button className="p-2 rounded-full text-secondary hover:bg-surface-container-low transition-colors">
-            <span className="material-symbols-outlined">notifications</span>
+    <div className="font-body-md text-body-md text-on-surface antialiased bg-background md:pl-64 pt-16 pb-20 md:pb-0 min-h-screen">
+      {/* Unified Top App Bar */}
+      <header className="fixed top-0 left-0 md:left-64 right-0 z-50 flex justify-between items-center px-4 md:px-8 h-16 bg-surface-white border-b border-secondary-container">
+        <div className="flex items-center">
+          <span className="text-2xl font-bold text-primary md:hidden">SwiftShip</span>
+        </div>
+        <div className="flex items-center gap-1.5 md:gap-2">
+          <Link
+            href="/settings"
+            className="flex items-center justify-center w-10 h-10 rounded-full text-secondary hover:bg-surface-container-high transition-colors cursor-pointer"
+            aria-label="Settings"
+          >
+            <span className="material-symbols-outlined text-xl">settings</span>
+          </Link>
+          <Link
+            href="/faq"
+            className="flex items-center justify-center w-10 h-10 rounded-full text-secondary hover:bg-surface-container-high transition-colors cursor-pointer"
+            aria-label="FAQ"
+          >
+            <span className="material-symbols-outlined text-xl">help</span>
+          </Link>
+          <Link
+            href="/support"
+            className="flex items-center justify-center w-10 h-10 rounded-full text-secondary hover:bg-surface-container-high transition-colors cursor-pointer"
+            aria-label="Support"
+          >
+            <span className="material-symbols-outlined text-xl">support_agent</span>
+          </Link>
+          <button
+            type="button"
+            className="relative flex items-center justify-center w-10 h-10 rounded-full text-secondary hover:bg-surface-container-high transition-colors cursor-pointer"
+            aria-label="Notifications"
+          >
+            <span className="material-symbols-outlined text-xl">notifications</span>
+            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-error-red" />
           </button>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center text-sm font-bold">
-              {userInitials}
-            </div>
-            {userRole && (
-              <span className={`hidden sm:inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${roleBadgeStyle}`}>
-                {roleLabel}
-              </span>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex items-center justify-center w-10 h-10 rounded-full text-secondary hover:text-error-red hover:bg-surface-container-high transition-colors cursor-pointer"
+            aria-label="Logout"
+          >
+            <span className="material-symbols-outlined text-xl">logout</span>
+          </button>
         </div>
       </header>
 
@@ -181,25 +208,10 @@ export default function DashboardLayout({
           })}
         </ul>
 
-        {/* Sidebar Footer: utility links */}
-        <div className="mt-auto pt-4 border-t border-secondary-container">
-          <ul className="flex flex-col gap-1">
-            {FOOTER_LINKS.map((link) => (
-              <li key={link.href}>
-                <Link
-                  href={link.href}
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-secondary hover:bg-surface-container-high transition-all duration-200"
-                >
-                  <span className="material-symbols-outlined">{link.icon}</span>
-                  {link.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-
-          {/* Profile Card — shown for all roles */}
-          {!isAuthLoading && user && (
-            <div className="mt-3 px-3 py-3 rounded-xl bg-surface-container-low flex items-center gap-3">
+        {/* Sidebar Footer: profile card */}
+        {!isAuthLoading && user && (
+          <div className="mt-auto pt-4 border-t border-secondary-container">
+            <div className="px-3 py-3 rounded-xl bg-surface-container-low flex items-center gap-3">
               <div className="w-9 h-9 shrink-0 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center text-sm font-bold">
                 {userInitials}
               </div>
@@ -213,8 +225,8 @@ export default function DashboardLayout({
                 </span>
               )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </nav>
 
       {/* Main Content Area */}

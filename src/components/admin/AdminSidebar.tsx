@@ -116,42 +116,9 @@ export default function AdminSidebar({
         </nav>
 
         {/* Bottom Footer Section */}
-        <div className="p-4 border-t border-outline-variant mt-auto">
-          <ul className="flex flex-col gap-1">
-            <li>
-              <Link
-                href="/settings"
-                onClick={handleLinkClick}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-secondary hover:bg-surface-container hover:text-on-surface transition-all cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[20px]">settings</span>
-                <span>Settings</span>
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/faq"
-                onClick={handleLinkClick}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-secondary hover:bg-surface-container hover:text-on-surface transition-all cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[20px]">help</span>
-                <span>FAQ</span>
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/support"
-                onClick={handleLinkClick}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-secondary hover:bg-surface-container hover:text-on-surface transition-all cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[20px]">contact_support</span>
-                <span>Support</span>
-              </Link>
-            </li>
-          </ul>
-
-          {!isAuthLoading && user && (
-            <div className="mt-3 px-3 py-3 rounded-xl bg-surface-container-low flex items-center gap-3">
+        {!isAuthLoading && user && (
+          <div className="p-4 border-t border-outline-variant mt-auto">
+            <div className="px-3 py-3 rounded-xl bg-surface-container-low flex items-center gap-3">
               <div className="w-9 h-9 shrink-0 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center text-sm font-bold">
                 {getInitials(user.name)}
               </div>
@@ -163,8 +130,8 @@ export default function AdminSidebar({
                 Admin
               </span>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </aside>
     </>
   );

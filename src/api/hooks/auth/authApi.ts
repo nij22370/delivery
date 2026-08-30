@@ -1,7 +1,12 @@
 // authApi.ts - TanStack Query hooks for auth domain
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { loginUser, registerUser, logoutUser } from '../../apis/auth/authApi';
-import type { LoginPayload, LoginResponse, RegisterPayload, RegisterResponse, LogoutResponse } from '@/types/auth/auth';
+import { loginUser, registerUser, logoutUser, changePassword } from '../../apis/auth/authApi';
+import type {
+  LoginPayload, LoginResponse,
+  RegisterPayload, RegisterResponse,
+  LogoutResponse,
+  ChangePasswordPayload, ChangePasswordResponse
+} from '@/types/auth/auth';
 import { toast } from 'sonner';
 import { AxiosError } from 'axios';
 import { getBackendErrorMessage } from '@/lib/errorResponse';
@@ -52,5 +57,17 @@ export function useLogout() {
       const message = getBackendErrorMessage(error, 'Logout failed');
       toast.error(message);
     }
+  });
+}
+
+export function useChangePassword() {
+  const queryClient = useQueryClient();
+
+  return useMutation<ChangePasswordResponse, AxiosError, ChangePasswordPayload>({
+    mutationFn: changePassword,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['me'] });
+      toast.success(data.message || 'Password updated successfully');
+    },
   });
 }
