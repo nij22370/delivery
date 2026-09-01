@@ -92,7 +92,7 @@ export default function DriverEarningsDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] pb-8">
+    <div className="min-h-screen bg-background pb-8">
       {/* Main Content Area */}
       <main className="w-full max-w-[1280px] mx-auto flex flex-col min-w-0">
         {/* Top Header */}
@@ -293,7 +293,7 @@ export default function DriverEarningsDashboard() {
                   </ul>
                 </div>
 
-                <p className="text-[10px] text-secondary leading-relaxed bg-[#f8fafc] border border-outline-variant p-2.5 rounded-lg">
+                <p className="text-[10px] text-secondary leading-relaxed bg-surface-container-low border border-outline-variant p-2.5 rounded-lg">
                   To ensure timely payouts, please verify your wallet ID or bank details in the settings tab.
                 </p>
 
@@ -322,7 +322,7 @@ export default function DriverEarningsDashboard() {
                 <button
                   type="button"
                   onClick={handleContactSupport}
-                  className="w-full h-10 rounded-lg bg-[#1e293b] text-white text-xs font-bold hover:bg-[#1e293b]/90 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full h-10 rounded-lg bg-inverse-surface text-inverse-on-surface text-xs font-bold hover:bg-inverse-surface/90 transition-colors flex items-center justify-center gap-2 cursor-pointer"
                 >
                   Contact Support
                 </button>

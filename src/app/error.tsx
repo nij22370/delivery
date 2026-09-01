@@ -101,7 +101,7 @@ export default function ErrorBoundary({ error, reset }: ErrorBoundaryProps) {
         <main className="flex-1 flex flex-col items-center justify-start md:justify-center overflow-y-auto p-4 sm:p-6 md:p-8 text-center">
           <div className="relative z-10 max-w-2xl w-full flex flex-col items-center py-2 md:py-4 my-auto">
             {/* Error Cloud Off Icon Illustration */}
-            <div className="mb-4 md:mb-6 p-6 sm:p-8 rounded-full bg-[#ffeae7] text-[#e11900] transition-all duration-300 hover:scale-105 shrink-0">
+            <div className="mb-4 md:mb-6 p-6 sm:p-8 rounded-full bg-error-container text-error-red transition-all duration-300 hover:scale-105 shrink-0">
               <span
                 className="material-symbols-outlined text-6xl sm:text-7xl md:text-8xl"
                 style={{ fontVariationSettings: "'wght' 200" }}

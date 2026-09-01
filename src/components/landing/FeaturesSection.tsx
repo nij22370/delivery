@@ -93,7 +93,7 @@ export default function FeaturesSection({ activeRole }: FeaturesSectionProps) {
                         <div className="text-[10px] text-on-surface-variant">Car · Kathmandu</div>
                       </div>
                     </div>
-                    <div className="absolute top-4 right-4 flex items-center gap-1 text-[#05A357]">
+                    <div className="absolute top-4 right-4 flex items-center gap-1 text-[var(--color-success-green)]">
                       <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
                     </div>
                     <div className="flex justify-between items-center text-[10px] font-mono text-on-surface-variant border-t border-outline-variant/30 pt-2 mt-2">
@@ -112,7 +112,7 @@ export default function FeaturesSection({ activeRole }: FeaturesSectionProps) {
                         <div className="text-[10px] text-on-surface-variant">Bike · Lalitpur</div>
                       </div>
                     </div>
-                    <div className="absolute top-4 right-4 flex items-center gap-1 text-[#05A357]">
+                    <div className="absolute top-4 right-4 flex items-center gap-1 text-[var(--color-success-green)]">
                       <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
                     </div>
                     <div className="flex justify-between items-center text-[10px] font-mono text-on-surface-variant border-t border-outline-variant/30 pt-2 mt-2">
@@ -238,7 +238,7 @@ export default function FeaturesSection({ activeRole }: FeaturesSectionProps) {
                     <span className="material-symbols-outlined text-on-surface-variant text-[20px]">inventory_2</span>
                     <span className="font-label-md text-xs font-semibold text-on-surface font-mono">Manifest: MNF-901</span>
                   </div>
-                  <span className="px-2 py-0.5 bg-amber-500/10 text-amber-600 font-label-sm text-[10px] font-bold rounded uppercase">
+                  <span className="px-2 py-0.5 bg-[var(--color-warning-amber)]/10 text-[var(--color-warning-amber)] font-label-sm text-[10px] font-bold rounded uppercase">
                     Requires Review
                   </span>
                 </div>
@@ -256,7 +256,7 @@ export default function FeaturesSection({ activeRole }: FeaturesSectionProps) {
               </p>
               <div className="w-full relative h-24 rounded-lg overflow-hidden border border-outline-variant/30 flex items-center justify-center bg-surface-container-low">
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-surface-container to-surface-container-low"></div>
-                <div className="absolute w-2.5 h-2.5 rounded-full bg-error-red shadow-[0_0_10px_#ba1a1a] animate-ping"></div>
+                <div className="absolute w-2.5 h-2.5 rounded-full bg-error-red shadow-[0_0_10px_var(--color-error)] animate-ping"></div>
                 <div className="absolute w-2.5 h-2.5 rounded-full bg-error-red"></div>
                 <div className="absolute w-32 border-t border-dashed border-error/50 right-1/2 top-1/2 -translate-y-1/2"></div>
                 <div className="relative z-10 px-3 py-1 bg-surface-white/90 backdrop-blur border border-error/30 rounded shadow-sm font-label-sm text-[10px] font-bold text-error-red font-mono uppercase tracking-wider">

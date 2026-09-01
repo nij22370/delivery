@@ -41,6 +41,8 @@ Known gaps, future enhancements, things deliberately left out.
 
 | ID | Title | Status | Requested | Shipped in |
 | --- | --- | --- | --- | --- |
+| FEATURE-25 | Payout receipt modal | Shipped | Sep 1 | feat/toast-theme-edit-profile |
+| FEATURE-24 | Persisted notification inbox + bell dropdown | Shipped | Sep 1 | feat/toast-theme-edit-profile |
 | FEATURE-23 | Header & Settings UI cleanup | Shipped | Aug 30 | â€” |
 | FEATURE-22 | Change Password flow + Logout buttons for all roles | Shipped | Aug 30 | â€” |
 | FEATURE-21 | Admin PDF/CSV report export | Shipped | Aug 29 | â€” |
@@ -776,3 +778,179 @@ The sidebars were clustered and overloaded with utility links. Additionally, set
 - `npx eslint` on all modified/new files â€” 0 errors.
 - `npm run build` â€” exit code 0; all pages generated successfully.
 
+
+---
+
+## FEATURE-24 — Persisted Notification Inbox + Bell Dropdown
+
+**Requested:** Sep 1 2026 · **Requested by:** user
+**Status:** Shipped
+**Scope:** Replaces the static red-dot on the notification bell (admin + dashboard layouts) with a real persistent inbox — DB-backed, Pusher-refreshed, per-user. Adds a `Notification` Mongoose model, three API routes, and a `<NotificationsPanel />` dropdown component. Does NOT change the existing Pusher `private-user-{userId}` event shape in a breaking way (adds optional `notificationId` field; existing consumers ignore it).
+
+### Why (intent)
+The bell button was a decorative stub — clicks did nothing. Toasts (via `NotificationProvider` + `PusherProvider`) surfaced the event but disappeared after 5 s, leaving the user with no inbox or history. A persisted inbox is the standard user expectation.
+
+### Design
+- Data model: new `Notification` Mongoose model (`{ _id, userId, type, message, link, readAt, createdAt, updatedAt }`) with indexes on `(userId, createdAt desc)` and `(userId, readAt)`.
+- API:
+  - `GET /api/notifications?page=&limit=&unreadOnly=` — paginated list, returns `unreadCount`.
+  - `PATCH /api/notifications/[id]/read` — user-scoped, sets `readAt`.
+  - `PATCH /api/notifications/read-all` — bulk mark-read.
+  - All `withAuth`. Never returns another user''s data.
+- Real-time: `notifyUser()` now persists the row before triggering Pusher. The transient sonner toast still fires (the existing `NotificationProvider` shows it on the `notification` event). The new inbox survives a refresh.
+- Decisions: route all in-app notifications through the existing `notifyUser()` — it stays the single entry point for `private-user-{userId}` events.
+
+### Implementation trail
+PLMS order followed:
+1. `src/types/notification/notification.ts` — types + Zod-less response shapes.
+2. `src/models/Notification.ts` — Mongoose model with HMR guard.
+3. `src/app/api/notifications/route.ts` — GET handler.
+4. `src/app/api/notifications/[id]/read/route.ts` — PATCH (wraps `withAuth` to inject the dynamic route context, matching the pattern in `/api/jobs/[id]/messages/read/route.ts`).
+5. `src/app/api/notifications/read-all/route.ts` — PATCH bulk.
+6. `src/api/apis/notifications/notificationsApi.ts` + `src/api/hooks/notifications/notificationsApi.ts` — TanStack Query hooks (`useNotifications`, `useMarkNotificationRead`, `useMarkAllNotificationsRead`).
+7. `src/lib/notify.ts` — extended to persist a row before Pusher trigger; errors are logged and non-fatal so a DB write failure does not break the Pusher fanout.
+8. `src/components/ui/NotificationsPanel.tsx` — bell dropdown with unread badge, mark-read on item click, "Mark all as read", empty state, ESC + click-outside close.
+9. `src/components/admin/AdminHeader.tsx` + `src/app/(dashboard)/layout.tsx` — wired the bell button: `useState` for open, `useNotificationsBellState()` for unread count, renders `<NotificationsPanel />` below the bell.
+
+### Verification
+- `npx tsc --noEmit` — 0 errors.
+- `npx eslint` on all changed files — 0 errors.
+- `npm run build` — clean; 3 new API routes registered.
+
+### Follow-ups
+- Notification grouping (per-day) is a UI enhancement; not required for v1.
+- `Notification.link` is in the schema but no server-side caller writes a `link` yet (only the post-resolve toast fires `notifyUser` without a link).
+
+---
+
+## FEATURE-25 — Admin Payout Receipt Modal
+
+**Requested:** Sep 1 2026 · **Requested by:** user (the "View Receipt" button did nothing on `/admin/payouts`)
+**Status:** Shipped
+**Scope:** New `PayoutReceiptModal` component, wired to the previously-dead "View Receipt" button. Pure UI — no backend changes, no model changes. Reuses the existing `AdminPayoutItem` data already returned by `/api/admin/payouts`.
+
+### Why (intent)
+The "View Receipt" branch in `payouts/page.tsx` was a `<button>` with no `onClick` and no associated modal/page. The two sibling branches (Process Payout, Retry) correctly opened `PayoutOverrideModal`; the "View Receipt" branch was never wired. Users clicking it had no feedback.
+
+### Design
+- Single read-only modal with: amount + status badge, driver name + email, job ID, platform fee, gateway (eSewa/Khalti), transaction ID with copy-to-clipboard, paid/created timestamps, notes.
+- Renders nothing unless `payout && isOpen` (no flicker).
+- ESC + click-outside close.
+- Reuses `formatNpr` and follows the same design tokens as the rest of the admin pages.
+- No new types, no new API routes, no model changes.
+
+### Implementation trail
+1. `src/components/admin/PayoutReceiptModal.tsx` — new component, 230 lines, with named constants at module level (per AGENTS rule) and the same modal pattern as `PayoutOverrideModal`.
+2. `src/app/(admin)/admin/payouts/page.tsx` — added two `useState` hooks (`isReceiptOpen`, `receiptPayout`), two `useCallback` handlers (`handleOpenReceipt`, `handleCloseReceipt`), wired `onClick` on the View Receipt button, and rendered the modal in JSX.
+
+### Verification
+- `npx tsc --noEmit` — 0 errors.
+- `npx eslint` — 0 errors.
+- `npm run build` — clean.
+
+### Follow-ups
+- One legacy data issue surfaced: a seeded record had `status="paid"` but no `paidAt`. The fix is a one-time DB backfill (see `scripts/backfill-payout-paidAt.mjs` and the Bug.md trace). This is a data issue, not a code issue — the override endpoint correctly sets `paidAt` for all new overrides.
+
+---
+
+## FEATURE-26 — Global Theme System (Light/Dark Toggle)
+
+**Requested:** Sep 1 2026 · **Requested by:** user
+**Status:** Shipped
+**Scope:** Add a global light/dark theme system using the existing `[data-theme="dark"]` CSS variable approach (no Tailwind `dark:` variant), a Zustand store with `localStorage` persistence, a Material Symbols `ThemeToggle` in both top-bars (admin + dashboard), an SSR flash-prevention inline script, and a sweep of hardcoded hex colors that broke dark mode in the landing page and poster dashboard.
+
+### Why (intent)
+The app shipped with a single light theme. A dark theme was needed for a basic UX expectation. The existing `globals.css` defined every color as a CSS variable, so the implementation path was already chosen: add a `[data-theme="dark"]` block with dark equivalents, then add a toggle to flip the `data-theme` attribute on `<html>`.
+
+### Design
+- No new dependencies. Existing `zustand` (5.x) handles the state. `globals.css` already has `--color-*` tokens for every UI element.
+- `src/store/themeStore.ts` — Zustand store. Initial state is always `"light"` on the server (no `localStorage`/`document` access at init — that''s what was breaking the hydration). A new `initTheme()` action reads `localStorage` and applies the `data-theme` attribute. Called from `<ThemeInitializer />` in a `useEffect`.
+- `src/components/ui/ThemeToggle.tsx` — Material Symbols `light_mode` / `dark_mode` (no new icon library; per AGENTS Hard Ban).
+- `src/components/providers/ThemeInitializer.tsx` — client component, `useEffect(()=>initTheme(), [])`, renders `null`.
+- SSR flash prevention: small inline script in `<body>` (first child) reads `localStorage` and sets `document.documentElement.dataset.theme` before React hydrates. Moved from `<head>` (where it triggered `Router action dispatched before initialization`).
+- Hex sweep: replaced `bg-white` / `bg-[#0f1117]` / `bg-[#f8f9fc]` / `bg-[#F9FAFB]` with the appropriate CSS variable on `(admin)/layout.tsx`, `ChatPanel.tsx`, the poster dashboard, and the landing page components.
+- `<html>` carries `suppressHydrationWarning` (camelCase React prop) so React does not warn when the inline script adds `data-theme` before hydration.
+
+### Implementation trail
+1. `src/app/globals.css` — added `[data-theme="dark"]` block with dark tokens for every `--color-*`; added `--color-success` and `--color-warning` semantic tokens used elsewhere.
+2. `src/store/themeStore.ts` — Zustand store with `theme`, `initTheme()`, `toggleTheme()`, `setTheme()`. Initial state always `"light"`.
+3. `src/components/providers/ThemeInitializer.tsx` — mounts `initTheme()` once.
+4. `src/components/ui/ThemeToggle.tsx` — icon button using Material Symbols.
+5. `src/app/(dashboard)/layout.tsx` + `src/components/admin/AdminHeader.tsx` — inserted `<ThemeToggle />` between the notifications bell and the logout button.
+6. `src/app/layout.tsx` — `<html suppressHydrationWarning>`, moved flash script to first child of `<body>`, mounted `<ThemeInitializer />`.
+7. Hardcoded hex sweep on `(admin)/layout.tsx`, `ChatPanel.tsx`, `(dashboard)/dashboard/page.tsx`, `landing/LandingPage.tsx`, `landing/HeroSection.tsx`, `landing/FeaturesSection.tsx`.
+
+### Verification
+- `npx tsc --noEmit` — 0 errors.
+- `npx eslint` — 0 errors on changed files (one pre-existing unrelated warning in `landing/LandingPage.tsx` setState-in-effect).
+- `npm run build` — clean.
+
+### Follow-ups
+- The landing page `glass-panel` / `light-panel` utility classes are defined inline in the section files, not in `globals.css`. If the design system grows, they should be promoted.
+- The poster dashboard still uses inline hex for the "Total Spent" card (`text-white` on `bg-primary` is intentional and fine).
+
+---
+
+## FEATURE-27 — Edit Profile Tab in Settings
+
+**Requested:** Sep 1 2026 · **Requested by:** user
+**Status:** Shipped
+**Scope:** Add an "Edit Profile" tab alongside the existing "Change Password" tab on the settings page for all three roles. Avatar upload via a new signed Cloudinary endpoint, role-aware form fields, locked email field, preferred language toggle (en/ne). All colors via CSS variables.
+
+### Why (intent)
+The settings page only had Change Password. Users (especially poster/driver) needed a way to update their phone, profile photo, vehicle type, operating zone, and language preference without going through admin.
+
+### Design
+- `src/models/User.ts` — added `profilePhotoUrl`, `preferredLanguage` (enum `en`/`ne`), `defaultPickupAddress`. `phone` already existed.
+- `src/models/DriverProfile.ts` — added `operatingZone`.
+- `src/types/profile/profile.ts` — Zod schemas per role, Nepal phone regex `^(98|97|96)\d{8}$`, base + poster + driver + admin.
+- `src/app/api/profile/route.ts` — `GET` (returns editable fields, never `passwordHash`/`refreshTokenHash`); `PATCH` (server-side role enforcement, ignores disallowed fields). Driver PATCH updates both `User` and `DriverProfile`.
+- `src/api/apis/profile/profileApi.ts` + `src/api/hooks/profile/profileApi.ts` — PLMS layer.
+- `src/app/api/uploads/profile-photo-sign/route.ts` — new signed upload endpoint for profile photos (the existing `/uploads/sign` is locked to driver verification documents, so a separate authed endpoint for any role is needed).
+- `src/components/profile/EditProfileForm.tsx` — single component with a `role` prop, dispatches to `PosterForm` / `DriverForm` / `AdminForm` (a union-typed `useForm` fights RHF''s `Path<T>` inference, so role-specific forms are clearer). Avatar uploader, locked email field, role-aware fields, skeleton loader, success/error toasts via sonner.
+- `src/components/profile/SettingsPageContent.tsx` — refactored to two-tab header (Material Symbols `person` / `lock`), blue filled pill on active, default Edit Profile tab.
+
+### Implementation trail
+PLMS order:
+1. `src/models/User.ts`, `src/models/DriverProfile.ts` — added only the specified fields; no existing fields modified.
+2. `src/types/profile/profile.ts` — Zod schemas + `ProfileResponse`.
+3. `src/app/api/profile/route.ts` — GET + PATCH.
+4. `src/api/apis/profile/profileApi.ts` + `src/api/hooks/profile/profileApi.ts`.
+5. `src/app/api/uploads/profile-photo-sign/route.ts` — Cloudinary signed upload.
+6. `src/components/profile/EditProfileForm.tsx` — three role-specific forms + shared `AvatarUploader` / `EmailLockedField` / `LanguageToggle` / `SubmitButton` helpers.
+7. `src/components/profile/SettingsPageContent.tsx` — tab header + content switch.
+
+### Verification
+- `npx tsc --noEmit` — 0 errors.
+- `npx eslint` — 0 errors on changed files.
+- `npm run build` — clean.
+
+### Follow-ups
+- `defaultPickupAddress` is currently a free-text string. A future enhancement could integrate it with the address picker used on the post-job form.
+
+---
+
+## BUG-10 — Payout missing paidAt on legacy data
+
+**Reported:** Sep 1 2026 (discovered when "View Receipt" modal showed `Paid At: —` for a `status: paid` record)
+**Status:** Resolved
+**Affected:** `Payout` collection, pre-existing data only
+
+### Why
+A legacy payout record had `status: "paid"` but `paidAt: null`. The current admin override endpoint correctly sets `paidAt` when transitioning to `paid` (`src/app/api/admin/payouts/[id]/route.ts:73`), and the real Khalti/eSewa verification endpoints create payouts as `pending` (so they would also go through the override). Therefore, the only way to get into this state is to insert a record as `paid` directly (seed, manual DB write, or a legacy code path no longer in the codebase).
+
+### Fix
+Created `scripts/backfill-payout-paidAt.mjs` — standalone Node ESM script (no new npm dependencies, uses the project''s existing `mongoose` + manual `.env.local` parsing with `fs`). It:
+- Connects to MongoDB.
+- Counts payouts with `status: "paid"` and `paidAt: null`.
+- Runs an aggregation-pipeline `updateMany` via the raw `collection.updateMany` driver call (Mongoose 9''s `Model.updateMany` requires an explicit opt-in flag for pipeline updates, so the native driver call is the cleanest path).
+- Sets `paidAt = $createdAt` for those rows.
+- Disconnects.
+
+### Verification
+- `node --check scripts/backfill-payout-paidAt.mjs` — clean.
+- Ran the script: `Found 10 paid payouts missing paidAt. Backfilled 10 payout document(s) (paidAt = createdAt). Done.`
+- Idempotent — re-running finds 0 rows to update.
+
+### Follow-ups
+- None. The current code paths correctly set `paidAt`; only legacy data needed the backfill.

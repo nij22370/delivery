@@ -1,9 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { signOut } from "next-auth/react";
 import { logoutUser } from "@/api/apis/auth/authApi";
+import ThemeToggle from "@/components/ui/ThemeToggle";
+import NotificationsPanel, {
+  NotificationsBellIcon,
+  UnreadBadge,
+  useNotificationsBellState,
+} from "@/components/ui/NotificationsPanel";
 
 interface AdminHeaderProps {
   title?: string;
@@ -20,6 +26,33 @@ export default function AdminHeader({
     } finally {
       signOut({ redirect: true, callbackUrl: "/login" });
     }
+  }, []);
+
+  return (
+    <HeaderContent
+      title={title}
+      onToggleMobile={onToggleMobile}
+      onLogout={handleLogout}
+    />
+  );
+}
+
+interface HeaderContentProps {
+  title: string;
+  onToggleMobile?: () => void;
+  onLogout: () => void;
+}
+
+function HeaderContent({ title, onToggleMobile, onLogout }: HeaderContentProps) {
+  const { unreadCount } = useNotificationsBellState();
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+
+  const handleToggleNotifications = useCallback(() => {
+    setIsNotificationsOpen((prev) => !prev);
+  }, []);
+
+  const handleCloseNotifications = useCallback(() => {
+    setIsNotificationsOpen(false);
   }, []);
 
   return (
@@ -62,17 +95,26 @@ export default function AdminHeader({
         >
           <span className="material-symbols-outlined text-xl">support_agent</span>
         </Link>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={handleToggleNotifications}
+            className="relative flex items-center justify-center w-10 h-10 rounded-full text-secondary hover:bg-surface-container transition-colors cursor-pointer"
+            aria-label="Notifications"
+            aria-expanded={isNotificationsOpen}
+          >
+            <NotificationsBellIcon />
+            <UnreadBadge count={unreadCount} />
+          </button>
+          <NotificationsPanel
+            isOpen={isNotificationsOpen}
+            onClose={handleCloseNotifications}
+          />
+        </div>
+        <ThemeToggle />
         <button
           type="button"
-          className="relative flex items-center justify-center w-10 h-10 rounded-full text-secondary hover:bg-surface-container transition-colors cursor-pointer"
-          aria-label="Notifications"
-        >
-          <span className="material-symbols-outlined text-xl">notifications</span>
-          <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-error-red" />
-        </button>
-        <button
-          type="button"
-          onClick={handleLogout}
+          onClick={onLogout}
           className="flex items-center justify-center w-10 h-10 rounded-full text-secondary hover:text-error-red hover:bg-surface-container transition-colors cursor-pointer"
           aria-label="Logout"
         >

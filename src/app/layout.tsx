@@ -17,11 +17,13 @@ export const metadata: Metadata = {
   description: "Empowering the Future of Logistics",
 };
 
-
 import AuthProvider from "@/components/providers/AuthProvider";
 import QueryProvider from "@/components/providers/QueryProvider";
 import PusherProvider from "@/components/providers/PusherProvider";
+import ThemeInitializer from "@/components/providers/ThemeInitializer";
 import { Toaster } from "sonner";
+
+const FLASH_THEME_SCRIPT = `(function(){try{var t=localStorage.getItem('swiftship-theme');if(t==='dark'||t==='light'){document.documentElement.dataset.theme=t;}}catch(e){}})();`;
 
 export default function RootLayout({
   children,
@@ -31,6 +33,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
@@ -42,6 +45,8 @@ export default function RootLayout({
         `}</style>
       </head>
       <body className="min-h-full flex flex-col bg-surface-white text-on-surface" suppressHydrationWarning>
+        <script dangerouslySetInnerHTML={{ __html: FLASH_THEME_SCRIPT }} />
+        <ThemeInitializer />
         <AuthProvider>
           <QueryProvider>
             <PusherProvider>

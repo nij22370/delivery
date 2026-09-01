@@ -53,7 +53,7 @@ export default async function PaymentSuccessPage({
     const formattedDate = formatPaymentDate(new Date());
 
     return (
-      <div className="min-h-screen bg-[#F5F5F5] flex flex-col font-sans">
+      <div className="min-h-screen bg-background flex flex-col font-sans">
         <main className="flex-grow flex items-center justify-center px-4 py-12">
           <div className="bg-surface-white rounded-2xl shadow-sm border border-outline-variant/40 p-8 md:p-10 max-w-md w-full flex flex-col items-center text-center">
             {/* Green Checkmark Badge */}

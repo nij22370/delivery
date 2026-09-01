@@ -53,7 +53,7 @@ export default function HeroSection({ activeRole }: HeroSectionProps) {
           {activeRole === "poster" && (
             <>
               <div className="inline-flex items-center gap-2 bg-surface-container-high/50 border border-outline-variant/30 px-3 py-1 rounded-full">
-                <span className="w-2 h-2 rounded-full bg-[#05A357] animate-pulse"></span>
+                <span className="w-2 h-2 rounded-full bg-[var(--color-success-green)] animate-pulse"></span>
                 <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest text-[11px] font-bold">
                   Active Delivery Network
                 </span>
@@ -166,7 +166,7 @@ export default function HeroSection({ activeRole }: HeroSectionProps) {
           {activeRole === "admin" && (
             <>
               <div className="inline-flex items-center space-x-2 bg-surface-container-lowest border border-outline-variant rounded-full px-4 py-1.5 shadow-sm">
-                <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_#22c55e] animate-pulse" />
+                <div className="w-2 h-2 rounded-full bg-success-green shadow-[0_0_8px_var(--color-success)] animate-pulse" />
                 <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest text-[11px] font-bold">
                   System Health: Optimal
                 </span>
@@ -221,7 +221,7 @@ export default function HeroSection({ activeRole }: HeroSectionProps) {
                 <div className="absolute top-4 right-4 bg-surface-white/95 backdrop-blur-md px-3 py-1.5 rounded text-primary font-mono text-xs border border-primary/20 shadow-sm z-20">
                   #PKG-8902-X
                 </div>
-                <div className="absolute bottom-4 left-4 bg-surface-white/95 backdrop-blur-md px-3 py-1.5 rounded text-[#05A357] font-mono text-xs border border-[#05A357]/20 flex items-center gap-2 shadow-sm z-20">
+                <div className="absolute bottom-4 left-4 bg-surface-container-lowest/95 backdrop-blur-md px-3 py-1.5 rounded text-[var(--color-success-green)] font-mono text-xs border border-[var(--color-success-green)]/20 flex items-center gap-2 shadow-sm z-20">
                   <span className="material-symbols-outlined text-[14px]">sensors</span>
                   SCANNING...
                 </div>

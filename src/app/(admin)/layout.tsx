@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import AdminHeader from "@/components/admin/AdminHeader";
+import NotificationProvider from "@/components/providers/NotificationProvider";
 
 export default function AdminLayout({
   children,
@@ -41,17 +42,19 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen bg-[#f9f9f9] text-on-surface flex flex-col">
-      <AdminSidebar
-        isMobileOpen={isMobileMenuOpen}
-        onCloseMobile={handleCloseMobile}
-      />
-      <div className="flex-1 md:ml-64 flex flex-col min-h-screen">
-        <AdminHeader onToggleMobile={handleToggleMobile} />
-        <main className="flex-1 mt-16 p-4 md:p-8 overflow-y-auto">
-          <div className="max-w-7xl mx-auto">{children}</div>
-        </main>
+    <NotificationProvider>
+      <div className="min-h-screen bg-[var(--color-background)] text-on-surface flex flex-col">
+        <AdminSidebar
+          isMobileOpen={isMobileMenuOpen}
+          onCloseMobile={handleCloseMobile}
+        />
+        <div className="flex-1 md:ml-64 flex flex-col min-h-screen">
+          <AdminHeader onToggleMobile={handleToggleMobile} />
+          <main className="flex-1 mt-16 p-4 md:p-8 overflow-y-auto">
+            <div className="max-w-7xl mx-auto">{children}</div>
+          </main>
+        </div>
       </div>
-    </div>
+    </NotificationProvider>
   );
 }

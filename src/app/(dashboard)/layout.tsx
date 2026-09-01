@@ -2,10 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMemo, useCallback } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { signOut } from "next-auth/react";
 import { logoutUser } from "@/api/apis/auth/authApi";
+import ThemeToggle from "@/components/ui/ThemeToggle";
+import NotificationProvider from "@/components/providers/NotificationProvider";
+import NotificationsPanel, {
+  NotificationsBellIcon,
+  UnreadBadge,
+  useNotificationsBellState,
+} from "@/components/ui/NotificationsPanel";
 
 const POSTER_ROLE = "poster";
 const DRIVER_ROLE = "driver";
@@ -112,7 +119,19 @@ export default function DashboardLayout({
     }
   }, []);
 
+  const { unreadCount } = useNotificationsBellState();
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+
+  const handleToggleNotifications = useCallback(() => {
+    setIsNotificationsOpen((prev) => !prev);
+  }, []);
+
+  const handleCloseNotifications = useCallback(() => {
+    setIsNotificationsOpen(false);
+  }, []);
+
   return (
+    <NotificationProvider>
     <div className="font-body-md text-body-md text-on-surface antialiased bg-background md:pl-64 pt-16 pb-20 md:pb-0 min-h-screen">
       {/* Unified Top App Bar */}
       <header className="fixed top-0 left-0 md:left-64 right-0 z-50 flex justify-between items-center px-4 md:px-8 h-16 bg-surface-white border-b border-secondary-container">
@@ -141,14 +160,23 @@ export default function DashboardLayout({
           >
             <span className="material-symbols-outlined text-xl">support_agent</span>
           </Link>
-          <button
-            type="button"
-            className="relative flex items-center justify-center w-10 h-10 rounded-full text-secondary hover:bg-surface-container-high transition-colors cursor-pointer"
-            aria-label="Notifications"
-          >
-            <span className="material-symbols-outlined text-xl">notifications</span>
-            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-error-red" />
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={handleToggleNotifications}
+              className="relative flex items-center justify-center w-10 h-10 rounded-full text-secondary hover:bg-surface-container-high transition-colors cursor-pointer"
+              aria-label="Notifications"
+              aria-expanded={isNotificationsOpen}
+            >
+              <NotificationsBellIcon />
+              <UnreadBadge count={unreadCount} />
+            </button>
+            <NotificationsPanel
+              isOpen={isNotificationsOpen}
+              onClose={handleCloseNotifications}
+            />
+          </div>
+          <ThemeToggle />
           <button
             type="button"
             onClick={handleLogout}
@@ -271,5 +299,6 @@ export default function DashboardLayout({
         )}
       </nav>
     </div>
+    </NotificationProvider>
   );
 }

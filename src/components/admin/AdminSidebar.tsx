@@ -24,6 +24,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "User Management", href: "/admin/users", icon: "people" },
   { label: "Payout Management", href: "/admin/payouts", icon: "account_balance_wallet" },
   { label: "Verifications", href: "/admin/verification", icon: "shield" },
+  { label: "History", href: "/history", icon: "history" },
 ];
 
 export default function AdminSidebar({

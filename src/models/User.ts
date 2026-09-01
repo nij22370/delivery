@@ -10,6 +10,9 @@ export interface IUser extends Document {
   oauthId?: string | null;
   refreshTokenHash?: string | null;
   isSuspended?: boolean;
+  profilePhotoUrl?: string | null;
+  preferredLanguage?: "en" | "ne";
+  defaultPickupAddress?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -30,6 +33,13 @@ const userSchema = new Schema<IUser>(
     oauthId: { type: String, default: null },
     refreshTokenHash: { type: String, default: null },
     isSuspended: { type: Boolean, default: false },
+    profilePhotoUrl: { type: String, default: null },
+    preferredLanguage: {
+      type: String,
+      enum: ["en", "ne"],
+      default: "en",
+    },
+    defaultPickupAddress: { type: String, default: null },
   },
   { timestamps: true }
 );
