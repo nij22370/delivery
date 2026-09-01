@@ -261,7 +261,7 @@ function PaymentPageInner() {
   const isPending = isSubmitting || initiatePaymentMutation.isPending;
 
   return (
-    <div className="min-h-screen bg-[#F3F3F3] py-10 px-4 md:px-8">
+    <div className="min-h-screen bg-background py-10 px-4 md:px-8">
       <div className="max-w-[1100px] mx-auto">
         {/* Back link */}
         <Link
@@ -381,7 +381,7 @@ function PaymentPageInner() {
             </div>
 
             {/* Total */}
-            <div className="bg-[#F0F4FF] rounded-xl px-4 py-3 flex justify-between items-center mb-6">
+            <div className="bg-primary/10 rounded-xl px-4 py-3 flex justify-between items-center mb-6">
               <span className="text-xs font-bold text-secondary uppercase tracking-widest">
                 Total to Pay
               </span>
@@ -427,7 +427,7 @@ export default function PaymentPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-[#F3F3F3] flex items-center justify-center">
+        <div className="min-h-screen bg-background flex items-center justify-center">
           <span className="material-symbols-outlined text-5xl text-primary animate-spin">
             progress_activity
           </span>

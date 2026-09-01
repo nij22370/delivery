@@ -15,7 +15,7 @@ function PaymentFailureInner() {
   const amount = amountParam ? parseFloat(amountParam) : null;
 
   return (
-    <div className="min-h-screen bg-[#F5F5F5] flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col">
       <main className="flex-grow flex items-center justify-center px-4 py-12">
         <div className="bg-surface-white rounded-2xl shadow-md p-8 max-w-md w-full flex flex-col items-center text-center">
           {/* Error icon */}
@@ -107,7 +107,7 @@ export default function PaymentFailurePage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center">
+        <div className="min-h-screen bg-background flex items-center justify-center">
           <span className="material-symbols-outlined text-5xl text-primary animate-spin">
             progress_activity
           </span>

@@ -45,8 +45,8 @@ export default function LandingPage() {
               onClick={() => setActiveRole("driver")}
               className={`px-5 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 cursor-pointer transition-all duration-300 ${
                 activeRole === "driver"
-                  ? "bg-[#05A357] text-white shadow-sm"
-                  : "text-on-surface-variant hover:bg-surface-container-low hover:text-[#05A357]"
+                  ? "bg-[var(--color-success-green)] text-white shadow-sm"
+                  : "text-on-surface-variant hover:bg-surface-container-low hover:text-[var(--color-success-green)]"
               }`}
             >
               <span className="material-symbols-outlined text-[18px]">local_shipping</span>
@@ -56,8 +56,8 @@ export default function LandingPage() {
               onClick={() => setActiveRole("admin")}
               className={`px-5 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 cursor-pointer transition-all duration-300 ${
                 activeRole === "admin"
-                  ? "bg-[#2f3131] text-white shadow-sm"
-                  : "text-on-surface-variant hover:bg-surface-container-low hover:text-black"
+                  ? "bg-[var(--color-inverse-surface)] text-[var(--color-inverse-on-surface)] shadow-sm"
+                  : "text-on-surface-variant hover:bg-surface-container-low hover:text-[var(--color-on-surface)]"
               }`}
             >
               <span className="material-symbols-outlined text-[18px]">deployed_code</span>

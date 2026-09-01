@@ -746,7 +746,7 @@ export default function ChatPanel({
         onCall={handleCall}
       />
 
-      <div className="flex-1 overflow-y-auto chat-scroll bg-[#F9FAFB] p-4 md:p-6 flex flex-col gap-6">
+      <div className="flex-1 overflow-y-auto chat-scroll bg-[var(--color-background)] p-4 md:p-6 flex flex-col gap-6">
         {isMessagesLoading ? (
           <div className="flex-1 flex items-center justify-center">
             <span className="material-symbols-outlined text-3xl text-secondary animate-spin">

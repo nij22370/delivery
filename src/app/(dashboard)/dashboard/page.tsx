@@ -71,17 +71,17 @@ function PosterDashboardContent({ posterId, posterName }: PosterDashboardContent
   }
 
   return (
-    <div className="max-w-[1280px] mx-auto px-4 md:px-10 py-5 flex flex-col gap-8 min-h-screen bg-[#f8f9fc]">
+    <div className="max-w-[1280px] mx-auto px-4 md:px-10 py-5 flex flex-col gap-8 min-h-screen bg-[var(--color-background)]">
       {/* Top Header Navigation Bar inside content area */}
-      <header className="flex items-center whitespace-nowrap border-b border-solid border-b-[#e7ebf3] px-4 py-3 bg-white/50 backdrop-blur-md sticky top-0 z-30 rounded-xl mb-2 shadow-sm">
+      <header className="flex items-center whitespace-nowrap border-b border-solid border-b-[var(--color-outline-variant)] px-4 py-3 bg-[var(--color-surface-container-lowest)]/50 backdrop-blur-md sticky top-0 z-30 rounded-xl mb-2 shadow-sm">
         <div className="flex items-center gap-8">
-          <div className="flex items-center gap-4 text-[#0d121c]">
+          <div className="flex items-center gap-4 text-[var(--color-on-surface)]">
             <div className="flex items-center gap-3">
               <div className="size-8 bg-primary rounded-lg flex items-center justify-center text-white">
                 <span className="material-symbols-outlined !text-xl">local_shipping</span>
               </div>
               <div className="flex flex-col">
-                <h2 className="text-[#0d121c] text-xl font-black leading-none tracking-tight">SwiftShip</h2>
+                <h2 className="text-[var(--color-on-surface)] text-xl font-black leading-none tracking-tight">SwiftShip</h2>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-secondary leading-none mt-1">
                   Logistics Portal
                 </p>
@@ -104,7 +104,7 @@ function PosterDashboardContent({ posterId, posterName }: PosterDashboardContent
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Active Jobs */}
-        <div className="flex flex-col gap-3 rounded-xl p-6 bg-white shadow-sm border border-outline-variant hover:shadow-md transition-shadow">
+        <div className="flex flex-col gap-3 rounded-xl p-6 bg-[var(--color-surface-container-lowest)] shadow-sm border border-outline-variant hover:shadow-md transition-shadow">
           <div className="flex justify-between items-start">
             <p className="text-secondary font-medium text-sm uppercase tracking-wider">Active Jobs</p>
             <span className="material-symbols-outlined text-primary">local_shipping</span>
@@ -121,7 +121,7 @@ function PosterDashboardContent({ posterId, posterName }: PosterDashboardContent
         </div>
 
         {/* Pending Acceptance */}
-        <div className="flex flex-col gap-3 rounded-xl p-6 bg-white shadow-sm border-2 border-warning-amber/30 hover:shadow-md transition-shadow">
+        <div className="flex flex-col gap-3 rounded-xl p-6 bg-[var(--color-surface-container-lowest)] shadow-sm border-2 border-warning-amber/30 hover:shadow-md transition-shadow">
           <div className="flex justify-between items-start">
             <p className="text-secondary font-medium text-sm uppercase tracking-wider">Pending Acceptance</p>
             <span className="material-symbols-outlined text-warning-amber" style={{ fontVariationSettings: "'FILL' 1" }}>
@@ -138,7 +138,7 @@ function PosterDashboardContent({ posterId, posterName }: PosterDashboardContent
         </div>
 
         {/* Completed Jobs */}
-        <div className="flex flex-col gap-3 rounded-xl p-6 bg-white shadow-sm border border-outline-variant hover:shadow-md transition-shadow">
+        <div className="flex flex-col gap-3 rounded-xl p-6 bg-[var(--color-surface-container-lowest)] shadow-sm border border-outline-variant hover:shadow-md transition-shadow">
           <div className="flex justify-between items-start">
             <p className="text-secondary font-medium text-sm uppercase tracking-wider">Completed Jobs</p>
             <span className="material-symbols-outlined text-secondary">task_alt</span>
@@ -161,7 +161,7 @@ function PosterDashboardContent({ posterId, posterName }: PosterDashboardContent
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Recent Deliveries Table */}
-        <div className="lg:col-span-2 flex flex-col gap-4 bg-white rounded-xl shadow-sm border border-outline-variant overflow-hidden">
+        <div className="lg:col-span-2 flex flex-col gap-4 bg-[var(--color-surface-container-lowest)] rounded-xl shadow-sm border border-outline-variant overflow-hidden">
           <div className="px-6 py-5 border-b border-outline-variant flex justify-between items-center">
             <h2 className="text-on-surface text-xl font-bold">Recent Deliveries</h2>
             <Link href="/history" className="text-primary text-sm font-bold hover:underline cursor-pointer">
@@ -233,7 +233,7 @@ function PosterDashboardContent({ posterId, posterName }: PosterDashboardContent
         {/* Right Sidebar */}
         <div className="flex flex-col gap-6">
           {/* Quick Actions */}
-          <div className="bg-white rounded-xl shadow-sm border border-outline-variant p-6">
+          <div className="bg-[var(--color-surface-container-lowest)] rounded-xl shadow-sm border border-outline-variant p-6">
             <h2 className="text-on-surface text-xl font-bold mb-4">Quick Actions</h2>
             <div className="flex flex-col gap-3">
               <Link
@@ -252,7 +252,7 @@ function PosterDashboardContent({ posterId, posterName }: PosterDashboardContent
               </Link>
               <button
                 type="button"
-                className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white border border-outline-variant text-on-surface rounded-xl font-bold hover:bg-surface-container-low transition-all cursor-pointer"
+                className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-[var(--color-surface-container-lowest)] border border-outline-variant text-on-surface rounded-xl font-bold hover:bg-surface-container-low transition-all cursor-pointer"
               >
                 <span className="material-symbols-outlined">support_agent</span>
                 Contact Support
@@ -261,7 +261,7 @@ function PosterDashboardContent({ posterId, posterName }: PosterDashboardContent
           </div>
 
           {/* Logistics Map Card */}
-          <div className="relative bg-white rounded-xl shadow-sm border border-outline-variant overflow-hidden aspect-[4/3] group">
+          <div className="relative bg-[var(--color-surface-container-lowest)] rounded-xl shadow-sm border border-outline-variant overflow-hidden aspect-[4/3] group">
             <div
               className="w-full h-full bg-cover bg-center transition-transform duration-700 group-hover:scale-110"
               style={{ backgroundImage: "url('/images/admin/kathmandu-map.png')" }}

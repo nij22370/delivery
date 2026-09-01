@@ -5,6 +5,7 @@ import { useAdminPayouts, useOverridePayoutStatus } from "@/api/hooks/admin/admi
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { formatNpr } from "@/utils/format";
 import PayoutOverrideModal from "@/components/admin/PayoutOverrideModal";
+import PayoutReceiptModal from "@/components/admin/PayoutReceiptModal";
 import type { AdminPayoutItem } from "@/types/admin/adminPayouts";
 import { toast } from "sonner";
 
@@ -61,6 +62,8 @@ export default function AdminPayoutsPage() {
   const [searchInput, setSearchInput] = useState("");
   const [selectedPayout, setSelectedPayout] = useState<AdminPayoutItem | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isReceiptOpen, setIsReceiptOpen] = useState(false);
+  const [receiptPayout, setReceiptPayout] = useState<AdminPayoutItem | null>(null);
 
   const debouncedSearch = useDebouncedValue(searchInput, 300);
 
@@ -126,6 +129,16 @@ export default function AdminPayoutsPage() {
   const handleCloseOverride = useCallback(() => {
     setIsModalOpen(false);
     setSelectedPayout(null);
+  }, []);
+
+  const handleOpenReceipt = useCallback((payout: AdminPayoutItem) => {
+    setReceiptPayout(payout);
+    setIsReceiptOpen(true);
+  }, []);
+
+  const handleCloseReceipt = useCallback(() => {
+    setIsReceiptOpen(false);
+    setReceiptPayout(null);
   }, []);
 
   const handleConfirmOverride = useCallback(
@@ -456,6 +469,7 @@ export default function AdminPayoutsPage() {
                     ) : (
                       <button
                         type="button"
+                        onClick={() => handleOpenReceipt(payout)}
                         className="text-xs text-primary hover:underline font-bold cursor-pointer"
                       >
                         View Receipt
@@ -527,6 +541,13 @@ export default function AdminPayoutsPage() {
           onConfirm={handleConfirmOverride}
         />
       )}
+
+      {/* Receipt Modal */}
+      <PayoutReceiptModal
+        isOpen={isReceiptOpen}
+        payout={receiptPayout}
+        onClose={handleCloseReceipt}
+      />
     </div>
   );
 }

@@ -57,7 +57,9 @@
   --color-error-container: #ffdad6;
   --color-on-error-container: #93000a;
   --color-error-red: #E11900;
+  --color-success: #16a34a;
   --color-success-green: #05A357;
+  --color-warning: #f59e0b;
   --color-warning-amber: #F5A623;
 
   /* ── Typography ──────────────────────────────────────── */
@@ -126,6 +128,68 @@ body {
   color: var(--color-on-surface);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+/* ── Dark Theme ─────────────────────────────────────────── */
+[data-theme="dark"] {
+  --color-background: #0f1117;
+  --color-on-background: #e2e8f0;
+  --color-surface: #1a1d27;
+  --color-on-surface: #e2e8f0;
+  --color-surface-dim: #12151f;
+  --color-surface-bright: #1e2130;
+  --color-surface-container-lowest: #12151f;
+  --color-surface-container-low: #1a1d27;
+  --color-surface-container: #1e2130;
+  --color-surface-container-high: #252938;
+  --color-surface-container-highest: #2c3040;
+  --color-surface-white: #1a1d27;
+  --color-surface-variant: #252938;
+  --color-surface-tint: #3b82f6;
+  --color-on-surface-variant: #94a3b8;
+  --color-inverse-surface: #e2e8f0;
+  --color-inverse-on-surface: #1a1d27;
+
+  --color-primary: #3b82f6;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #1e3a8a;
+  --color-on-primary-container: #dbeafe;
+  --color-inverse-primary: #93c5fd;
+  --color-primary-fixed: #1e3a8a;
+  --color-primary-fixed-dim: #1e40af;
+  --color-on-primary-fixed: #dbeafe;
+  --color-on-primary-fixed-variant: #93c5fd;
+
+  --color-secondary: #94a3b8;
+  --color-on-secondary: #1a1d27;
+  --color-secondary-container: #252938;
+  --color-on-secondary-container: #cbd5e1;
+  --color-secondary-fixed: #252938;
+  --color-secondary-fixed-dim: #334155;
+  --color-on-secondary-fixed: #e2e8f0;
+  --color-on-secondary-fixed-variant: #cbd5e1;
+
+  --color-tertiary: #fb923c;
+  --color-on-tertiary: #1a1d27;
+  --color-tertiary-container: #7c2d12;
+  --color-on-tertiary-container: #fed7aa;
+  --color-tertiary-fixed: #7c2d12;
+  --color-tertiary-fixed-dim: #9a3412;
+  --color-on-tertiary-fixed: #fed7aa;
+  --color-on-tertiary-fixed-variant: #fdba74;
+
+  --color-outline: #94a3b8;
+  --color-outline-variant: rgba(255, 255, 255, 0.08);
+
+  --color-error: #f87171;
+  --color-on-error: #1a1d27;
+  --color-error-container: #7f1d1d;
+  --color-on-error-container: #fecaca;
+  --color-error-red: #f87171;
+  --color-success: #22c55e;
+  --color-success-green: #22c55e;
+  --color-warning: #fbbf24;
+  --color-warning-amber: #fbbf24;
 }
 
 /* ── Material Symbols ───────────────────────────────────── */
@@ -212,4 +276,21 @@ body {
 
 .glass-panel-glow {
   box-shadow: 0 10px 30px rgba(39, 110, 241, 0.08);
+}
+
+/* ── Dark Theme — Landing Page Panels ──────────────────────── */
+[data-theme="dark"] .bg-grid-pattern {
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+}
+
+[data-theme="dark"] .light-panel,
+[data-theme="dark"] .glass-panel {
+  background-color: var(--color-surface-container);
+  border-color: var(--color-outline-variant);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .glass-panel-glow {
+  box-shadow: 0 10px 30px rgba(59, 130, 246, 0.15);
 }
