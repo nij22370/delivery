@@ -41,6 +41,7 @@ Known gaps, future enhancements, things deliberately left out.
 
 | ID | Title | Status | Requested | Shipped in |
 | --- | --- | --- | --- | --- |
+| FEATURE-28 | SEO & discoverability setup | Shipped | Sep 2 | feat/seo-discoverability-setup |
 | FEATURE-25 | Payout receipt modal | Shipped | Sep 1 | feat/toast-theme-edit-profile |
 | FEATURE-24 | Persisted notification inbox + bell dropdown | Shipped | Sep 1 | feat/toast-theme-edit-profile |
 | FEATURE-23 | Header & Settings UI cleanup | Shipped | Aug 30 | — |
@@ -954,3 +955,39 @@ Created `scripts/backfill-payout-paidAt.mjs` � standalone Node ESM script (no ne
 
 ### Follow-ups
 - None. The current code paths correctly set `paidAt`; only legacy data needed the backfill.
+
+---
+
+## FEATURE-28 — SEO & Discoverability Setup
+
+**Requested:** Sep 2 2026 · **Requested by:** user
+**Status:** Shipped
+**Scope:** Add sitemap, Open Graph metadata, and llms.txt so the platform is indexable by search engines and AI platforms. Only the three public routes (`/`, `/login`, `/register`) are exposed; all authenticated routes remain hidden from crawlers.
+
+### Why (intent)
+The deployment at `delivery-pied-eight.vercel.app` was not indexable: no sitemap, no OG image metadata, no machine-readable description for AI crawlers. Without these, search engines can't discover the public marketing pages, social media link previews were empty, and AI assistants had no first-party source of truth about what the platform is.
+
+### Design
+- **Sitemap** — Next.js 14 built-in `MetadataRoute.Sitemap` via `src/app/sitemap.ts`. Lists only the three public routes. Authenticated routes (`/poster/*`, `/driver/*`, `/admin/*`, `/api/*`) are deliberately excluded. Site URL is read from `process.env.NEXT_PUBLIC_SITE_URL` (fallback `http://localhost:3000`) so the same code works in dev, staging, and production without code changes.
+- **Open Graph** — Expanded `metadata` export in `src/app/layout.tsx` with a full `openGraph` block (title, description, url, siteName, images array, locale, type). Also added `metadataBase` to resolve relative OG image paths against the deployment URL (Next.js prints a warning if `metadataBase` is missing). All three URL fields (`metadataBase`, `openGraph.url`, sitemap `SITE_URL`) use the same env var.
+- **OG image** — A valid 1200×630 PNG placeholder at `public/images/og-image.png` (3,632 bytes, solid `#0D121C` background). Generated with a one-shot Node script using `zlib` — no new npm dependency. The `openGraph.images` entry references this file with explicit width/height/alt.
+- **llms.txt** — Plain-text file at `public/llms.txt` describing the platform, the three user roles, and the public routes. Served as a static asset.
+
+### Implementation trail
+1. `src/app/sitemap.ts` — created.
+2. `src/app/layout.tsx` — `metadata` expanded with `openGraph` block and `metadataBase` (both reading `process.env.NEXT_PUBLIC_SITE_URL`).
+3. `public/images/og-image.png` — generated via `node -e` script using `zlib.deflateSync` to produce a minimal valid PNG.
+4. `public/llms.txt` — created.
+5. `.env.local` — added `NEXT_PUBLIC_SITE_URL=https://delivery-pied-eight.vercel.app` (gitignored, never committed).
+
+### Follow-up corrections
+- Initial implementation hardcoded the URL in three places (`metadataBase`, `openGraph.url`, sitemap `SITE_URL`). User flagged this and asked to read from the env var instead. All three sites updated to `process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"`. `.env.local` is the source of truth for the deployed value.
+
+### Verification
+- `npx tsc --noEmit` — 0 errors.
+- `npx eslint` — 0 errors on changed files (one pre-existing font warning on the Material Symbols `<link>`, unrelated to this task).
+- `npm run build` — clean; `/sitemap.xml` registered as static route.
+
+### Follow-ups
+- Replace the placeholder OG image with a real branded image before launch.
+- Add a `robots.txt` to explicitly disallow `/poster`, `/driver`, `/admin`, and `/api` from crawlers (Next.js supports `src/app/robots.ts`).

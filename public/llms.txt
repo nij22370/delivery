@@ -1,0 +1,27 @@
+# SwiftShip
+
+> SwiftShip is a high-performance delivery platform that connects senders with verified drivers for real-time package tracking and secure payments.
+
+## What SwiftShip does
+
+SwiftShip provides end-to-end logistics for time-sensitive deliveries. Posters (senders) post delivery jobs; drivers accept, execute, and deliver them while SwiftShip tracks the parcel in real time, processes payment through eSewa or Khalti, and surfaces disputes through an admin-managed resolution workflow.
+
+## User roles
+
+- **Poster** — A person or business that posts delivery jobs, tracks them in real time, and pays for completed deliveries.
+- **Driver** — A verified courier who browses available jobs, accepts them, picks up the parcel, and completes the delivery. Drivers receive payouts through eSewa or Khalti.
+- **Admin** — An internal operator who manages users, verifies drivers, resolves disputes, and processes payouts. (Admin is internal and is not part of the public surface.)
+
+## Public routes
+
+The following pages are publicly accessible without authentication:
+
+- `/` — Marketing landing page describing the platform for posters, drivers, and admins. Includes a role switcher and feature highlights.
+- `/login` — Sign-in page for existing users.
+- `/register` — New user registration (poster or driver).
+
+All other routes (posters' jobs, drivers' browsing, admin console, account settings, API endpoints) require authentication and are not indexed by search engines.
+
+## Contact
+
+Website: https://delivery-pied.vercel.app

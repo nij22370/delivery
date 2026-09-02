@@ -14,7 +14,26 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "SwiftShip | Delivery Network",
-  description: "Empowering the Future of Logistics",
+  description:
+    "SwiftShip is a high-performance delivery platform connecting posters and drivers with real-time tracking, secure payments, and a verified fleet.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
+  openGraph: {
+    title: "SwiftShip | Delivery Network",
+    description:
+      "SwiftShip is a high-performance delivery platform connecting posters and drivers with real-time tracking, secure payments, and a verified fleet.",
+    url: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+    siteName: "SwiftShip",
+    images: [
+      {
+        url: "/images/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "SwiftShip — Delivery Network",
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
 };
 
 import AuthProvider from "@/components/providers/AuthProvider";
