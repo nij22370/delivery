@@ -18,8 +18,8 @@ interface StepVehicleProps {
 
 const VEHICLE_OPTIONS: VehicleOption[] = [
   {
-    value: JOB_VEHICLE_TYPE.BICYCLE,
-    label: "Bicycle / Scooter",
+    value: JOB_VEHICLE_TYPE.BIKE,
+    label: "Bike / Scooter",
     icon: "pedal_bike",
     description:
       "Ideal for small documents, letters, or single small packages. Fastest for dense urban areas.",

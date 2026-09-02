@@ -435,4 +435,78 @@ The existing `POST /api/jobs/:id/messages` route uses `assertParticipant()` (in 
 
 ---
 
+## BUG-20 — `/api/payments/history` filter mismatch (string vs ObjectId)
+
+**Status:** Fixed · **Found:** Sep 2 · **Owner:** project session
+
+### Symptom
+Billing page showed 0 records and the Analytics Total Spent card showed whatever `Job.aggregate` over delivered jobs returned (NPR 2,516), instead of the real PaymentTransaction total (NPR 681). Reported as the "Total Spent mismatch between Analytics and Billing" bug.
+
+### Root cause
+`src/app/api/payments/history/route.ts` filtered by `{ posterId: user.userId }` where `user.userId` is a plain string from the JWT. But `PaymentTransaction.posterId` is a Mongo `ObjectId`. BSON type comparison in MongoDB means a plain string never matches an `ObjectId`, so the filter returned zero rows for every authenticated user.
+
+### Fix
+One-line change: cast with `new Types.ObjectId(user.userId)`. The file also needed `import { Types } from "mongoose"`.
+
+### Regression guard
+- Always cast string IDs from the JWT before using them in MongoDB filters. Add a lint rule (or shared `toObjectId` helper) so this can never happen again silently.
+- The history endpoint's optional `?aggregate=true` mode uses the same filter and is now correct by construction.
+
+### Verification
+- `npx tsc --noEmit` 0 errors
+- `npx eslint` clean on `src/app/api/payments/history/route.ts`
+- The Billing and Analytics pages now read from the same source (`usePaymentHistory*` against `/api/payments/history`) and will always agree by definition.
+
+---
+
+## BUG-21 — Driver dashboard Recent Activity empty (no `driverId=me`)
+
+**Status:** Fixed · **Found:** Sep 2 · **Owner:** project session
+
+### Symptom
+Driver dashboard "Recent Activity" section was empty even though the driver had a delivered job.
+
+### Root cause
+`src/app/(dashboard)/driver/dashboard/page.tsx:86` called `useMyJobs({ page: 1, limit: PAGE_SIZE })` with no `driverId` param. In `GET /api/jobs → buildRoleScopedFilter`, a driver with no `driverId` param falls into the `else` branch (line 47) which sets `filter.status = JOB_STATUS.POSTED` — i.e. the response is the open-jobs pool, not the driver's own jobs. The driver only ever sees their own jobs when they pass `driverId: "me"` (handled by line 41-42 of the same function).
+
+### Fix
+Add `driverId: "me"` to the `useMyJobs` call. One-line change.
+
+### Regression guard
+- Any driver-side page that wants the driver's own jobs MUST pass `driverId: "me"`. Add a comment to `buildRoleScopedFilter` to that effect.
+
+### Verification
+- `npx tsc --noEmit` 0 errors
+- `npx eslint` clean on `src/app/(dashboard)/driver/dashboard/page.tsx`
+
+---
+
+## BUG-22 — Driver column "Unassigned" (populate after lean + wrong field name)
+
+**Status:** Fixed · **Found:** Sep 2 · **Owner:** project session
+
+### Symptom
+Poster dashboard "Recent Deliveries" table showed "Unassigned" for the Driver column on every row, including delivered jobs that had a real driver assigned.
+
+### Root cause (two bugs in one)
+1. **Populate chained after `.lean()`** — `Job.find()` was followed by `.lean()` before `.populate("driverId", "name")`. Mongoose silently ignores `.populate()` when chained after `.lean()` because `.lean()` returns plain JS objects, bypassing the query-level populate step. The API was returning the raw `driverId` ObjectId (or null) for every job, never the populated `{ _id, name }` subdocument.
+2. **Frontend reading the wrong field** — the render at `src/app/(dashboard)/dashboard/page.tsx:200` read `job.driver?.name`. The `Job` schema has a `driverId` field, not a `driver` field. Even after fixing the populate order, the render would still see `undefined` and fall through to "Unassigned". The `Job` type in `src/types/jobs/jobs.ts` had a speculative `driver?: { name?: string }` augmentation that referenced a field that never existed on the schema.
+
+### Fix
+- **API:** `src/app/api/jobs/route.ts` — moved `.populate("driverId", "name")` to immediately after `.find(filter)` (before `.lean()`). Correct order: `.find().populate().sort().skip().limit().lean()`.
+- **Type:** `Job.driverId` is now `string | { _id: string; name: string } | null` to reflect the populated shape. Dropped the speculative `driver?` augmentation on `MyJobsResponse.jobs`.
+- **API client:** removed the dead `job.driver ?? undefined` post-`.map()` remap in `fetchMyJobs`.
+- **Render:** `src/app/(dashboard)/dashboard/page.tsx` — read `typeof job.driverId === "object" && job.driverId !== null ? job.driverId.name : "Unassigned"`. The typeof guard handles all three shapes (populated, null, un-populated string).
+
+### Regression guard
+- The order rule `.find().populate().sort().skip().limit().lean()` is non-negotiable. Consider a lint rule against `.lean().populate()`.
+- Never speculate fields in TypeScript types. The schema is the source of truth; use the populated shape only when the API actually populates it.
+
+### Verification
+- `npx tsc --noEmit` 0 errors
+- `npx eslint` clean on `src/app/api/jobs/route.ts`, `src/types/jobs/jobs.ts`, `src/api/apis/jobs/jobApi.ts`, `src/app/(dashboard)/dashboard/page.tsx`
+- Delivered jobs with a driver assigned now show the driver's name in the Driver column; posted/accepted jobs with no driver still show "Unassigned".
+
+---
+
 

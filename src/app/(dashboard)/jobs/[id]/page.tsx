@@ -6,9 +6,11 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { JOB_STATUS } from "@/types/job";
 import type { JobVehicleType } from "@/types/job";
+import { DRIVER_PROFILE_STATUS } from "@/types/driverProfile/driverProfile";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
 import { apiFetch } from "@/utils/apiFetch";
 import { useDriverPayouts } from "@/api/hooks/drivers/payoutsApi";
+import { useDriverVerification } from "@/api/hooks/drivers/driversApi";
 import { formatCompletedDate } from "@/utils/format";
 
 const MapPreview = dynamic(() => import("@/components/MapPreview"), { ssr: false });
@@ -29,9 +31,13 @@ const DISPUTABLE_STATUSES: Set<string> = new Set([
   JOB_STATUS.DELIVERED,
 ]);
 const MIN_DISPUTE_REASON_LENGTH = 10;
+const VERIFICATION_REQUIRED_MESSAGE =
+  "Complete verification to accept this job.";
+const VERIFICATION_REQUIRED_LABEL = "Complete verification to accept";
+const VERIFICATION_LINK_HREF = "/driver/verification";
 
 const VEHICLE_LABELS: Record<JobVehicleType, string> = {
-  bicycle: "Bicycle / Scooter",
+  bike: "Bike / Scooter",
   car: "Standard Sedan",
   van: "Cargo Van",
   truck: "Box Truck",
@@ -133,6 +139,14 @@ export default function JobDetailPage({
   const isPoster = !isAuthLoading && user?.role === POSTER_ROLE;
   const isDriver = !isAuthLoading && user?.role !== POSTER_ROLE;
 
+  const { data: verificationData } = useDriverVerification();
+  const driverProfile = verificationData?.profile;
+  const driverVerificationStatus = driverProfile?.status;
+  const isVerificationPending =
+    isDriver &&
+    driverVerificationStatus !== undefined &&
+    driverVerificationStatus !== DRIVER_PROFILE_STATUS.APPROVED;
+
   const {
     data: job,
     isLoading,
@@ -160,8 +174,9 @@ export default function JobDetailPage({
   });
 
   const handleAccept = useCallback(() => {
+    if (isVerificationPending) return;
     acceptMutation.mutate();
-  }, [acceptMutation]);
+  }, [acceptMutation, isVerificationPending]);
 
   const [isDisputeModalOpen, setIsDisputeModalOpen] = useState(false);
   const [disputeReason, setDisputeReason] = useState("");
@@ -468,26 +483,54 @@ export default function JobDetailPage({
                       : "Failed to accept job."}
                   </div>
                 )}
-                <button
-                  id="btn-accept-job"
-                  onClick={handleAccept}
-                  disabled={acceptMutation.isPending}
-                  className="w-full flex items-center justify-center gap-2 bg-primary text-on-primary h-12 rounded-lg text-sm font-semibold hover:bg-primary-container transition-all active:scale-[0.98] disabled:opacity-75 disabled:cursor-not-allowed cursor-pointer mb-3"
-                >
-                  {acceptMutation.isPending ? (
-                    <>
-                      <span className="material-symbols-outlined text-xl animate-spin">
-                        progress_activity
-                      </span>
-                      Accepting...
-                    </>
-                  ) : (
-                    <>
-                      Accept Job
-                      <span className="material-symbols-outlined text-xl">check_circle</span>
-                    </>
-                  )}
-                </button>
+                {isVerificationPending && (
+                  <div
+                    role="status"
+                    data-testid="driver-verification-pending-banner"
+                    className="mb-4 flex items-start gap-2 rounded-lg border border-warning-amber/40 bg-warning-amber/10 p-3"
+                  >
+                    <span className="material-symbols-outlined text-warning-amber text-xl shrink-0">
+                      hourglass_top
+                    </span>
+                    <p className="text-xs text-on-surface leading-relaxed">
+                      Your account is pending verification. Finish verification to accept this job.
+                    </p>
+                  </div>
+                )}
+                {isVerificationPending ? (
+                  <Link
+                    href={VERIFICATION_LINK_HREF}
+                    id="btn-accept-job"
+                    title={VERIFICATION_REQUIRED_MESSAGE}
+                    aria-disabled="true"
+                    onClick={(event) => event.preventDefault()}
+                    className="w-full flex items-center justify-center gap-2 bg-surface-container-low text-on-surface-variant h-12 rounded-lg text-sm font-semibold cursor-not-allowed mb-3 border border-outline-variant"
+                  >
+                    <span className="material-symbols-outlined text-xl">lock</span>
+                    {VERIFICATION_REQUIRED_LABEL}
+                  </Link>
+                ) : (
+                  <button
+                    id="btn-accept-job"
+                    onClick={handleAccept}
+                    disabled={acceptMutation.isPending}
+                    className="w-full flex items-center justify-center gap-2 bg-primary text-on-primary h-12 rounded-lg text-sm font-semibold hover:bg-primary-container transition-all active:scale-[0.98] disabled:opacity-75 disabled:cursor-not-allowed cursor-pointer mb-3"
+                  >
+                    {acceptMutation.isPending ? (
+                      <>
+                        <span className="material-symbols-outlined text-xl animate-spin">
+                          progress_activity
+                        </span>
+                        Accepting...
+                      </>
+                    ) : (
+                      <>
+                        Accept Job
+                        <span className="material-symbols-outlined text-xl">check_circle</span>
+                      </>
+                    )}
+                  </button>
+                )}
                 <button
                   id="btn-decline-job"
                   onClick={() => window.history.back()}

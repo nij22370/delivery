@@ -22,7 +22,7 @@ const DASHBOARD_PATH = "/dashboard";
 const FILLED_ICON_STYLE = { fontVariationSettings: "'FILL' 1" } as const;
 
 const VEHICLE_LABELS: Record<DriverVehicleType, string> = {
-  bike: "Bicycle",
+  bike: "Bike",
   car: "Sedan",
   van: "Cargo Van",
   truck: "Box Truck",

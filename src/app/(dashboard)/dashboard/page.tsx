@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
 import { usePosterSummary } from "@/api/hooks/posters/posterDashboardApi";
 import { useMyJobs } from "@/api/hooks/jobs/jobsApi";
+import { usePaymentHistoryAggregate } from "@/api/hooks/payments/paymentHistoryApi";
 import { formatNpr } from "@/utils/format";
 import { JOB_STATUS } from "@/types/job";
 
@@ -44,10 +45,12 @@ interface PosterDashboardContentProps {
 function PosterDashboardContent({ posterId, posterName }: PosterDashboardContentProps) {
   const { data: summaryData, isLoading: isSummaryLoading, isError: isSummaryError } = usePosterSummary(posterId);
   const { data: jobsData, isLoading: isJobsLoading } = useMyJobs({ page: 1, limit: PAGE_SIZE });
+  const { data: paymentAggregate, isLoading: isPaymentAggregateLoading } = usePaymentHistoryAggregate();
   const stats = summaryData?.data?.stats;
+  const totalSpent = paymentAggregate?.totalAmount ?? 0;
   const recentJobs = jobsData?.jobs ?? [];
 
-  if (isSummaryLoading || isJobsLoading) {
+  if (isSummaryLoading || isJobsLoading || isPaymentAggregateLoading) {
     return (
       <div className="max-w-[1280px] mx-auto px-4 md:px-10 py-5 flex flex-col gap-6 min-h-screen">
         <div className="h-8 w-48 bg-surface-container-high rounded animate-pulse" />
@@ -153,7 +156,7 @@ function PosterDashboardContent({ posterId, posterName }: PosterDashboardContent
             <p className="text-primary-fixed/80 font-medium text-sm uppercase tracking-wider">Total Spent</p>
             <span className="material-symbols-outlined text-primary-fixed">payments</span>
           </div>
-          <p className="text-white text-3xl font-black">{formatNpr(stats.totalSpent)}</p>
+          <p className="text-white text-3xl font-black">{formatNpr(totalSpent)}</p>
           <p className="text-primary-fixed/60 text-xs font-medium">Sum of completed jobs</p>
         </div>
       </div>
@@ -197,7 +200,11 @@ function PosterDashboardContent({ posterId, posterName }: PosterDashboardContent
                         <div className="size-8 rounded-full bg-surface-container flex items-center justify-center text-secondary">
                           <span className="material-symbols-outlined !text-sm">person</span>
                         </div>
-                        <span className="text-sm font-medium">{job.driver?.name ?? "Unassigned"}</span>
+                        <span className="text-sm font-medium">
+                          {typeof job.driverId === "object" && job.driverId !== null
+                            ? job.driverId.name
+                            : "Unassigned"}
+                        </span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-secondary truncate max-w-[200px]">

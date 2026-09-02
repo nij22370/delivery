@@ -991,3 +991,123 @@ The deployment at `delivery-pied-eight.vercel.app` was not indexable: no sitemap
 ### Follow-ups
 - Replace the placeholder OG image with a real branded image before launch.
 - Add a `robots.txt` to explicitly disallow `/poster`, `/driver`, `/admin`, and `/api` from crawlers (Next.js supports `src/app/robots.ts`).
+
+---
+
+## FEATURE-29 — Sidebar Profile Links
+
+**Requested:** Sep 2 2026 · **Requested by:** user (make the bottom sidebar profile block clickable)
+**Status:** Shipped
+**Scope:** Wrap the bottom-left avatar/name/role block in the dashboard sidebar in a Next.js `Link` that navigates to the user's own profile page. The admin sidebar gets a matching link to `/admin/settings`. Visual layout is unchanged.
+
+### Why (intent)
+The avatar/name/role block at the bottom of the sidebar was a passive label. Users expected to click it to navigate to their own profile (or to admin settings for admin role). Adding the link is a one-time per-layout change with no API or data layer impact.
+
+### Design
+- For drivers: link to `/drivers/{userId}` (the existing public driver profile page).
+- For posters: link to `/posters/{userId}` (a new public poster profile page — see FEATURE-30).
+- For admins: link to `/admin/settings`.
+- The block is extracted to a small `ProfileBlockContent` component (per the AGENTS no-inline-JSX rule).
+- Reuses the existing `profileHref` `useMemo` (already computed in the layout for the public profile link).
+
+### Implementation trail
+- `src/app/(dashboard)/layout.tsx`: extracted `ProfileBlockContent`, added `profileHref` memo, wrapped the block in `<Link>` with hover styling.
+- `src/components/admin/AdminSidebar.tsx`: wrapped the bottom block in `<Link href="/admin/settings">` with `aria-label="Open admin profile"`.
+
+### Verification
+- `npx tsc --noEmit` — 0 errors.
+- `npx eslint` — 0 errors on modified files.
+
+---
+
+## FEATURE-30 — Public Poster Profile
+
+**Requested:** Sep 2 2026 · **Requested by:** user
+**Status:** Shipped
+**Scope:** A new public poster profile page at `/posters/[id]` mirroring the existing public driver profile at `/drivers/[id]`. Plus a `GET /api/users/[id]` endpoint that returns the safe user fields plus poster-specific aggregates.
+
+### Why (intent)
+Driver profiles were already public and viewable. Posters had no public profile equivalent, so the sidebar link for posters (FEATURE-29) had no destination. Adding the page also unblocks "view this poster's activity" workflows.
+
+### Design
+- **API** — `GET /api/users/[id]` is `withAuth`-gated (any authenticated user can view). Returns `{ user, totalJobsPosted, averageRatingGiven }`. `user` uses a safe projection — never returns `passwordHash`, `refreshTokenHash`, or `oauthId`. `totalJobsPosted` is `Job.countDocuments({ posterId: id })`. `averageRatingGiven` is computed by `Rating.aggregate({ fromUserId: id })` (the average rating this poster gives to drivers).
+- **Page** — `src/app/(dashboard)/posters/[id]/page.tsx`. Mirrors the driver profile's 12-col bento: hero card with name, `PST-XXXX` short ID, member-since year, "Poster" badge, total jobs posted, average rating given; KPI banner; about card. Drivers are redirected to `/dashboard`.
+- **PLMS** — `src/types/users/publicProfile.ts`, `src/api/apis/users/userPublicProfileApi.ts`, `src/api/hooks/users/userPublicProfileApi.ts`. `useUserPublicProfile(userId | null)` is enabled only when `userId` is truthy, with `retry: false`.
+
+### Implementation trail
+1. `src/types/users/publicProfile.ts` — `UserPublicProfile`, `PosterStats`.
+2. `src/app/api/users/[id]/route.ts` — `withAuth` + safe projection + `Job.countDocuments` + `Rating.aggregate`. Invalid ObjectId ? 400.
+3. `src/api/apis/users/userPublicProfileApi.ts` + `src/api/hooks/users/userPublicProfileApi.ts`.
+4. `src/app/(dashboard)/posters/[id]/page.tsx` — page component (12-col bento, `useAuthGuard` redirects drivers).
+
+### Verification
+- `npx tsc --noEmit` — 0 errors.
+- `npx eslint` — 0 errors on changed files.
+
+### Follow-ups
+- A future enhancement could add a list of recent jobs posted by the poster (paginated, opt-in).
+
+---
+
+## FEATURE-31 — PaymentTransaction posterId + Idempotent Verify Routes
+
+**Requested:** Sep 2 2026 · **Requested by:** user (improve payment reliability)
+**Status:** Shipped
+**Scope:** Add an optional `posterId` field to the `PaymentTransaction` schema. Reorder both verify routes (Khalti and eSewa) so `PaymentTransaction.create()` is the idempotency anchor, before `Payout.create()` and `job.save()`. Resolves the TOCTOU window flagged in D-31.
+
+### Why (intent)
+The verify routes previously did check-then-insert and created the `Payout` *before* the `PaymentTransaction`. Two concurrent verify calls with the same `transactionId` could both pass the existence check and double-create `Payout`s. The unique index on `{gateway, transactionId}` only guarded `PaymentTransaction`, not `Payout`. Additionally, `PaymentTransaction` had no `posterId`, so there was no clean way to query "all transactions for a given poster" — required for FEATURE-32.
+
+### Design
+- **Schema** — `src/models/PaymentTransaction.ts`: added optional `posterId?: Types.ObjectId` (ref "User", `required: false`, `default: null`) and compound index `{posterId: 1, processedAt: -1}` for the history query. Existing documents unaffected.
+- **Verify routes** — both `/api/payments/khalti/verify` and `/api/payments/esewa/verify` are reordered to `PaymentTransaction.create()` first (idempotency anchor), then `Payout.create()`, then `job.paymentStatus = "paid"; job.save()`. Each step is wrapped in a try/catch that redirects to the failure URL on error (never returns JSON on a GET). MongoDB code 11000 on `PaymentTransaction.create()` is treated as already-processed and redirects to the success URL. The `posterId: job.posterId` is now wired into the `PaymentTransaction.create()` call.
+
+### Implementation trail
+- `src/models/PaymentTransaction.ts` — added `posterId` field and compound index.
+- `src/app/api/payments/khalti/verify/route.ts` — reordered + redirect-on-error + `posterId` wiring.
+- `src/app/api/payments/esewa/verify/route.ts` — same pattern.
+
+### Verification
+- `npx tsc --noEmit` — 0 errors.
+- `npx eslint` — 0 errors on changed files.
+
+### Follow-ups
+- Legacy `PaymentTransaction` documents that pre-date the schema change have `posterId: null` and are invisible to the new history endpoint. Backfill one-liner if needed: `db.paymenttransactions.updateMany({posterId: null}, [{$set: {posterId: "$jobId.posterId"}}])`. Documented in Handover.
+
+---
+
+## FEATURE-32 — Analytics & Billing Source-of-Truth Alignment (PaymentTransaction)
+
+**Requested:** Sep 2 2026 · **Requested by:** user (Analytics and Billing showed different Total Spent values)
+**Status:** Shipped
+**Scope:** Unify the "Total Spent" UI on Analytics, Billing, and the Poster History Payments tab on a single source of truth — `GET /api/payments/history?aggregate=true` (or paginated, with `?aggregate=true` for totals-only). No schema changes. No new API routes beyond `/api/payments/history` (created in the same scope).
+
+### Why (intent)
+The Analytics card was reading `stats.totalSpent` from `/api/posters/[id]/summary` which summed `Job.offeredPrice` for delivered jobs (overcounted by any unpaid delivered job). The Billing page was reading `/api/jobs?status=delivered` (capped at page 1 of 10). The Poster History Payments tab was derived from delivered jobs. Three different sources, three different numbers. Now there is one source.
+
+### Design
+- **API** — `GET /api/payments/history?page=&limit=&aggregate=true` is `withAuth`-gated, paginated (default page 1, limit 20, max 100), filters by `new Types.ObjectId(user.userId)`, sorts by `processedAt: -1`, and populates `jobId` with `pickupAddress, dropoffAddress, offeredPrice, paymentStatus, paymentGateway`. `?aggregate=true` mode returns `{ totalAmount, total }` (sum + count across all transactions).
+- **PLMS** — `src/types/payments/paymentHistory.ts`, `src/api/apis/payments/paymentHistoryApi.ts`, `src/api/hooks/payments/paymentHistoryApi.ts`. Hooks: `usePaymentHistory({ page, limit, enabled })`, `usePaymentHistoryAggregate(enabled)`.
+- **Consumers**:
+  - Analytics `Total Spent` card ? `usePaymentHistoryAggregate()` (NPR 681 for the test poster).
+  - Billing `Total Spent` card + spending-trend `AreaChart` + table ? `usePaymentHistory({ page: 1, limit: 50 })`.
+  - Poster History Payments tab ? `usePaymentHistory({ page: 1, limit: 20 })`.
+  - Driver history is untouched (uses `useDriverPayouts` against the `Payout` collection).
+
+### Implementation trail
+1. `src/types/payments/paymentHistory.ts` — `PaymentTransactionItem`, `PopulatedJobOnTransaction`, `PaymentHistoryResponse`.
+2. `src/app/api/payments/history/route.ts` — paginated + `?aggregate=true` mode.
+3. `src/api/apis/payments/paymentHistoryApi.ts` + `src/api/hooks/payments/paymentHistoryApi.ts`.
+4. `src/app/(dashboard)/analytics/page.tsx` — Total Spent switched to `paymentAggregate?.totalAmount ?? 0`. Added `isPaymentAggregateLoading` to the loading guard.
+5. `src/app/(dashboard)/billing/page.tsx` — Total Spent, spending-trend chart, and table switched to `usePaymentHistory`. Removed unused `useQuery` + `JOB_STATUS` imports.
+6. `src/components/history/PosterHistory.tsx` — Payments tab switched to `usePaymentHistory`. DriverHistory untouched.
+
+### Verification
+- `npx tsc --noEmit` — 0 errors.
+- `npx eslint` — 0 errors on changed files.
+- Analytics and Billing now read from the same source — they will always agree by definition.
+
+### Follow-ups
+- Add a CSV export on the Billing page (the existing CSV utility can be reused).
+- A future "Payment Analytics" tab could break down the totals by gateway (Khalti vs eSewa).
+

@@ -46,11 +46,5 @@ export async function fetchMyJobs(query: MyJobsQuery = {}): Promise<MyJobsRespon
   if (query.status) params.status = query.status;
 
   const response = await api.get<MyJobsResponse>('/jobs', { params });
-  return {
-    ...response.data,
-    jobs: (response.data.jobs ?? []).map((job) => ({
-      ...job,
-      driver: job.driver ?? undefined,
-    })),
-  };
+  return response.data;
 }

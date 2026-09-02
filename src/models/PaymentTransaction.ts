@@ -5,6 +5,7 @@ export type TransactionStatus = "Completed" | "Pending" | "Failed" | "Expired" |
 
 export interface IPaymentTransaction extends Document {
   jobId: Types.ObjectId;
+  posterId?: Types.ObjectId;
   gateway: PaymentGateway;
   transactionId: string;
   amount: number;
@@ -18,6 +19,12 @@ const paymentTransactionSchema = new Schema<IPaymentTransaction>(
       type: Schema.Types.ObjectId,
       ref: "Job",
       required: true,
+    },
+    posterId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: false,
+      default: null,
     },
     gateway: {
       type: String,
@@ -46,6 +53,7 @@ const paymentTransactionSchema = new Schema<IPaymentTransaction>(
 );
 
 paymentTransactionSchema.index({ gateway: 1, transactionId: 1 }, { unique: true });
+paymentTransactionSchema.index({ posterId: 1, processedAt: -1 });
 
 const PaymentTransaction: Model<IPaymentTransaction> =
   mongoose.models.PaymentTransaction ||

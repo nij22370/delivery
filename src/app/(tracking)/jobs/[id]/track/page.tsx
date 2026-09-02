@@ -83,17 +83,14 @@ const TRACK_FOOTER_LINKS = [
   { href: "/support", icon: "contact_support", label: "Support" },
 ] as const;
 
-// Covers both the Job enum (bicycle) and the DriverProfile enum (bike).
 const VEHICLE_TYPE_LABELS: Record<string, string> = {
-  bicycle: "Bicycle / Scooter",
-  bike: "Bicycle / Scooter",
+  bike: "Bike / Scooter",
   car: "Standard Sedan",
   van: "Cargo Van",
   truck: "Box Truck",
 };
 
 const VEHICLE_TYPE_ICONS: Record<string, string> = {
-  bicycle: "pedal_bike",
   bike: "pedal_bike",
   car: "directions_car",
   van: "local_shipping",

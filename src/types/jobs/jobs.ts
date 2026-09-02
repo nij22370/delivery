@@ -26,7 +26,7 @@ export type CreateJobPayload = JobLocationInput & JobVehicleInput & JobPricingIn
 export interface Job {
   _id: string;
   posterId: string;
-  driverId?: string;
+  driverId?: string | { _id: string; name: string } | null;
   status: JobStatus;
   pickupAddress: string;
   dropoffAddress: string;
@@ -53,7 +53,7 @@ export interface GetJobsResponse {
 }
 
 export interface MyJobsResponse {
-  jobs: Array<Job & { driver?: { name?: string } | null }>;
+  jobs: Job[];
   total: number;
   page: number;
   totalPages: number;

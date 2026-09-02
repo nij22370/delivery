@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/lib/db";
 import Job from "@/models/Job";
+import DriverProfile from "@/models/DriverProfile";
 import { withRole, withAuth } from "@/lib/auth";
 import { jobCreationSchema, JOB_STATUS, JOB_VEHICLE_TYPE } from "@/types/job";
 import type { JwtAccessPayload } from "@/types/auth/auth";
@@ -9,13 +10,24 @@ import type { JobStatus, JobVehicleType } from "@/types/job";
 // ── Constants ────────────────────────────────────────────────────────────────
 const PAGE_SIZE = 10;
 const FALLBACK_PAGE = 1;
+const NO_MATCH_VEHICLE_TYPE = "__none__";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+async function resolveDriverVehicleType(
+  userId: string
+): Promise<string | null> {
+  const profile = await DriverProfile.findOne({ userId })
+    .select("vehicleType")
+    .lean();
+  return profile?.vehicleType ?? null;
+}
+
 function buildRoleScopedFilter(
   user: JwtAccessPayload,
   statusParam: string | null,
   vehicleTypeParam: string | null,
-  driverIdParam: string | null
+  driverIdParam: string | null,
+  driverVehicleType: string | null
 ): Record<string, unknown> {
   const filter: Record<string, unknown> = {};
 
@@ -34,6 +46,11 @@ function buildRoleScopedFilter(
       // is bounded to "posted" unless the driver is scoping to their own jobs.
       filter.status = JOB_STATUS.POSTED;
     }
+
+    // Drivers see only jobs that match their verified vehicle type.
+    // If they have no DriverProfile yet, return zero jobs (an impossible
+    // vehicleType value guarantees an empty result set).
+    filter.vehicleType = driverVehicleType ?? NO_MATCH_VEHICLE_TYPE;
   }
   // Admin: no baseline scoping; sees all jobs.
 
@@ -53,7 +70,8 @@ function buildRoleScopedFilter(
 
   if (
     vehicleTypeParam &&
-    Object.values(JOB_VEHICLE_TYPE).includes(vehicleTypeParam as JobVehicleType)
+    Object.values(JOB_VEHICLE_TYPE).includes(vehicleTypeParam as JobVehicleType) &&
+    user.role !== "driver"
   ) {
     filter.vehicleType = vehicleTypeParam;
   }
@@ -151,11 +169,27 @@ async function handleListJobs(
     const limitParam = searchParams.get("limit");
     const driverIdParam = searchParams.get("driverId");
 
-    const filter = buildRoleScopedFilter(user, statusParam, vehicleTypeParam, driverIdParam);
+    let driverVehicleType: string | null = null;
+    if (user.role === "driver") {
+      driverVehicleType = await resolveDriverVehicleType(user.userId);
+    }
+
+    const filter = buildRoleScopedFilter(
+      user,
+      statusParam,
+      vehicleTypeParam,
+      driverIdParam,
+      driverVehicleType
+    );
     const { page, limit, skip } = parsePaginationParams(pageParam, limitParam);
 
     const [jobs, total] = await Promise.all([
-      Job.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Job.find(filter)
+        .populate("driverId", "name")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
       Job.countDocuments(filter),
     ]);
 

@@ -3,8 +3,8 @@
 import { useMemo } from "react";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
 import { usePosterSummary } from "@/api/hooks/posters/posterDashboardApi";
+import { usePaymentHistoryAggregate } from "@/api/hooks/payments/paymentHistoryApi";
 import { formatNpr } from "@/utils/format";
-import { JOB_STATUS } from "@/types/job";
 import {
   BarChart,
   Bar,
@@ -119,7 +119,13 @@ export default function AnalyticsPage() {
     isError: isSummaryError,
   } = usePosterSummary(posterId);
 
+  const {
+    data: paymentAggregate,
+    isLoading: isPaymentAggregateLoading,
+  } = usePaymentHistoryAggregate(Boolean(posterId));
+
   const stats = summaryData?.data?.stats;
+  const totalSpent = paymentAggregate?.totalAmount ?? 0;
 
   const chartData = useMemo<ChartBarItem[]>(() => {
     if (!stats) return [];
@@ -147,7 +153,7 @@ export default function AnalyticsPage() {
     [chartData]
   );
 
-  if (isAuthLoading || isSummaryLoading) {
+  if (isAuthLoading || isSummaryLoading || isPaymentAggregateLoading) {
     return (
       <div className="max-w-[1280px] mx-auto px-4 md:px-10 py-8 min-h-screen">
         <div className="h-8 w-48 bg-surface-container-high rounded animate-pulse mb-8" />
@@ -193,7 +199,7 @@ export default function AnalyticsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <AnalyticsCard
           label="Total Spent"
-          value={formatNpr(stats.totalSpent)}
+          value={formatNpr(totalSpent)}
           icon="payments"
         />
         <AnalyticsCard

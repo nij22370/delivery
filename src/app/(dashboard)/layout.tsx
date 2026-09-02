@@ -66,6 +66,39 @@ function resolveUserInitials(name: string | undefined): string {
   return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 }
 
+interface ProfileBlockContentProps {
+  initials: string;
+  name: string;
+  email: string;
+  roleBadgeStyle: string;
+  roleLabel: string;
+}
+
+function ProfileBlockContent({
+  initials,
+  name,
+  email,
+  roleBadgeStyle,
+  roleLabel,
+}: ProfileBlockContentProps) {
+  return (
+    <>
+      <div className="w-9 h-9 shrink-0 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center text-sm font-bold">
+        {initials}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-on-surface truncate">{name}</p>
+        <p className="text-xs text-secondary truncate">{email}</p>
+      </div>
+      {roleLabel && (
+        <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${roleBadgeStyle}`}>
+          {roleLabel}
+        </span>
+      )}
+    </>
+  );
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -87,6 +120,14 @@ export default function DashboardLayout({
     () => (userRole ? (ROLE_LABELS[userRole] ?? userRole) : ""),
     [userRole]
   );
+
+  const profileHref = useMemo(() => {
+    if (!user || !userRole) return null;
+    if (userRole === DRIVER_ROLE) return `/drivers/${user._id}`;
+    if (userRole === POSTER_ROLE) return `/posters/${user._id}`;
+    if (userRole === ADMIN_ROLE) return "/admin/settings";
+    return null;
+  }, [user, userRole]);
 
   const visibleNavLinks = useMemo(() => {
     if (isAuthLoading) return NAV_LINKS;
@@ -239,20 +280,31 @@ export default function DashboardLayout({
         {/* Sidebar Footer: profile card */}
         {!isAuthLoading && user && (
           <div className="mt-auto pt-4 border-t border-secondary-container">
-            <div className="px-3 py-3 rounded-xl bg-surface-container-low flex items-center gap-3">
-              <div className="w-9 h-9 shrink-0 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center text-sm font-bold">
-                {userInitials}
+            {profileHref ? (
+              <Link
+                href={profileHref}
+                aria-label={`Open ${roleLabel || "user"} profile`}
+                className="block px-3 py-3 rounded-xl bg-surface-container-low flex items-center gap-3 hover:bg-surface-container transition-colors cursor-pointer"
+              >
+                <ProfileBlockContent
+                  initials={userInitials}
+                  name={user.name}
+                  email={user.email}
+                  roleBadgeStyle={roleBadgeStyle}
+                  roleLabel={roleLabel}
+                />
+              </Link>
+            ) : (
+              <div className="px-3 py-3 rounded-xl bg-surface-container-low flex items-center gap-3">
+                <ProfileBlockContent
+                  initials={userInitials}
+                  name={user.name}
+                  email={user.email}
+                  roleBadgeStyle={roleBadgeStyle}
+                  roleLabel={roleLabel}
+                />
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-on-surface truncate">{user.name}</p>
-                <p className="text-xs text-secondary truncate">{user.email}</p>
-              </div>
-              {userRole && (
-                <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${roleBadgeStyle}`}>
-                  {roleLabel}
-                </span>
-              )}
-            </div>
+            )}
           </div>
         )}
       </nav>

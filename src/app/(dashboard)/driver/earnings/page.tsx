@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
@@ -8,6 +8,144 @@ import { useDriverPayouts } from "@/api/hooks/drivers/payoutsApi";
 import { formatNpr, formatShortDate } from "@/utils/format";
 import type { DriverPayoutItem } from "@/types/payout/payout";
 import { toast } from "sonner";
+
+type EarningsTimeRange = "7d" | "30d" | "90d" | "all";
+
+const EARNINGS_TIME_RANGE_OPTIONS: { value: EarningsTimeRange; label: string }[] = [
+  { value: "7d", label: "Last 7 Days" },
+  { value: "30d", label: "Last 30 Days" },
+  { value: "90d", label: "Last 90 Days" },
+  { value: "all", label: "All Time" },
+];
+
+const DEFAULT_EARNINGS_TIME_RANGE: EarningsTimeRange = "7d";
+
+const DAY_OF_WEEK_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
+const DAYS_PER_WEEK = 7;
+
+interface ChartBucket {
+  dayName: string;
+  dateStr: string;
+  amount: number;
+}
+
+function startOfDay(date: Date): Date {
+  const copy = new Date(date);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+}
+
+function startOfWeek(date: Date): Date {
+  const copy = startOfDay(date);
+  copy.setDate(copy.getDate() - copy.getDay());
+  return copy;
+}
+
+function startOfMonth(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function formatWeekStartLabel(date: Date): string {
+  return `${MONTH_LABELS[date.getMonth()]} ${date.getDate()}`;
+}
+
+function getBucketsForRange(timeRange: EarningsTimeRange, today: Date): ChartBucket[] {
+  const todayStart = startOfDay(today);
+  switch (timeRange) {
+    case "7d": {
+      return Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(todayStart);
+        d.setDate(d.getDate() - (6 - i));
+        return {
+          dayName: DAY_OF_WEEK_LABELS[d.getDay()],
+          dateStr: d.toDateString(),
+          amount: 0,
+        };
+      });
+    }
+    case "30d": {
+      return Array.from({ length: 5 }, (_, i) => {
+        const weekStart = new Date(todayStart);
+        weekStart.setDate(weekStart.getDate() - (4 - i) * DAYS_PER_WEEK);
+        return {
+          dayName: `Week ${i + 1}`,
+          dateStr: weekStart.toDateString(),
+          amount: 0,
+        };
+      });
+    }
+    case "90d": {
+      return Array.from({ length: 13 }, (_, i) => {
+        const weekStart = new Date(todayStart);
+        weekStart.setDate(weekStart.getDate() - (12 - i) * DAYS_PER_WEEK);
+        return {
+          dayName: formatWeekStartLabel(weekStart),
+          dateStr: weekStart.toDateString(),
+          amount: 0,
+        };
+      });
+    }
+    case "all": {
+      const months: ChartBucket[] = [];
+      const cursor = startOfMonth(todayStart);
+      const earliest = new Date(todayStart);
+      earliest.setMonth(earliest.getMonth() - 11);
+      const walk = new Date(earliest);
+      while (walk.getTime() <= cursor.getTime()) {
+        months.push({
+          dayName: MONTH_LABELS[walk.getMonth()],
+          dateStr: startOfMonth(walk).toDateString(),
+          amount: 0,
+        });
+        walk.setMonth(walk.getMonth() + 1);
+      }
+      return months;
+    }
+  }
+}
+
+function bucketPayoutsForChart(
+  payouts: DriverPayoutItem[],
+  timeRange: EarningsTimeRange,
+  today: Date = new Date()
+): ChartBucket[] {
+  const buckets = getBucketsForRange(timeRange, today);
+  if (buckets.length === 0) return buckets;
+
+  const todayStart = startOfDay(today);
+
+  payouts.forEach((payout) => {
+    if (payout.status !== "paid") return;
+    const payoutDate = startOfDay(new Date(payout.createdAt));
+    if (payoutDate.getTime() > todayStart.getTime()) return;
+
+    const match = findBucketMatch(buckets, payoutDate, timeRange);
+    if (match) {
+      match.amount += payout.amount || 0;
+    }
+  });
+
+  return buckets;
+}
+
+function findBucketMatch(
+  buckets: ChartBucket[],
+  payoutDate: Date,
+  timeRange: EarningsTimeRange
+): ChartBucket | undefined {
+  if (timeRange === "7d") {
+    return buckets.find((bucket) => new Date(bucket.dateStr).getTime() === payoutDate.getTime());
+  }
+  if (timeRange === "30d" || timeRange === "90d") {
+    const payoutWeekStart = startOfWeek(payoutDate).getTime();
+    return buckets.find((bucket) => new Date(bucket.dateStr).getTime() === payoutWeekStart);
+  }
+  const payoutMonthStart = startOfMonth(payoutDate).getTime();
+  return buckets.find(
+    (bucket) => new Date(bucket.dateStr).getTime() === payoutMonthStart
+  );
+}
 
 // Nepali Gateways Logo Colors / Styling
 const GATEWAY_CLASSES: Record<string, { bg: string; text: string; label: string }> = {
@@ -26,6 +164,7 @@ export default function DriverEarningsDashboard() {
   const router = useRouter();
   const { user, isLoading: isAuthLoading } = useAuthGuard();
   const isDriver = !isAuthLoading && user?.role === "driver";
+  const [timeRange, setTimeRange] = useState<EarningsTimeRange>(DEFAULT_EARNINGS_TIME_RANGE);
 
   const { data, isLoading } = useDriverPayouts(isDriver);
 
@@ -33,40 +172,34 @@ export default function DriverEarningsDashboard() {
   const totalEarned = useMemo(() => data?.totalEarned ?? 0, [data]);
   const pendingPayout = useMemo(() => data?.pendingPayout ?? 0, [data]);
 
-  // Compute this week's earnings (last 7 days of paid payouts)
-  const thisWeekEarnings = useMemo(() => {
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    return payouts
-      .filter((p) => p.status === "paid" && new Date(p.createdAt) >= oneWeekAgo)
+  const timeRangeDays: number | null = useMemo(() => {
+    switch (timeRange) {
+      case "7d": return 7;
+      case "30d": return 30;
+      case "90d": return 90;
+      case "all": return null;
+    }
+  }, [timeRange]);
+
+  const payoutsInRange = useMemo(() => {
+    if (timeRangeDays === null) return payouts;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - timeRangeDays);
+    return payouts.filter((p) => new Date(p.createdAt) >= cutoff);
+  }, [payouts, timeRangeDays]);
+
+  // Compute earnings within the selected time range
+  const rangeEarnings = useMemo(() => {
+    return payoutsInRange
+      .filter((p) => p.status === "paid")
       .reduce((sum, p) => sum + (p.amount || 0), 0);
-  }, [payouts]);
+  }, [payoutsInRange]);
 
-  // Compute daily earnings for chart (last 7 days)
+  // Compute bucketed earnings for chart based on the selected range.
+  // 7d = daily buckets, 30d/90d = weekly buckets, all = monthly buckets.
   const chartData = useMemo(() => {
-    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const result = Array.from({ length: 7 }).map((_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      return {
-        dayName: days[d.getDay()],
-        dateStr: d.toDateString(),
-        amount: 0,
-      };
-    }).reverse();
-
-    payouts.forEach((p) => {
-      if (p.status === "paid") {
-        const pDate = new Date(p.createdAt).toDateString();
-        const match = result.find((r) => r.dateStr === pDate);
-        if (match) {
-          match.amount += p.amount;
-        }
-      }
-    });
-
-    return result;
-  }, [payouts]);
+    return bucketPayoutsForChart(payoutsInRange, timeRange);
+  }, [payoutsInRange, timeRange]);
 
   const maxChartAmount = useMemo(() => {
     const max = Math.max(...chartData.map((d) => d.amount));
@@ -118,14 +251,14 @@ export default function DriverEarningsDashboard() {
             {/* KPI 2: This Week */}
             <div className="bg-surface-white border border-outline-variant rounded-xl p-5 shadow-sm">
               <span className="text-[10px] font-bold text-secondary uppercase tracking-wider block mb-1">
-                THIS WEEK
+                {timeRange === "all" ? "ALL TIME" : `LAST ${timeRangeDays} DAYS`}
               </span>
               <p className="text-2xl font-black text-primary mt-1">
-                {formatNpr(thisWeekEarnings)}
+                {formatNpr(rangeEarnings)}
               </p>
               <div className="flex items-center gap-1 text-success-green text-[10px] font-bold mt-1.5">
                 <span className="material-symbols-outlined text-xs">trending_up</span>
-                <span>+15% from last week</span>
+                <span>+15% from previous period</span>
               </div>
             </div>
 
@@ -149,11 +282,19 @@ export default function DriverEarningsDashboard() {
               <div className="bg-surface-white border border-outline-variant rounded-xl p-6 shadow-sm flex flex-col">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-sm font-bold text-on-surface">Earnings Overview</h3>
-                  <select className="h-9 px-2 rounded-lg border border-outline-variant bg-surface-container-lowest text-xs font-semibold text-secondary focus:outline-none cursor-pointer">
-                    <option>Last 7 Days</option>
+                  <select
+                    value={timeRange}
+                    onChange={(event) => setTimeRange(event.target.value as EarningsTimeRange)}
+                    aria-label="Earnings time range"
+                    className="h-9 px-2 rounded-lg border border-outline-variant bg-surface-container-lowest text-xs font-semibold text-secondary focus:outline-none cursor-pointer"
+                  >
+                    {EARNINGS_TIME_RANGE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
-
                 {/* Render Custom dynamic Bar Chart */}
                 <div className="h-56 flex items-end justify-between gap-3 pt-6 pb-2 px-4 border-b border-outline-variant relative">
                   {/* Grid Lines */}
