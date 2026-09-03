@@ -13,9 +13,9 @@ export const JOB_STATUS = {
 export type JobStatus = (typeof JOB_STATUS)[keyof typeof JOB_STATUS];
 
 // Vehicle types match the Stitch Step 2 design exactly (4 options):
-// Bicycle/Scooter, Standard Sedan (car), Cargo Van (van), Box Truck (truck).
+// Bike/Scooter, Standard Sedan (car), Cargo Van (van), Box Truck (truck).
 export const JOB_VEHICLE_TYPE = {
-  BICYCLE: "bicycle",
+  BIKE: "bike",
   CAR: "car",
   VAN: "van",
   TRUCK: "truck",
@@ -41,7 +41,7 @@ export const jobCreationSchema = z.object({
 
   // ── Step 2 fields ──
   vehicleType: z.enum(
-    [JOB_VEHICLE_TYPE.BICYCLE, JOB_VEHICLE_TYPE.CAR, JOB_VEHICLE_TYPE.VAN, JOB_VEHICLE_TYPE.TRUCK] as const,
+    [JOB_VEHICLE_TYPE.BIKE, JOB_VEHICLE_TYPE.CAR, JOB_VEHICLE_TYPE.VAN, JOB_VEHICLE_TYPE.TRUCK] as const,
     { error: "Please select a vehicle type" }
   ),
 

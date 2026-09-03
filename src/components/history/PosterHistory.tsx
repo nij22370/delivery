@@ -26,8 +26,11 @@ import {
 import { JOB_STATUS } from "@/types/job";
 import { formatShortDate } from "@/utils/format";
 import { apiFetch } from "@/utils/apiFetch";
+import { usePaymentHistory } from "@/api/hooks/payments/paymentHistoryApi";
+import { useAuth } from "@/hooks/useAuth";
 
-const PAGE_SIZE = 10;
+const JOBS_PAGE_SIZE = 10;
+const PAYMENT_HISTORY_PAGE_SIZE = 20;
 const JOBS_ENDPOINT = "/api/jobs";
 
 const STATUS_BADGE_CLASSES: Record<string, string> = {
@@ -84,6 +87,7 @@ interface JobsTableRow {
 }
 
 interface PaymentRecord {
+  transactionId: string;
   jobId: string;
   displayJobId: string;
   amount: number;
@@ -110,9 +114,9 @@ function StatusBadge({ status }: { status: string }) {
 function PaymentStatusBadge({ status }: { status?: string }) {
   const rawStatus = status ?? "paid";
   const className =
-    rawStatus === "paid"
+    rawStatus === "Completed" || rawStatus === "paid"
       ? "bg-success-green/10 text-success-green"
-      : rawStatus === "failed"
+      : rawStatus === "Failed" || rawStatus === "failed"
       ? "bg-error-container text-error-red"
       : "bg-warning-amber/10 text-warning-amber";
   return (
@@ -148,9 +152,9 @@ function SortIcon({ isSorted }: { isSorted: false | "asc" | "desc" }) {
 function TableSkeleton({ cols, rows = 5 }: { cols: number; rows?: number }) {
   return (
     <>
-      {Array.from({ length: rows }).map((_, rowIdx) => (
+      {Array.from({ length: rows }, (_, rowIdx) => (
         <tr key={rowIdx} className="border-b border-outline-variant">
-          {Array.from({ length: cols }).map((_, colIdx) => (
+          {Array.from({ length: cols }, (_, colIdx) => (
             <td key={colIdx} className="px-6 py-4">
               <div className="h-4 bg-surface-container-high rounded animate-pulse w-3/4" />
             </td>
@@ -165,7 +169,7 @@ async function fetchJobsByStatus(status: string, page: number): Promise<JobsApiR
   const params = new URLSearchParams({
     status,
     page: String(page),
-    limit: String(PAGE_SIZE),
+    limit: String(JOBS_PAGE_SIZE),
   });
   const response = await apiFetch(`${JOBS_ENDPOINT}?${params}`);
   if (!response.ok) throw new Error("Failed to load jobs");
@@ -229,7 +233,8 @@ const JOB_COLUMNS = [
             <Link
               href={`/jobs/${fullId}/rate`}
               title="Rate this delivery"
-              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-amber-900 bg-amber-100 hover:bg-amber-200 rounded-md transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-amber-900 bg-amber-100
+hover:bg-amber-200 rounded-md transition-colors cursor-pointer"
             >
               <span className="material-symbols-outlined text-[14px]">star</span>
               Rate
@@ -240,7 +245,8 @@ const JOB_COLUMNS = [
             <Link
               href={`/payment?jobId=${fullId}`}
               title="Pay for this shipment"
-              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 rounded-md transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-primary bg-primary/10
+hover:bg-primary/20 rounded-md transition-colors cursor-pointer"
             >
               <span className="material-symbols-outlined text-[14px]">credit_card</span>
               Pay
@@ -251,7 +257,8 @@ const JOB_COLUMNS = [
             <Link
               href={`/jobs/${fullId}/chat`}
               title="Open chat"
-              className="inline-flex items-center justify-center w-7 h-7 text-xs font-semibold text-secondary hover:text-primary hover:bg-surface-container-high rounded-md transition-colors cursor-pointer"
+              className="inline-flex items-center justify-center w-7 h-7 text-xs font-semibold text-secondary
+hover:text-primary hover:bg-surface-container-high rounded-md transition-colors cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px]">chat</span>
             </Link>
@@ -261,7 +268,8 @@ const JOB_COLUMNS = [
             <Link
               href={`/jobs/${fullId}/track`}
               title="Track delivery"
-              className="inline-flex items-center justify-center w-7 h-7 text-xs font-semibold text-secondary hover:text-primary hover:bg-surface-container-high rounded-md transition-colors cursor-pointer"
+              className="inline-flex items-center justify-center w-7 h-7 text-xs font-semibold text-secondary
+hover:text-primary hover:bg-surface-container-high rounded-md transition-colors cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px]">location_on</span>
             </Link>
@@ -271,7 +279,8 @@ const JOB_COLUMNS = [
             <Link
               href={`/jobs/${fullId}/dispute`}
               title="Report an issue or dispute"
-              className="inline-flex items-center justify-center w-7 h-7 text-xs font-semibold text-secondary hover:text-error-red hover:bg-error-red/10 rounded-md transition-colors cursor-pointer"
+              className="inline-flex items-center justify-center w-7 h-7 text-xs font-semibold text-secondary
+hover:text-error-red hover:bg-error-red/10 rounded-md transition-colors cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px]">gavel</span>
             </Link>
@@ -353,13 +362,15 @@ function DataTableShell({
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3 px-1">
         <div className="relative flex-1 max-w-xs">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg select-none">search</span>
+          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant
+text-lg select-none">search</span>
           <input
             type="text"
             placeholder={searchPlaceholder}
             value={globalFilter}
             onChange={onGlobalFilterChange}
-            className="w-full pl-9 pr-4 py-2 text-sm bg-surface-container-low border border-outline-variant rounded-lg text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-primary transition-colors"
+            className="w-full pl-9 pr-4 py-2 text-sm bg-surface-container-low border border-outline-variant rounded-lg
+text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-primary transition-colors"
           />
         </div>
         <span className="text-xs text-secondary">{filteredCount} record{filteredCount !== 1 ? "s" : ""}</span>
@@ -373,7 +384,8 @@ function DataTableShell({
             ) : filteredCount === 0 ? (
               <tr>
                 <td colSpan={colCount} className="p-10 text-center text-secondary">
-                  <span className="material-symbols-outlined text-4xl text-on-surface-variant block mb-2">{emptyIcon}</span>
+                  <span className="material-symbols-outlined text-4xl text-on-surface-variant block
+mb-2">{emptyIcon}</span>
                   {emptyMessage}
                 </td>
               </tr>
@@ -382,7 +394,8 @@ function DataTableShell({
         </table>
 
         {filteredCount > 0 && (
-          <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-outline-variant bg-surface-white gap-3">
+          <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-outline-variant
+bg-surface-white gap-3">
             <p className="text-xs font-semibold text-secondary">
               Showing {startItem} to {endItem} of {filteredCount} entries
             </p>
@@ -391,7 +404,9 @@ function DataTableShell({
                 type="button"
                 onClick={onPrevPage}
                 disabled={!canGoToPrevPage}
-                className="flex items-center justify-center w-8 h-8 rounded border border-outline-variant text-secondary hover:bg-surface-container transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                className="flex items-center justify-center w-8 h-8 rounded border border-outline-variant
+text-secondary hover:bg-surface-container transition-colors disabled:opacity-40 disabled:cursor-not-allowed
+cursor-pointer"
                 aria-label="Previous page"
               >
                 <span className="material-symbols-outlined text-base">chevron_left</span>
@@ -403,7 +418,9 @@ function DataTableShell({
                 type="button"
                 onClick={onNextPage}
                 disabled={!canGoToNextPage}
-                className="flex items-center justify-center w-8 h-8 rounded border border-outline-variant text-secondary hover:bg-surface-container transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                className="flex items-center justify-center w-8 h-8 rounded border border-outline-variant
+text-secondary hover:bg-surface-container transition-colors disabled:opacity-40 disabled:cursor-not-allowed
+cursor-pointer"
                 aria-label="Next page"
               >
                 <span className="material-symbols-outlined text-base">chevron_right</span>
@@ -417,6 +434,7 @@ function DataTableShell({
 }
 
 export default function PosterHistory() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"jobs" | "payments">("jobs");
   const [jobsGlobalFilter, setJobsGlobalFilter] = useState("");
   const [paymentsGlobalFilter, setPaymentsGlobalFilter] = useState("");
@@ -439,13 +457,15 @@ export default function PosterHistory() {
     staleTime: 30_000,
   });
 
-  const { data: posterPaymentJobsData, isLoading: isPaymentsLoading, isError: isPaymentsError } = useQuery<
-    JobsApiResponse,
-    Error
-  >({
-    queryKey: ["history-payments-poster"],
-    queryFn: () => fetchJobsByStatus(JOB_STATUS.DELIVERED, 1),
-    staleTime: 30_000,
+  const paymentsEnabled = !!user;
+  const {
+    data: paymentsData,
+    isLoading: isPaymentsLoading,
+    isError: isPaymentsError,
+  } = usePaymentHistory({
+    page: 1,
+    limit: PAYMENT_HISTORY_PAGE_SIZE,
+    enabled: paymentsEnabled,
   });
 
   const jobTableRows = useMemo<JobsTableRow[]>(() => {
@@ -455,8 +475,8 @@ export default function PosterHistory() {
       .map((job) => ({
         jobId: job._id.slice(-6).toUpperCase(),
         fullId: job._id,
-        destination: `${formatShortAddress(job.pickupAddress)} → ${formatShortAddress(job.dropoffAddress)}`,
-        driver: job.driverId ? `#${job.driverId.slice(-6).toUpperCase()}` : "—",
+        destination: `${formatShortAddress(job.pickupAddress)} â†’ ${formatShortAddress(job.dropoffAddress)}`,
+        driver: job.driverId ? `#${job.driverId.slice(-6).toUpperCase()}` : "â€”",
         status: job.status,
         price: job.offeredPrice,
         date: formatShortDate(job.createdAt),
@@ -464,16 +484,21 @@ export default function PosterHistory() {
   }, [deliveredJobs?.jobs, cancelledJobs?.jobs]);
 
   const paymentRecords = useMemo<PaymentRecord[]>(() => {
-    return (posterPaymentJobsData?.jobs ?? []).map((job) => ({
-      jobId: job._id,
-      displayJobId: job._id.slice(-6).toUpperCase(),
-      amount: job.offeredPrice,
-      gateway: job.paymentGateway ?? "bank",
-      status: job.paymentStatus ?? "paid",
-      date: formatShortDate(job.createdAt),
-      isDriver: false,
-    }));
-  }, [posterPaymentJobsData?.jobs]);
+    return (paymentsData?.transactions ?? []).map((tx) => {
+      const jobIdString =
+        typeof tx.jobId === "string" ? tx.jobId : tx.jobId?._id ?? "";
+      return {
+        transactionId: tx.transactionId,
+        jobId: jobIdString,
+        displayJobId: jobIdString ? jobIdString.slice(-6).toUpperCase() : "—",
+        amount: tx.amount,
+        gateway: tx.gateway,
+        status: tx.status,
+        date: formatShortDate(tx.processedAt),
+        isDriver: false,
+      };
+    });
+  }, [paymentsData?.transactions]);
 
   const totalPaid = useMemo(
     () => paymentRecords.reduce((sum, r) => sum + r.amount, 0),
@@ -481,9 +506,9 @@ export default function PosterHistory() {
   );
 
   const [sortingJobs, setSortingJobs] = useState<SortingState>([]);
-  const [paginationJobs, setPaginationJobs] = useState({ pageIndex: 0, pageSize: PAGE_SIZE });
+  const [paginationJobs, setPaginationJobs] = useState({ pageIndex: 0, pageSize: JOBS_PAGE_SIZE });
   const [sortingPayments, setSortingPayments] = useState<SortingState>([]);
-  const [paginationPayments, setPaginationPayments] = useState({ pageIndex: 0, pageSize: PAGE_SIZE });
+  const [paginationPayments, setPaginationPayments] = useState({ pageIndex: 0, pageSize: PAYMENT_HISTORY_PAGE_SIZE });
 
   const tableJobs = useTable({
     features: TABLE_FEATURES,
@@ -505,13 +530,13 @@ export default function PosterHistory() {
 
   const jobsFilteredCount = tableJobs.getFilteredRowModel().rows.length;
   const jobsPageCount = tableJobs.getPageCount();
-  const jobsStartItem = jobsFilteredCount === 0 ? 0 : paginationJobs.pageIndex * PAGE_SIZE + 1;
-  const jobsEndItem = Math.min((paginationJobs.pageIndex + 1) * PAGE_SIZE, jobsFilteredCount);
+  const jobsStartItem = jobsFilteredCount === 0 ? 0 : paginationJobs.pageIndex * JOBS_PAGE_SIZE + 1;
+  const jobsEndItem = Math.min((paginationJobs.pageIndex + 1) * JOBS_PAGE_SIZE, jobsFilteredCount);
 
   const payFilteredCount = tablePayments.getFilteredRowModel().rows.length;
   const payPageCount = tablePayments.getPageCount();
-  const payStartItem = payFilteredCount === 0 ? 0 : paginationPayments.pageIndex * PAGE_SIZE + 1;
-  const payEndItem = Math.min((paginationPayments.pageIndex + 1) * PAGE_SIZE, payFilteredCount);
+  const payStartItem = payFilteredCount === 0 ? 0 : paginationPayments.pageIndex * PAYMENT_HISTORY_PAGE_SIZE + 1;
+  const payEndItem = Math.min((paginationPayments.pageIndex + 1) * PAYMENT_HISTORY_PAGE_SIZE, payFilteredCount);
 
   const handleJobsPrev = useCallback(() => setPaginationJobs((p) => ({ ...p, pageIndex: p.pageIndex - 1 })), []);
   const handleJobsNext = useCallback(() => setPaginationJobs((p) => ({ ...p, pageIndex: p.pageIndex + 1 })), []);
@@ -579,15 +604,17 @@ export default function PosterHistory() {
               emptyIcon="inbox"
               emptyMessage="No job history found."
             >
-              <thead className="bg-surface-container-low text-secondary uppercase font-semibold text-xs border-b border-outline-variant">
+              <thead className="bg-surface-container-low text-secondary uppercase font-semibold text-xs border-b
+border-outline-variant">
                 {tableJobs.getHeaderGroups().map((g) => (
                   <tr key={g.id}>
                     {g.headers.map((h) => (
                       <th
                         key={h.id}
                         className={`px-6 py-4 whitespace-nowrap ${
-                          h.column.getCanSort() ? "cursor-pointer select-none hover:text-on-surface transition-colors" : ""
-                        }`}
+                          h.column.getCanSort() ? "cursor-pointer select-none hover:text-on-surface transition-colors"
+: ""}
+                        `}
                         onClick={h.column.getToggleSortingHandler()}
                       >
                         <div className="flex items-center gap-1.5">
@@ -645,15 +672,17 @@ export default function PosterHistory() {
               emptyIcon="receipt_long"
               emptyMessage="No payment records found."
             >
-              <thead className="bg-surface-container-low text-secondary uppercase font-semibold text-xs border-b border-outline-variant">
+              <thead className="bg-surface-container-low text-secondary uppercase font-semibold text-xs border-b
+border-outline-variant">
                 {tablePayments.getHeaderGroups().map((g) => (
                   <tr key={g.id}>
                     {g.headers.map((h) => (
                       <th
                         key={h.id}
                         className={`px-6 py-4 whitespace-nowrap ${
-                          h.column.getCanSort() ? "cursor-pointer select-none hover:text-on-surface transition-colors" : ""
-                        }`}
+                          h.column.getCanSort() ? "cursor-pointer select-none hover:text-on-surface transition-colors"
+: ""}
+                        `}
                         onClick={h.column.getToggleSortingHandler()}
                       >
                         <div className="flex items-center gap-1.5">

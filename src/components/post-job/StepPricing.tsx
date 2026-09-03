@@ -19,7 +19,7 @@ const TIME_WINDOW_OPTIONS = [
 ] as const;
 
 const VEHICLE_LABELS: Record<JobVehicleType, string> = {
-  bicycle: "Bicycle / Scooter",
+  bike: "Bike / Scooter",
   car: "Standard Sedan",
   van: "Cargo Van",
   truck: "Box Truck",

@@ -7,6 +7,7 @@ import { verifyEsewaSignature, getEsewaPaymentFailureUrl } from "@/lib/payments/
 
 const DRIVER_PAYOUT_PERCENTAGE = 0.9;
 const PLATFORM_FEE_PERCENTAGE = 0.1;
+const DUPLICATE_KEY_ERROR_CODE = 11000;
 
 interface EsewaDecodedData {
   transaction_uuid: string;
@@ -17,7 +18,26 @@ interface EsewaDecodedData {
   signature: string;
 }
 
+function redirectToSuccess(req: NextRequest, job: { _id: unknown; offeredPrice: number }): NextResponse {
+  return NextResponse.redirect(
+    new URL(
+      `/payment/success?jobId=${job._id}&gateway=esewa&amount=${job.offeredPrice}&verified=true`,
+      req.url
+    )
+  );
+}
+
+function redirectToFailure(req: NextRequest, jobId: string | undefined, reason: string): NextResponse {
+  const targetJobId = jobId ?? "";
+  const failureUrl = getEsewaPaymentFailureUrl(targetJobId);
+  const separator = failureUrl.includes("?") ? "&" : "?";
+  return NextResponse.redirect(
+    new URL(`${failureUrl}${separator}reason=${reason}`, req.url)
+  );
+}
+
 export async function GET(req: NextRequest) {
+  let jobIdForFailure: string | undefined;
   try {
     await connectDB();
 
@@ -36,10 +56,7 @@ export async function GET(req: NextRequest) {
       const decodedString = Buffer.from(dataParam, "base64").toString("utf-8");
       decoded = JSON.parse(decodedString);
     } catch {
-      const failureUrl = getEsewaPaymentFailureUrl();
-      return NextResponse.redirect(
-        new URL(`${failureUrl}?reason=invalid_data`, req.url)
-      );
+      return redirectToFailure(req, undefined, "invalid_data");
     }
 
     const {
@@ -67,91 +84,92 @@ export async function GET(req: NextRequest) {
     );
 
     if (!isSignatureValid) {
-      const failureUrl = getEsewaPaymentFailureUrl();
-      return NextResponse.redirect(
-        new URL(`${failureUrl}?reason=invalid_signature`, req.url)
-      );
+      return redirectToFailure(req, undefined, "invalid_signature");
     }
 
     const job = await Job.findOne({ paymentTransactionUuid: transaction_uuid });
     if (!job) {
       return NextResponse.json({ message: "Job not found" }, { status: 404 });
     }
+    jobIdForFailure = job._id.toString();
 
     if (status === "COMPLETE") {
-      const existingTransaction = await PaymentTransaction.findOne({
-        gateway: "esewa",
-        transactionId: transaction_code,
-      });
-
-      if (existingTransaction) {
-        return NextResponse.redirect(
-          new URL(
-            `/payment/success?jobId=${job._id}&gateway=esewa&amount=${job.offeredPrice}&verified=true`,
-            req.url
-          )
-        );
+      // Step 1 — PaymentTransaction.create() FIRST (idempotency anchor).
+      let createdTransaction;
+      try {
+        createdTransaction = await PaymentTransaction.create({
+          jobId: job._id,
+          posterId: job.posterId,
+          gateway: "esewa",
+          transactionId: transaction_code,
+          amount: job.offeredPrice,
+          status: "Completed",
+          processedAt: new Date(),
+        });
+      } catch (transactionError: unknown) {
+        const isDuplicate =
+          typeof transactionError === "object" &&
+          transactionError !== null &&
+          "code" in transactionError &&
+          (transactionError as { code?: number }).code === DUPLICATE_KEY_ERROR_CODE;
+        if (isDuplicate) {
+          return redirectToSuccess(req, job);
+        }
+        console.error("eSewa PaymentTransaction create failed:", transactionError);
+        return redirectToFailure(req, jobIdForFailure, "server_error");
       }
 
       if (!job.driverId) {
-        const failureUrl = getEsewaPaymentFailureUrl(job._id.toString());
-        const separator = failureUrl.includes("?") ? "&" : "?";
-        return NextResponse.redirect(
-          new URL(`${failureUrl}${separator}reason=no_driver_assigned`, req.url)
-        );
+        return redirectToFailure(req, jobIdForFailure, "no_driver_assigned");
       }
 
-      job.paymentStatus = "paid";
-      await job.save();
+      // Step 2 — Payout.create() second.
+      try {
+        const amount = job.offeredPrice * DRIVER_PAYOUT_PERCENTAGE;
+        const platformFee = job.offeredPrice * PLATFORM_FEE_PERCENTAGE;
+        await Payout.create({
+          driverId: job.driverId,
+          jobId: job._id,
+          amount,
+          platformFee,
+          gateway: "esewa",
+          gatewayTransactionId: transaction_code,
+          status: "pending",
+        });
+      } catch (payoutError: unknown) {
+        console.error("eSewa Payout create failed:", payoutError);
+        return redirectToFailure(req, jobIdForFailure, "server_error");
+      }
 
-      const amount = job.offeredPrice * DRIVER_PAYOUT_PERCENTAGE;
-      const platformFee = job.offeredPrice * PLATFORM_FEE_PERCENTAGE;
+      // Step 3 — job.paymentStatus update last.
+      try {
+        job.paymentStatus = "paid";
+        await job.save();
+      } catch (jobError: unknown) {
+        console.error("eSewa job save failed:", jobError);
+        return redirectToFailure(req, jobIdForFailure, "server_error");
+      }
 
-      await Payout.create({
-        driverId: job.driverId,
-        jobId: job._id,
-        amount,
-        platformFee,
-        gateway: "esewa",
-        gatewayTransactionId: transaction_code,
-        status: "pending",
-      });
-
-      await PaymentTransaction.create({
-        jobId: job._id,
-        gateway: "esewa",
-        transactionId: transaction_code,
-        amount: job.offeredPrice,
-        status: "Completed",
-        processedAt: new Date(),
-      });
-
-      return NextResponse.redirect(
-        new URL(
-          `/payment/success?jobId=${job._id}&gateway=esewa&amount=${job.offeredPrice}&verified=true`,
-          req.url
-        )
-      );
+      void createdTransaction;
+      return redirectToSuccess(req, job);
     }
 
-    const failureUrl = getEsewaPaymentFailureUrl(job?._id?.toString());
-    const separator = failureUrl.includes("?") ? "&" : "?";
-
     if (status === "FAILED" || status === "AMBIGUOUS") {
-      job.paymentStatus = "failed";
-      await job.save();
-      return NextResponse.redirect(
-        new URL(`${failureUrl}${separator}reason=${status}`, req.url)
-      );
+      try {
+        job.paymentStatus = "failed";
+        await job.save();
+      } catch (jobError: unknown) {
+        console.error("eSewa job save failed (FAILED/AMBIGUOUS):", jobError);
+      }
+      return redirectToFailure(req, jobIdForFailure, status);
     }
 
     console.error(`Unknown eSewa payment status: ${status}`);
-    return NextResponse.redirect(
-      new URL(`${failureUrl}${separator}reason=unknown`, req.url)
-    );
+    return redirectToFailure(req, jobIdForFailure, "unknown");
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "Failed to verify payment";
-    return NextResponse.json({ message }, { status: 500 });
+    console.error("eSewa verify fatal error:", message);
+    return redirectToFailure(req, jobIdForFailure, "server_error");
   }
 }

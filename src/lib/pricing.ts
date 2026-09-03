@@ -19,7 +19,7 @@ export interface VehicleRateConfig {
 }
 
 export const VEHICLE_RATES: Record<JobVehicleType, VehicleRateConfig> = {
-  [JOB_VEHICLE_TYPE.BICYCLE]: { basePrice: 150, freeKm: 2, perKmPrice: 30, maxKg: 5 },
+  [JOB_VEHICLE_TYPE.BIKE]: { basePrice: 150, freeKm: 2, perKmPrice: 30, maxKg: 5 },
   [JOB_VEHICLE_TYPE.CAR]: { basePrice: 300, freeKm: 2, perKmPrice: 50, maxKg: 50 },
   [JOB_VEHICLE_TYPE.VAN]: { basePrice: 600, freeKm: 2, perKmPrice: 80, maxKg: 500 },
   [JOB_VEHICLE_TYPE.TRUCK]: { basePrice: 1200, freeKm: 2, perKmPrice: 120, maxKg: 2000 },

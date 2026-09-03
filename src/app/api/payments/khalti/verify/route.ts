@@ -7,8 +7,28 @@ import { verifyKhaltiPayment, getPaymentFailureUrl } from "@/lib/payments/khalti
 
 const DRIVER_PAYOUT_PERCENTAGE = 0.9;
 const PLATFORM_FEE_PERCENTAGE = 0.1;
+const DUPLICATE_KEY_ERROR_CODE = 11000;
+
+function redirectToSuccess(req: NextRequest, job: { _id: unknown; offeredPrice: number }): NextResponse {
+  return NextResponse.redirect(
+    new URL(
+      `/payment/success?jobId=${job._id}&gateway=khalti&amount=${job.offeredPrice}&verified=true`,
+      req.url
+    )
+  );
+}
+
+function redirectToFailure(req: NextRequest, jobId: string | undefined, reason: string): NextResponse {
+  const targetJobId = jobId ?? "";
+  const failureUrl = getPaymentFailureUrl(targetJobId);
+  const separator = failureUrl.includes("?") ? "&" : "?";
+  return NextResponse.redirect(
+    new URL(`${failureUrl}${separator}reason=${reason}`, req.url)
+  );
+}
 
 export async function GET(req: NextRequest) {
+  let jobIdForFailure: string | undefined;
   try {
     await connectDB();
 
@@ -28,105 +48,112 @@ export async function GET(req: NextRequest) {
     if (!job) {
       return NextResponse.json({ message: "Job not found" }, { status: 404 });
     }
+    jobIdForFailure = job._id.toString();
 
     const status = result.status;
 
     if (status === "Completed") {
-      const existingTransaction = await PaymentTransaction.findOne({
-        gateway: "khalti",
-        transactionId: result.transaction_id,
-      });
-
-      if (existingTransaction) {
-        return NextResponse.redirect(
-          new URL(
-            `/payment/success?jobId=${job._id}&gateway=khalti&amount=${job.offeredPrice}&verified=true`,
-            req.url
-          )
-        );
+      // Step 1 — PaymentTransaction.create() FIRST (idempotency anchor).
+      // The unique index on (gateway, transactionId) dedupes concurrent retries.
+      let createdTransaction;
+      try {
+        createdTransaction = await PaymentTransaction.create({
+          jobId: job._id,
+          posterId: job.posterId,
+          gateway: "khalti",
+          transactionId: result.transaction_id,
+          amount: job.offeredPrice,
+          status: "Completed",
+          processedAt: new Date(),
+        });
+      } catch (transactionError: unknown) {
+        const isDuplicate =
+          typeof transactionError === "object" &&
+          transactionError !== null &&
+          "code" in transactionError &&
+          (transactionError as { code?: number }).code === DUPLICATE_KEY_ERROR_CODE;
+        if (isDuplicate) {
+          return redirectToSuccess(req, job);
+        }
+        console.error("Khalti PaymentTransaction create failed:", transactionError);
+        return redirectToFailure(req, jobIdForFailure, "server_error");
       }
 
       if (!job.driverId) {
-        const failureUrl = getPaymentFailureUrl(job._id.toString());
-        const separator = failureUrl.includes("?") ? "&" : "?";
-        return NextResponse.redirect(
-          new URL(`${failureUrl}${separator}reason=no_driver_assigned`, req.url)
-        );
+        return redirectToFailure(req, jobIdForFailure, "no_driver_assigned");
       }
 
-      job.paymentStatus = "paid";
-      await job.save();
+      // Step 2 — Payout.create() second.
+      try {
+        const amount = job.offeredPrice * DRIVER_PAYOUT_PERCENTAGE;
+        const platformFee = job.offeredPrice * PLATFORM_FEE_PERCENTAGE;
+        await Payout.create({
+          driverId: job.driverId,
+          jobId: job._id,
+          amount,
+          platformFee,
+          gateway: "khalti",
+          gatewayTransactionId: result.transaction_id,
+          status: "pending",
+        });
+      } catch (payoutError: unknown) {
+        console.error("Khalti Payout create failed:", payoutError);
+        return redirectToFailure(req, jobIdForFailure, "server_error");
+      }
 
-      const amount = job.offeredPrice * DRIVER_PAYOUT_PERCENTAGE;
-      const platformFee = job.offeredPrice * PLATFORM_FEE_PERCENTAGE;
+      // Step 3 — job.paymentStatus update last.
+      try {
+        job.paymentStatus = "paid";
+        await job.save();
+      } catch (jobError: unknown) {
+        console.error("Khalti job save failed:", jobError);
+        return redirectToFailure(req, jobIdForFailure, "server_error");
+      }
 
-      await Payout.create({
-        driverId: job.driverId,
-        jobId: job._id,
-        amount,
-        platformFee,
-        gateway: "khalti",
-        gatewayTransactionId: result.transaction_id,
-        status: "pending",
-      });
-
-      await PaymentTransaction.create({
-        jobId: job._id,
-        gateway: "khalti",
-        transactionId: result.transaction_id,
-        amount: job.offeredPrice,
-        status: "Completed",
-        processedAt: new Date(),
-      });
-
-      return NextResponse.redirect(
-        new URL(
-          `/payment/success?jobId=${job._id}&gateway=khalti&amount=${job.offeredPrice}&verified=true`,
-          req.url
-        )
-      );
+      void createdTransaction;
+      return redirectToSuccess(req, job);
     }
 
-    const failureUrl = getPaymentFailureUrl(job?._id?.toString());
-    const separator = failureUrl.includes("?") ? "&" : "?";
-
     if (status === "Pending") {
-      return NextResponse.redirect(
-        new URL(`${failureUrl}${separator}reason=pending`, req.url)
-      );
+      return redirectToFailure(req, jobIdForFailure, "pending");
     }
 
     if (status === "Expired") {
-      job.paymentStatus = "failed";
-      await job.save();
-      return NextResponse.redirect(
-        new URL(`${failureUrl}${separator}reason=Expired`, req.url)
-      );
+      try {
+        job.paymentStatus = "failed";
+        await job.save();
+      } catch (jobError: unknown) {
+        console.error("Khalti job save failed (Expired):", jobError);
+      }
+      return redirectToFailure(req, jobIdForFailure, "Expired");
     }
 
     if (status === "User canceled") {
-      job.paymentStatus = "failed";
-      await job.save();
-      return NextResponse.redirect(
-        new URL(`${failureUrl}${separator}reason=User%20canceled`, req.url)
-      );
+      try {
+        job.paymentStatus = "failed";
+        await job.save();
+      } catch (jobError: unknown) {
+        console.error("Khalti job save failed (User canceled):", jobError);
+      }
+      return redirectToFailure(req, jobIdForFailure, "User%20canceled");
     }
 
     if (status === "Refunded") {
-      job.paymentStatus = "failed";
-      await job.save();
-      return NextResponse.redirect(
-        new URL(`${failureUrl}${separator}reason=Refunded`, req.url)
-      );
+      try {
+        job.paymentStatus = "failed";
+        await job.save();
+      } catch (jobError: unknown) {
+        console.error("Khalti job save failed (Refunded):", jobError);
+      }
+      return redirectToFailure(req, jobIdForFailure, "Refunded");
     }
 
     console.error(`Unknown Khalti payment status: ${status}`);
-    return NextResponse.redirect(
-      new URL(`${failureUrl}${separator}reason=unknown`, req.url)
-    );
+    return redirectToFailure(req, jobIdForFailure, "unknown");
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "Failed to verify payment";
-    return NextResponse.json({ message }, { status: 500 });
+    console.error("Khalti verify fatal error:", message);
+    return redirectToFailure(req, jobIdForFailure, "server_error");
   }
 }

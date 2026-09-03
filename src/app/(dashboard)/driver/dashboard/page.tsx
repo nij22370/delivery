@@ -83,7 +83,7 @@ export default function DriverDashboardPage() {
     data: jobsData,
     isLoading: isJobsLoading,
     isError: isJobsError,
-  } = useMyJobs({ page: 1, limit: PAGE_SIZE });
+  } = useMyJobs({ page: 1, limit: PAGE_SIZE, driverId: "me" });
 
   const stats = useMemo(() => summaryData?.data?.stats, [summaryData]);
   const recentJobs = useMemo(() => jobsData?.jobs ?? [], [jobsData]);

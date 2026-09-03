@@ -66,7 +66,7 @@ const FILTER_TABS: Array<{ key: FilterTabKey; label: string }> = [
 
 const VEHICLE_OPTIONS: Array<{ key: VehicleFilterKey; label: string }> = [
   { key: "all", label: "All Vehicles" },
-  { key: JOB_VEHICLE_TYPE.BICYCLE, label: "Bicycle / Scooter" },
+  { key: JOB_VEHICLE_TYPE.BIKE, label: "Bike / Scooter" },
   { key: JOB_VEHICLE_TYPE.CAR, label: "Standard Sedan" },
   { key: JOB_VEHICLE_TYPE.VAN, label: "Cargo Van" },
   { key: JOB_VEHICLE_TYPE.TRUCK, label: "Box Truck" },

@@ -6,7 +6,9 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { JOB_VEHICLE_TYPE, JOB_STATUS } from "@/types/job";
 import type { JobVehicleType } from "@/types/job";
+import { DRIVER_PROFILE_STATUS } from "@/types/driverProfile/driverProfile";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
+import { useDriverVerification } from "@/api/hooks/drivers/driversApi";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/utils/apiFetch";
 
@@ -20,6 +22,12 @@ const MIN_PAYOUT_MIN = 0;
 const MIN_PAYOUT_MAX = 5000;
 const MIN_PAYOUT_STEP = 100;
 const MIN_PAYOUT_DEFAULT = 0;
+const VERIFICATION_PENDING_BANNER_MESSAGE =
+  "Your account is pending verification. You cannot accept jobs until approved.";
+const VERIFICATION_LINK_HREF = "/driver/verification";
+const EMPTY_VEHICLE_TYPE_MESSAGE = "No jobs available for your vehicle type.";
+const EMPTY_GENERIC_MESSAGE =
+  "There are no open jobs matching your current filters. Try adjusting the vehicle type or minimum payout.";
 
 const DISTANCE_RADIUS_OPTIONS = [
   "Within 5 miles",
@@ -30,14 +38,14 @@ const DISTANCE_RADIUS_OPTIONS = [
 ] as const;
 
 const VEHICLE_LABELS: Record<JobVehicleType, string> = {
-  bicycle: "Bicycle",
+  bike: "Bike",
   car: "Sedan",
   van: "Cargo Van",
   truck: "Truck",
 };
 
 const VEHICLE_ICONS: Record<JobVehicleType, string> = {
-  bicycle: "pedal_bike",
+  bike: "pedal_bike",
   car: "directions_car",
   van: "local_shipping",
   truck: "fire_truck",
@@ -309,6 +317,14 @@ export default function BrowseJobsPage() {
   const [distanceRadius, setDistanceRadius] = useState<string>(DISTANCE_RADIUS_OPTIONS[1]);
   const [minPayoutNpr, setMinPayoutNpr] = useState(MIN_PAYOUT_DEFAULT);
 
+  const { data: verificationData } = useDriverVerification();
+  const driverProfile = verificationData?.profile;
+  const driverVerificationStatus = driverProfile?.status;
+  const isVerificationPending =
+    isDriver &&
+    driverVerificationStatus !== undefined &&
+    driverVerificationStatus !== DRIVER_PROFILE_STATUS.APPROVED;
+
   const { data, isLoading, isError, error } = useQuery({
     queryKey: [JOBS_QUERY_KEY, page, selectedVehicleTypes, minPayoutNpr],
     queryFn: () => fetchBrowseJobs(page, selectedVehicleTypes, minPayoutNpr),
@@ -367,6 +383,30 @@ export default function BrowseJobsPage() {
           )}
         </div>
 
+        {isVerificationPending && (
+          <div
+            role="status"
+            data-testid="driver-verification-pending-banner"
+            className="mb-6 flex items-start gap-3 rounded-xl border border-warning-amber/40 bg-warning-amber/10 p-4"
+          >
+            <span className="material-symbols-outlined text-warning-amber text-2xl shrink-0">
+              hourglass_top
+            </span>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-on-surface">
+                {VERIFICATION_PENDING_BANNER_MESSAGE}
+              </p>
+              <Link
+                href={VERIFICATION_LINK_HREF}
+                className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
+              >
+                Complete verification
+                <span className="material-symbols-outlined text-base">arrow_forward</span>
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* Three-column layout: Filters | Jobs | Map */}
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Filters */}
@@ -415,8 +455,9 @@ export default function BrowseJobsPage() {
                   No jobs available
                 </h2>
                 <p className="text-sm text-on-surface-variant max-w-sm mx-auto mb-4">
-                  There are no open jobs matching your current filters. Try adjusting the
-                  vehicle type or minimum payout.
+                  {selectedVehicleTypes.length === 0
+                    ? EMPTY_VEHICLE_TYPE_MESSAGE
+                    : EMPTY_GENERIC_MESSAGE}
                 </p>
                 {selectedVehicleTypes.length > 0 && (
                   <button

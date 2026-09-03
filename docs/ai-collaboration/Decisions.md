@@ -517,3 +517,40 @@ Format: newest at the top. Every decision gets the **model/session** that made i
 
 **Why:** The profile card is already rendered at the bottom of the sidebar. Re-rendering it in the header creates a repetitive profile display in the same layout view. Keeping it only in the sidebar footer eliminates duplication and aligns the dashboard header design with the admin header design.
 
+---
+
+## D-55 — Cast JWT `userId` to `ObjectId` in MongoDB filters
+
+**Status:** Accepted · **Model:** project session (Sep 2) · **Applies to:** all API routes that filter by `userId` (posterId, driverId, etc.) when the value comes from the JWT.
+
+**Decision:** All MongoDB filters that target an `ObjectId` field must cast the value from the JWT (a plain string) with `new Types.ObjectId(...)` before passing it to Mongoose. A plain string never matches an `ObjectId` field in BSON type comparison — the filter silently returns zero rows.
+
+**Why:** Mongoose does not auto-cast scalar values when they are not in a `Schema.Types.ObjectId` field of a model passed to `.find()`. When the filter is constructed ad-hoc from JWT data, the cast is the caller's responsibility. The `/api/payments/history` bug (BUG-20) was caused by this exact omission — the Billing page showed 0 records because `{ posterId: user.userId }` never matched any `PaymentTransaction.posterId` (an `ObjectId`).
+
+**Pattern:**
+
+```ts
+import { Types } from "mongoose";
+const filter = { posterId: new Types.ObjectId(user.userId) };
+```
+
+---
+
+## D-56 — Verify routes: `PaymentTransaction` is the idempotency anchor
+
+**Status:** Accepted · **Model:** project session (Sep 2) · **Applies to:** `src/app/api/payments/khalti/verify/route.ts`, `src/app/api/payments/esewa/verify/route.ts`
+
+**Decision:** Both Khalti and eSewa verify routes are reordered to create `PaymentTransaction` *first*, then `Payout`, then update the Job. Each step is wrapped in a try/catch that redirects to the failure URL on error (never returns JSON on a GET). A MongoDB duplicate-key error (code 11000) on `PaymentTransaction.create()` is treated as already-processed and redirects to the success URL.
+
+**Why:** The `PaymentTransaction` collection has a unique index on `{gateway, transactionId}`. That index is the actual arbiter of "was this verify call processed before?". Creating it first means concurrent verify calls cannot both succeed at the `Payout` step (a previous D-31 finding). The `Payout` collection has no unique index, so without this anchor a retry could create duplicate `Payout` rows. Each step is wrapped so any subsequent failure (e.g. Payout create) redirects cleanly to the failure URL.
+
+---
+
+## D-57 — Single source of truth for poster "Total Spent": `/api/payments/history`
+
+**Status:** Accepted · **Model:** project session (Sep 2) · **Applies to:** Analytics, Billing, Poster History Payments tab, and any future "money spent" UI for posters.
+
+**Decision:** Any "Total Spent" UI for a poster reads from `GET /api/payments/history?aggregate=true` (sum of `PaymentTransaction.amount` for the authenticated poster). No UI computes this number from `Job.offeredPrice` or from a `countDocuments` of delivered jobs.
+
+**Why:** Previously three different surfaces computed the same number from three different sources — and they all disagreed. `Job.aggregate` over delivered jobs overcounts when a delivered job is unpaid. `/api/jobs?status=delivered` is paginated and capped at page 1 of 10. The new `PaymentTransaction` is the canonical financial record (it is created by the verify routes, which are the only path that can move money). The driver-side "Total Earned" is intentionally separate and reads from the `Payout` collection (D-32).
+

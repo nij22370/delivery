@@ -119,7 +119,11 @@ export default function AdminSidebar({
         {/* Bottom Footer Section */}
         {!isAuthLoading && user && (
           <div className="p-4 border-t border-outline-variant mt-auto">
-            <div className="px-3 py-3 rounded-xl bg-surface-container-low flex items-center gap-3">
+            <Link
+              href="/admin/settings"
+              aria-label="Open admin profile"
+              className="block px-3 py-3 rounded-xl bg-surface-container-low flex items-center gap-3 hover:bg-surface-container transition-colors cursor-pointer"
+            >
               <div className="w-9 h-9 shrink-0 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center text-sm font-bold">
                 {getInitials(user.name)}
               </div>
@@ -130,7 +134,7 @@ export default function AdminSidebar({
               <span className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
                 Admin
               </span>
-            </div>
+            </Link>
           </div>
         )}
       </aside>
