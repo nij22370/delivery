@@ -26,6 +26,12 @@ import {
 import { JOB_STATUS } from "@/types/job";
 import { formatShortDate } from "@/utils/format";
 import { apiFetch } from "@/utils/apiFetch";
+import type {
+  AdminJobsResponse,
+} from "@/types/admin/adminJobs";
+import type {
+  AdminPayoutsResponse,
+} from "@/types/admin/adminPayouts";
 
 const PAGE_SIZE = 10;
 const ADMIN_JOBS_ENDPOINT = "/api/admin/jobs";
@@ -57,39 +63,6 @@ const TABLE_FEATURES = tableFeatures({
   filteredRowModel: createFilteredRowModel(),
   paginatedRowModel: createPaginatedRowModel(),
 });
-
-interface AdminJobItem {
-  _id: string;
-  pickupAddress: string;
-  dropoffAddress: string;
-  status: string;
-  offeredPrice: number;
-  createdAt: string;
-  posterId?: { name: string };
-  driverId?: { name: string } | null;
-}
-
-interface AdminJobsResponse {
-  jobs: AdminJobItem[];
-  total: number;
-  totalPages: number;
-}
-
-interface AdminPayoutItem {
-  _id: string;
-  jobId: { _id: string } | string;
-  driverId: { name: string };
-  amount: number;
-  status: string;
-  gateway: string;
-  createdAt: string;
-}
-
-interface AdminPayoutsResponse {
-  payouts: AdminPayoutItem[];
-  total: number;
-  totalPages: number;
-}
 
 interface JobsTableRow {
   jobId: string;
@@ -349,21 +322,23 @@ function DataTableShell({
         <span className="text-xs text-secondary">{filteredCount} record{filteredCount !== 1 ? "s" : ""}</span>
       </div>
       <div className="bg-surface-white border border-outline-variant rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full text-left text-sm border-collapse">
-          {children}
-          <tbody className="divide-y divide-outline-variant">
-            {isLoading ? (
-              <TableSkeleton cols={colCount} rows={5} />
-            ) : filteredCount === 0 ? (
-              <tr>
-                <td colSpan={colCount} className="p-10 text-center text-secondary">
-                  <span className="material-symbols-outlined text-4xl text-on-surface-variant block mb-2">{emptyIcon}</span>
-                  {emptyMessage}
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm border-collapse">
+            {children}
+            <tbody className="divide-y divide-outline-variant">
+              {isLoading ? (
+                <TableSkeleton cols={colCount} rows={5} />
+              ) : filteredCount === 0 ? (
+                <tr>
+                  <td colSpan={colCount} className="p-10 text-center text-secondary">
+                    <span className="material-symbols-outlined text-4xl text-on-surface-variant block mb-2">{emptyIcon}</span>
+                    {emptyMessage}
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
 
         {filteredCount > 0 && (
           <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-outline-variant bg-surface-white gap-3">
@@ -424,35 +399,32 @@ export default function AdminHistory() {
   });
 
   const jobTableRows = useMemo<JobsTableRow[]>(() => {
-    return (adminJobsData?.jobs ?? [])
+    return (adminJobsData?.data ?? [])
       .slice()
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .map((job) => ({
         jobId: job._id.slice(-6).toUpperCase(),
         fullId: job._id,
         destination: `${formatShortAddress(job.pickupAddress)} → ${formatShortAddress(job.dropoffAddress)}`,
-        poster: job.posterId?.name ?? "System",
-        driver: job.driverId?.name ?? "—",
+        poster: job.poster.name,
+        driver: job.driver?.name ?? "—",
         status: job.status,
         price: job.offeredPrice,
         date: formatShortDate(job.createdAt),
       }));
-  }, [adminJobsData?.jobs]);
+  }, [adminJobsData?.data]);
 
   const paymentRecords = useMemo<PaymentRecord[]>(() => {
-    return (adminPayoutsData?.payouts ?? []).map((payout) => {
-      const jobId = typeof payout.jobId !== "string" ? payout.jobId?._id : payout.jobId;
-      return {
-        jobId: jobId ?? payout._id,
-        displayJobId: (jobId ?? payout._id).slice(-6).toUpperCase(),
-        driverName: payout.driverId?.name ?? "—",
-        amount: payout.amount,
-        gateway: payout.gateway ?? "bank",
-        status: payout.status,
-        date: formatShortDate(payout.createdAt),
-      };
-    });
-  }, [adminPayoutsData?.payouts]);
+    return (adminPayoutsData?.data ?? []).map((payout) => ({
+      jobId: payout.jobId,
+      displayJobId: payout.jobId.slice(-6).toUpperCase(),
+      driverName: payout.driverName ?? "—",
+      amount: payout.amount,
+      gateway: payout.gateway ?? "bank",
+      status: payout.status,
+      date: formatShortDate(payout.createdAt),
+    }));
+  }, [adminPayoutsData?.data]);
 
   const [sortingJobs, setSortingJobs] = useState<SortingState>([]);
   const [paginationJobs, setPaginationJobs] = useState({ pageIndex: 0, pageSize: PAGE_SIZE });

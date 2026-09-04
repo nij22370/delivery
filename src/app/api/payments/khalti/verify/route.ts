@@ -4,6 +4,7 @@ import Job from "@/models/Job";
 import PaymentTransaction from "@/models/PaymentTransaction";
 import Payout from "@/models/Payout";
 import { verifyKhaltiPayment, getPaymentFailureUrl } from "@/lib/payments/khalti";
+import { notifyUser } from "@/lib/notify";
 
 const DRIVER_PAYOUT_PERCENTAGE = 0.9;
 const PLATFORM_FEE_PERCENTAGE = 0.1;
@@ -110,6 +111,23 @@ export async function GET(req: NextRequest) {
         return redirectToFailure(req, jobIdForFailure, "server_error");
       }
 
+      const jobIdString = job._id.toString();
+      void notifyUser(
+        String(job.posterId),
+        `Payment received for your delivery via Khalti.`,
+        "success",
+        { link: `/jobs/${jobIdString}` }
+      );
+      if (job.driverId) {
+        const driverPayoutAmount = Math.round(job.offeredPrice * DRIVER_PAYOUT_PERCENTAGE);
+        void notifyUser(
+          String(job.driverId),
+          `A payout of NPR ${driverPayoutAmount} has been initiated for you.`,
+          "info",
+          { link: "/driver/payouts" }
+        );
+      }
+
       void createdTransaction;
       return redirectToSuccess(req, job);
     }
@@ -122,6 +140,12 @@ export async function GET(req: NextRequest) {
       try {
         job.paymentStatus = "failed";
         await job.save();
+        void notifyUser(
+          String(job.posterId),
+          `Your Khalti payment expired. Please retry to confirm your delivery.`,
+          "error",
+          { link: `/jobs/${jobIdForFailure}` }
+        );
       } catch (jobError: unknown) {
         console.error("Khalti job save failed (Expired):", jobError);
       }
@@ -132,6 +156,12 @@ export async function GET(req: NextRequest) {
       try {
         job.paymentStatus = "failed";
         await job.save();
+        void notifyUser(
+          String(job.posterId),
+          `Your Khalti payment was cancelled. You can retry from the job page.`,
+          "warning",
+          { link: `/jobs/${jobIdForFailure}` }
+        );
       } catch (jobError: unknown) {
         console.error("Khalti job save failed (User canceled):", jobError);
       }
@@ -142,6 +172,12 @@ export async function GET(req: NextRequest) {
       try {
         job.paymentStatus = "failed";
         await job.save();
+        void notifyUser(
+          String(job.posterId),
+          `Your Khalti payment was refunded.`,
+          "info",
+          { link: `/jobs/${jobIdForFailure}` }
+        );
       } catch (jobError: unknown) {
         console.error("Khalti job save failed (Refunded):", jobError);
       }

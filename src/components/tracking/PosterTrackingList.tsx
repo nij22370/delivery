@@ -52,8 +52,16 @@ interface ActiveJob {
   dropoffAddress: string;
   status: string;
   offeredPrice: number;
-  driverId: string | null;
+  driverId: string | { _id: string; name: string } | null;
   createdAt: string;
+}
+
+function getDriverIdString(
+  driverId: ActiveJob["driverId"]
+): string | null {
+  if (driverId === null || driverId === undefined) return null;
+  if (typeof driverId === "string") return driverId;
+  return driverId._id;
 }
 
 interface MyActiveIdsResponse {
@@ -230,9 +238,10 @@ export default function PosterTrackingList() {
       jobId: job._id.slice(-6).toUpperCase(),
       fullId: job._id,
       route: `${formatShortAddress(job.pickupAddress)} → ${formatShortAddress(job.dropoffAddress)}`,
-      driver: job.driverId
-        ? `#${job.driverId.slice(-6).toUpperCase()}`
-        : "Not assigned",
+      driver: (() => {
+        const driverIdString = getDriverIdString(job.driverId);
+        return driverIdString ? `#${driverIdString.slice(-6).toUpperCase()}` : "Not assigned";
+      })(),
       status: job.status,
       date: formatShortDate(job.createdAt),
     }));

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import Link from "next/link";
 import { useVerificationQueue, useApproveRejectDriver } from "@/api/hooks/admin/adminApi";
 import { DRIVER_PROFILE_STATUS } from "@/types/driverProfile/driverProfile";
 import type { DriverProfileStatus } from "@/types/driverProfile/driverProfile";
@@ -13,6 +14,7 @@ const QUEUE_PAGE_SIZE = 10;
 const SEARCH_DEBOUNCE_MS = 300;
 const COPY_FEEDBACK_MS = 2000;
 const USER_ID_PREFIX_LENGTH = 8;
+const DRIVER_PROFILE_PATH = "/drivers";
 
 const TABS: AdminTabKey[] = [
   DRIVER_PROFILE_STATUS.PENDING,
@@ -179,26 +181,42 @@ export default function AdminVerificationPage() {
       </div>
 
       <div className="flex gap-6 border-b border-outline-variant">
-        {TABS.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => handleTabChange(tab)}
-            className={[
-              "h-12 flex items-center -mb-px border-b-2 text-sm font-semibold transition-colors cursor-pointer",
-              activeTab === tab
-                ? "border-primary text-primary"
-                : "border-transparent text-on-surface-variant hover:text-on-surface",
-            ].join(" ")}
-          >
-            {TAB_LABELS[tab]}
-            {tab === DRIVER_PROFILE_STATUS.PENDING && data?.totalPending !== undefined && (
-              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-warning-amber/10 text-warning-amber">
-                {data.totalPending}
-              </span>
-            )}
-          </button>
-        ))}
+        {TABS.map((tab) => {
+          const badgeCount =
+            tab === DRIVER_PROFILE_STATUS.PENDING
+              ? data?.totalPending
+              : tab === DRIVER_PROFILE_STATUS.APPROVED
+              ? data?.totalApproved
+              : data?.totalRejected;
+
+          const badgeStyle =
+            tab === DRIVER_PROFILE_STATUS.PENDING
+              ? "bg-warning-amber/10 text-warning-amber"
+              : tab === DRIVER_PROFILE_STATUS.APPROVED
+              ? "bg-success-green/10 text-success-green"
+              : "bg-error-red/10 text-error-red";
+
+          return (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => handleTabChange(tab)}
+              className={[
+                "h-12 flex items-center -mb-px border-b-2 text-sm font-semibold transition-colors cursor-pointer",
+                activeTab === tab
+                  ? "border-primary text-primary"
+                  : "border-transparent text-on-surface-variant hover:text-on-surface",
+              ].join(" ")}
+            >
+              {TAB_LABELS[tab]}
+              {badgeCount !== undefined && (
+                <span className={`ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${badgeStyle}`}>
+                  {badgeCount}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <div className="relative">
@@ -351,7 +369,7 @@ export default function AdminVerificationPage() {
                             type="button"
                             onClick={() => handleApprove(profile._id)}
                             disabled={approveReject.isPending}
-                            className="px-4 h-12 flex items-center justify-center rounded-lg text-xs font-semibold bg-success-green text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                            className="px-4 h-10 flex items-center justify-center rounded-lg text-xs font-semibold bg-success-green text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                           >
                             Approve
                           </button>
@@ -359,9 +377,51 @@ export default function AdminVerificationPage() {
                             type="button"
                             onClick={() => setRejectTarget(profile)}
                             disabled={approveReject.isPending}
-                            className="px-4 h-12 flex items-center justify-center rounded-lg text-xs font-semibold border border-error-red text-error-red hover:bg-error-container/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                            className="px-4 h-10 flex items-center justify-center rounded-lg text-xs font-semibold border border-error-red text-error-red hover:bg-error-container/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                           >
                             Reject
+                          </button>
+                        </div>
+                      )}
+                      {activeTab === DRIVER_PROFILE_STATUS.APPROVED && (
+                        <div className="flex gap-2 items-center">
+                          <Link
+                            href={`${DRIVER_PROFILE_PATH}/${profile.userId}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 h-10 rounded-lg text-xs font-semibold border border-primary text-primary hover:bg-primary/5 transition-colors cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                            Profile
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => setRejectTarget(profile)}
+                            disabled={approveReject.isPending}
+                            className="px-3 h-10 flex items-center justify-center rounded-lg text-xs font-semibold border border-error-red text-error-red hover:bg-error-container/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                          >
+                            Revoke
+                          </button>
+                        </div>
+                      )}
+                      {activeTab === DRIVER_PROFILE_STATUS.REJECTED && (
+                        <div className="flex gap-2 items-center">
+                          <Link
+                            href={`${DRIVER_PROFILE_PATH}/${profile.userId}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 h-10 rounded-lg text-xs font-semibold border border-outline-variant text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                            Profile
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => handleApprove(profile._id)}
+                            disabled={approveReject.isPending}
+                            className="px-3 h-10 flex items-center justify-center rounded-lg text-xs font-semibold bg-success-green text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                          >
+                            Re-Approve
                           </button>
                         </div>
                       )}

@@ -52,7 +52,7 @@ async function handleReview(
     }
 
     const updatedProfile = await DriverProfile.findOneAndUpdate(
-      { _id: id, status: DRIVER_PROFILE_STATUS.PENDING },
+      { _id: id },
       { $set: update },
       { new: true }
     ).lean();

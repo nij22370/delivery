@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback } from "react";
+import { signOut } from "next-auth/react";
+import { logoutUser } from "@/api/apis/auth/authApi";
 import { useAuth } from "@/hooks/useAuth";
 import { getInitials } from "@/utils/format";
 
@@ -24,7 +26,13 @@ const NAV_ITEMS: NavItem[] = [
   { label: "User Management", href: "/admin/users", icon: "people" },
   { label: "Payout Management", href: "/admin/payouts", icon: "account_balance_wallet" },
   { label: "Verifications", href: "/admin/verification", icon: "shield" },
-  { label: "History", href: "/history", icon: "history" },
+  { label: "History", href: "/admin/history", icon: "history" },
+];
+
+const UTILITY_LINKS: NavItem[] = [
+  { label: "Settings", href: "/admin/settings", icon: "settings" },
+  { label: "FAQ", href: "/faq", icon: "help" },
+  { label: "Support", href: "/support", icon: "support_agent" },
 ];
 
 export default function AdminSidebar({
@@ -37,6 +45,17 @@ export default function AdminSidebar({
   const handleLinkClick = useCallback(() => {
     if (onCloseMobile) {
       onCloseMobile();
+    }
+  }, [onCloseMobile]);
+
+  const handleLogout = useCallback(async () => {
+    if (onCloseMobile) {
+      onCloseMobile();
+    }
+    try {
+      await logoutUser();
+    } finally {
+      signOut({ redirect: true, callbackUrl: "/login" });
     }
   }, [onCloseMobile]);
 
@@ -117,10 +136,35 @@ export default function AdminSidebar({
         </nav>
 
         {/* Bottom Footer Section */}
-        {!isAuthLoading && user && (
-          <div className="p-4 border-t border-outline-variant mt-auto">
+        <div className="p-4 border-t border-outline-variant mt-auto flex flex-col gap-1">
+          {/* Utility Links (Settings / FAQ / Support) — full-width on mobile, hidden on desktop where the top bar owns them */}
+          <div className="flex flex-col gap-1 md:hidden">
+            {UTILITY_LINKS.map((item) => {
+              const isActive = pathname?.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={handleLinkClick}
+                  className={[
+                    "flex items-center gap-3 px-4 h-12 rounded-lg text-sm font-semibold transition-all cursor-pointer",
+                    isActive
+                      ? "bg-primary text-surface-white shadow-sm"
+                      : "text-on-surface-variant hover:bg-surface-container hover:text-on-surface",
+                  ].join(" ")}
+                >
+                  <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Profile card */}
+          {!isAuthLoading && user && (
             <Link
               href="/admin/settings"
+              onClick={handleLinkClick}
               aria-label="Open admin profile"
               className="block px-3 py-3 rounded-xl bg-surface-container-low flex items-center gap-3 hover:bg-surface-container transition-colors cursor-pointer"
             >
@@ -135,8 +179,19 @@ export default function AdminSidebar({
                 Admin
               </span>
             </Link>
-          </div>
-        )}
+          )}
+
+          {/* Logout (visible on mobile, since top bar hides it below md) */}
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="md:hidden flex items-center gap-3 px-4 h-12 rounded-lg text-sm font-semibold text-error-red hover:bg-error-red/10 transition-colors cursor-pointer"
+            aria-label="Logout"
+          >
+            <span className="material-symbols-outlined text-[20px]">logout</span>
+            <span>Logout</span>
+          </button>
+        </div>
       </aside>
     </>
   );

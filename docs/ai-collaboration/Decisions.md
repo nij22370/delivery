@@ -6,6 +6,20 @@ Format: newest at the top. Every decision gets the **model/session** that made i
 
 ---
 
+## D-58 — All in-app user notifications route through `notifyUser()` (no direct Pusher triggers for `private-user-{userId}`)
+
+**Status:** Accepted · **Model:** kilo-auto/free session (Sep 3) · **Applies to:** `src/lib/notify.ts` and all 9 call sites in `src/app/api/jobs/[id]/*/route.ts`, `src/app/api/payments/{khalti,esewa}/verify/route.ts`, `src/app/api/admin/jobs/[id]/resolve/route.ts`, `src/app/api/admin/payouts/[id]/route.ts` (FEATURE-33).
+
+**Decision:** Every route that produces a user-visible state change MUST call `notifyUser(userId, message, type, { link })` from `src/lib/notify.ts` rather than calling `pusherServer.trigger("private-user-...")` directly. `notifyUser` does both jobs — it persists a `Notification` row first (idempotent on `_id`), then triggers the Pusher `notification` event on the user's private channel. The `NotificationsPanel` reads from `GET /api/notifications` (DB-backed) and the transient `NotificationProvider` toast reads from Pusher, so one call satisfies both the bell inbox and the toast. All call sites use `void notifyUser(...)` (fire-and-forget per the field guide) so the live response is never blocked on a non-critical side effect.
+
+**Why:** Two real bugs shipped in the FEATURE-24 window. (1) The bell inbox was permanently empty because no business-logic route ever called `notifyUser` — the helper existed but had zero callers. (2) The two message routes (`messages` and `admin-message`) called `pusherServer.trigger("private-job-...")` directly for the `new-message` event. That was correct for job-scoped real-time, but for the per-user inbox they were silent. Funneling everything through `notifyUser` makes it impossible to ship a route that updates the toast but forgets the inbox (or vice versa) — both come from the same code path.
+
+**Tradeoff accepted:** A single `notifyUser` call produces one Pusher event and one DB write. If a user is offline, the Pusher event is dropped (the provider doesn't queue), but the `Notification` row persists and the bell inbox shows the message on the next page load. That's the right tradeoff for a non-critical side effect — the alternative (durable Pusher queueing) is out of scope and would require a separate worker.
+
+**Linked rule (add to AGENTS.md on next edit):** "Any API route that produces a user-visible state change MUST call `notifyUser` for every affected user. The only exception is routes that write to a real-time channel the user is already subscribed to (e.g. `messages/route.ts` writes to `private-job-{jobId}` for both participants). A separate `notifyUser` for those would be redundant noise on a different device."
+
+---
+
 ## D-50 — Change Password: server-side passwordHash check + signOut for logout
 
 **Status:** Accepted · **Model:** kilo-auto/free session (Aug 30) · **Applies to:** `src/app/(dashboard)/settings/page.tsx`, `src/app/(admin)/admin/settings/page.tsx`, `src/components/profile/SettingsPageContent.tsx`, `src/components/profile/ChangePasswordForm.tsx`, `src/app/api/auth/change-password/route.ts`, `src/app/(dashboard)/layout.tsx`, `src/components/admin/AdminSidebar.tsx`

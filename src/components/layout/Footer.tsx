@@ -10,7 +10,7 @@ export default function Footer() {
             SwiftShip
           </span>
           <p className="text-xs text-on-secondary-container">
-            © 2024 SwiftShip Logistics Inc. All rights reserved.
+            © 2026 SwiftShip. All rights reserved.
           </p>
         </div>
 
@@ -21,33 +21,61 @@ export default function Footer() {
               SwiftShip
             </span>
             <p className="text-xs text-on-secondary-container">
-              © 2024 SwiftShip Logistics Inc. All rights reserved.
+              © 2026 SwiftShip. All rights reserved.
             </p>
           </div>
 
           <div className="flex flex-col gap-3">
-            <h4 className="text-sm font-bold text-on-surface">Company</h4>
+            <h4 className="text-sm font-bold text-on-surface">Platform</h4>
             <Link
-              href="#"
+              href="/register"
               className="text-sm text-on-secondary-container hover:text-primary transition-colors cursor-pointer"
             >
-              Support Center
+              For Posters
             </Link>
             <Link
-              href="#"
+              href="/register"
               className="text-sm text-on-secondary-container hover:text-primary transition-colors cursor-pointer"
             >
-              Driver Requirements
+              For Drivers
+            </Link>
+            <Link
+              href="/#how-it-works"
+              className="text-sm text-on-secondary-container hover:text-primary transition-colors cursor-pointer"
+            >
+              How it Works
             </Link>
           </div>
 
           <div className="flex flex-col gap-3">
-            <h4 className="text-sm font-bold text-on-surface">Resources</h4>
+            <h4 className="text-sm font-bold text-on-surface">Support</h4>
+            <Link
+              href="/faq"
+              className="text-sm text-on-secondary-container hover:text-primary transition-colors cursor-pointer"
+            >
+              FAQ
+            </Link>
             <Link
               href="#"
               className="text-sm text-on-secondary-container hover:text-primary transition-colors cursor-pointer"
             >
-              Insurance Policy
+              Contact Support
+            </Link>
+            <Link
+              href="#"
+              className="text-sm text-on-secondary-container hover:text-primary transition-colors cursor-pointer"
+            >
+              Report an Issue
+            </Link>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <h4 className="text-sm font-bold text-on-surface">Legal</h4>
+            <Link
+              href="#"
+              className="text-sm text-on-secondary-container hover:text-primary transition-colors cursor-pointer"
+            >
+              Privacy Policy
             </Link>
             <Link
               href="#"
@@ -55,24 +83,6 @@ export default function Footer() {
             >
               Terms of Service
             </Link>
-          </div>
-
-          <div className="flex flex-col gap-3">
-            <h4 className="text-sm font-bold text-on-surface">Connect</h4>
-            <Link
-              href="#"
-              className="text-sm text-on-secondary-container hover:text-primary transition-colors cursor-pointer"
-            >
-              Privacy
-            </Link>
-            <div className="flex gap-4 mt-1">
-              <span className="material-symbols-outlined text-on-secondary-container cursor-pointer hover:text-primary transition-colors">
-                language
-              </span>
-              <span className="material-symbols-outlined text-on-secondary-container cursor-pointer hover:text-primary transition-colors">
-                public
-              </span>
-            </div>
           </div>
         </div>
       </div>

@@ -5,6 +5,7 @@ import Job from "@/models/Job";
 import PaymentTransaction from "@/models/PaymentTransaction";
 import Payout from "@/models/Payout";
 import { withRole } from "@/lib/auth";
+import { notifyUser } from "@/lib/notify";
 import type { JwtAccessPayload } from "@/types/auth/auth";
 import { JOB_STATUS } from "@/types/job";
 import { triggerJobEvent } from "@/lib/triggerJobEvent";
@@ -45,6 +46,10 @@ async function handleDeliverJob(
     await triggerJobEvent(id, STATUS_CHANGE_EVENT, {
       status: JOB_STATUS.DELIVERED,
       timestamp: new Date().toISOString(),
+    });
+
+    void notifyUser(String(deliveredJob.posterId), "Your delivery has been marked as delivered.", "success", {
+      link: `/jobs/${id}`,
     });
 
     const paymentTx = await PaymentTransaction.findOne({ jobId: new Types.ObjectId(id) }).lean();

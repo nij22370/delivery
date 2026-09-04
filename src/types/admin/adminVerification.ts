@@ -53,6 +53,7 @@ export interface AdminVerificationResponse {
   totalPages: number;
   totalApproved: number;
   totalPending: number;
+  totalRejected: number;
 }
 
 export interface ApproveRejectResponse {

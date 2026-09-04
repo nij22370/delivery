@@ -273,11 +273,13 @@ export default function BillingPage() {
         <div className="bg-primary-container rounded-xl p-6 shadow-lg animate-pulse h-24" />
         <div className="bg-surface-white border border-outline-variant rounded-xl shadow-sm p-6 h-48 animate-pulse" />
         <div className="bg-surface-white border border-outline-variant rounded-xl shadow-sm overflow-hidden">
-          <table className="w-full text-left text-sm border-collapse">
-            <tbody className="divide-y divide-outline-variant">
-              <TableSkeleton cols={BILLING_COL_COUNT} rows={5} />
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm border-collapse">
+              <tbody className="divide-y divide-outline-variant">
+                <TableSkeleton cols={BILLING_COL_COUNT} rows={5} />
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     );
@@ -356,8 +358,9 @@ transition-colors"
         </div>
 
         <div className="bg-surface-white border border-outline-variant rounded-xl shadow-sm overflow-hidden">
-          <table className="w-full text-left text-sm border-collapse">
-            <thead className="bg-surface-container-low text-secondary uppercase font-semibold text-xs border-b
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm border-collapse">
+              <thead className="bg-surface-container-low text-secondary uppercase font-semibold text-xs border-b
 border-outline-variant">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
@@ -400,6 +403,7 @@ mb-2">receipt_long</span>
               )}
             </tbody>
           </table>
+          </div>
 
           {filteredCount > 0 && (
             <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-outline-variant
