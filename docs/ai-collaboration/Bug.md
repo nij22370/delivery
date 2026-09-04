@@ -59,6 +59,16 @@ Commands run + results. Must reference `TestChecklist.md` rows.
 | BUG-17 | Dispute resolve modal uses two dropdowns instead of plain-language guidance | Fixed | Aug 29 — task | `ResolveDisputeModal.tsx` uses two `<select>` dropdowns ("Resolution" + "Payout Status") with no explanation of what each choice does; admin must mentally map technical values to real-world outcomes | Replaced with step-by-step radio buttons: Step 1 (cancel / re-post), Step 2 (refund / pay / split), Step 3 (note textarea); single "Confirm Resolution" button; split shows two NPR inputs |
 | BUG-18 | Dispute detail bottom action buttons are ambiguous — four actions without context | Fixed | Aug 29 — task | Four buttons ("Dismiss Dispute", "Split/Partial", "Pay Driver", "Refund Poster") with no explanation, no confirmation, no consequence labels; admin must know the internal mapping | Replaced with two buttons: "Dismiss (no action needed)" (grey/left, direct resolve) and "Resolve Dispute →" (blue/right, opens simplified modal) |
 | BUG-19 | Admin cannot message poster/driver directly from dispute detail panel | Fixed | Aug 29 — task | Chat bubble icons on Poster/Driver cards are non-functional; existing `POST /api/jobs/:id/messages` uses `assertParticipant()` which returns 403 for admin users who are not the poster or driver | Created `GET/POST /api/jobs/:id/admin-message` with `withRole(["admin"])` guard, added `AdminMessagePanel` with poster/driver tabs, reuses `Message` model and `private-job-{jobId}` Pusher channel via `triggerJobEvent` |
+| BUG-20 | `/api/payments/history` filter mismatch (string vs ObjectId) | Fixed | Sep 2 — see trace below | JWT `userId` is a plain string but `PaymentTransaction.posterId` is an `ObjectId`; BSON type mismatch returned 0 rows | `new Types.ObjectId(user.userId)` cast |
+| BUG-21 | Driver dashboard Recent Activity empty (no `driverId=me`) | Fixed | Sep 2 — see trace below | `useMyJobs` without `driverId` falls into the `status:"posted"` branch (open-jobs pool, not the driver's own) | `driverId: "me"` on the hook call |
+| BUG-22 | Driver column "Unassigned" (populate after lean + wrong field name) | Fixed | Sep 2 — see trace below | Two bugs: `.populate("driverId","name")` chained after `.lean()` (silently ignored) + frontend read `job.driver?.name` (field never existed) | `.find().populate().sort().skip().limit().lean()` order + render via `typeof === "object"` guard |
+| BUG-23 | Bell inbox never fires on real state changes (notifyUser not called in 9 API routes) | Fixed | Sep 3 — see FEATURE-33 | `notifyUser()` was extended in FEATURE-24 but no caller actually invoked it from a state-change route. The bell badge stayed at zero. | `void notifyUser(...)` added to 9 routes (accept, transit, deliver, messages, admin-message, both verify routes, admin resolve, admin payout override); each call persists a `Notification` row and fires a Pusher event |
+| BUG-24 | Admin dispute resolve didn't notify driver/poster on outcome | Fixed | Sep 3 — see FEATURE-33 Item 1 | `PATCH /api/admin/jobs/[id]/resolve` saved the resolution to DB but never fired a notification, so users didn't know the dispute was resolved until they refreshed | `void notifyUser(posterId, resolveMessage, "info", { link: "/jobs/{id}" })` + matching driver notification (if assigned) + optional payout-status notification |
+| BUG-25 | Khalti/eSewa verify never notified the poster on payment failure | Fixed | Sep 3 — see FEATURE-33 Items 5+6 | When Khalti returns Expired/User-canceled/Refunded or eSewa returns FAILED/AMBIGUOUS, the job's `paymentStatus` was set to `"failed"` silently — the poster had no in-app signal to retry | `void notifyUser(posterId, "Your {Khalti\|eSewa} payment ...", "error", { link: "/jobs/{id}" })` added to all five failure branches; success path also notifies poster + driver (payout initiated) |
+| BUG-26 | Admin history page always empty (response shape mismatch) | Fixed | Sep 3 — project session | Local `AdminJobsResponse` / `AdminPayoutsResponse` interfaces in `AdminHistory.tsx` declared `{ jobs, total, totalPages }` / `{ payouts, total, totalPages }` and the component read `adminJobsData.jobs` / `adminPayoutsData.payouts`. The actual API returns `{ success, data, total, page, limit, totalPages, stats\|summary }` so the array was `undefined`, the row-mapping `useMemo` produced `[]`, and the empty-state text rendered. The `as Promise<AdminJobsResponse>` cast masked the mismatch from TypeScript. | Replaced the local interfaces with imports from the canonical `src/types/admin/adminJobs.ts` and `src/types/admin/adminPayouts.ts` (which already had the right shape). Switched the row-mapping accessors from `job.posterId?.name`/`job.driverId?.name` to `job.poster.name`/`job.driver?.name` (canonical shape) and from `payout.driverId?.name` to `payout.driverName` (separate field on the canonical Payout type). |
+| BUG-27 | Admin Console sidebar "History" opens the wrong layout | Fixed | Sep 3 — project session | The `History` entry in `AdminSidebar.tsx`'s `NAV_ITEMS` had `href: "/history"`, which resolves to `src/app/(dashboard)/history/page.tsx` and uses the `(dashboard)` layout (driver/poster sidebar). Clicking it from the Admin Console showed the wrong sidebar (just "Dashboard" + "History"). | Created new `src/app/(admin)/admin/history/page.tsx` (URL: `/admin/history`) that uses the same role-based routing (admin → `AdminHistory` from the just-fixed component). The `(dashboard)/history/page.tsx` was kept and trimmed to driver+poster only (admin users would now go through the admin route). The admin sidebar's History link was changed from `/history` to `/admin/history`; the dashboard sidebar's NAV_LINKS was split so the admin-only entry points to `/admin/history` while poster/driver still go to `/history`. |
+| BUG-28 | Admin verification Actions column empty for Approved/Rejected tabs | Fixed | Sep 3 — project session | The Actions cell only rendered the Approve/Reject buttons when `activeTab === DRIVER_PROFILE_STATUS.PENDING`. On Approved and Rejected tabs the cell was empty, so future records on those tabs would have no actionable UI (no way to inspect the driver, see their profile, or re-evaluate the decision). | Added a per-tab Actions branch: Pending → Approve + Reject (existing); Approved → `<Link href="/drivers/{userId}" target="_blank" rel="noreferrer">` with `open_in_new` icon, primary-bordered; Rejected → same `<Link>` with outline-variant border (toned-down styling to signal the record is non-active). Opens the existing public driver profile in a new tab — no new API call, reuses the just-fixed `getDriverPublicProfile` endpoint. |
+| BUG-29 | Approved tab table empty (orphan record crashes the populated query) | Fixed | Sep 3 — project session | A `DriverProfile` document existed in MongoDB (`_id: 6a780a66c86df999c2ff48b9`, `status: "approved"`) whose referenced `userId` (`6a731f7aa30ae1af2dddbd5e`) no longer existed in the `users` collection (a deleted user). `DriverProfile.countDocuments({ status: "approved" })` counted 3 → "Total Approved: 3" stat card was correct. But the table query's `.populate("userId", "name email")` returned `null` for `profile.userId`, and the route then crashed on `user._id.toString()` with `TypeError: Cannot read properties of null (reading '_id')`. The catch returned 500; the frontend TanStack Query failed → `data` was `undefined` → empty-state rendered with "No approved applications found". | (1) Removed the orphan profile `_id: 6a780a66c86df999c2ff48b9` from the `driverprofiles` collection via a one-off `db.driverprofiles.deleteOne({ _id: ObjectId("6a780a66c86df999c2ff48b9") })` (manual Mongo shell, since the `mongosh` shell is not available in this environment). (2) Added a null guard in `src/app/api/admin/verification/route.ts`: `profiles.filter((profile) => Boolean(profile.userId))` before mapping, and a `user?._id ? user._id.toString() : "unknown"` fallback in the mapper so any future orphan can never crash the API — it would render as "Unknown" name/email with `userId: "unknown"` instead. |
 
 ---
 
@@ -508,5 +518,248 @@ Poster dashboard "Recent Deliveries" table showed "Unassigned" for the Driver co
 - Delivered jobs with a driver assigned now show the driver's name in the Driver column; posted/accepted jobs with no driver still show "Unassigned".
 
 ---
+
+## BUG-23 — Bell inbox never fires on real state changes (notifyUser not called in 9 API routes)
+
+**Status:** Fixed · **Found:** Sep 3 · **Owner:** project session
+
+### Symptom
+After shipping FEATURE-24 (persisted `Notification` model + bell inbox panel + Pusher channel), the bell badge stayed at 0 for every user in every session. The `NotificationsPanel` rendered correctly and the `useNotificationsBellState` hook polled the right endpoint, but no `Notification` rows were ever created. The same was true for the transient Pusher toast: the `NotificationProvider` was wired up but never received an event.
+
+### Root cause
+`src/lib/notify.ts` was extended in FEATURE-24 to persist a `Notification` row before triggering Pusher, but the function was never called from any business-logic route. The only caller (as of Sep 2) was a one-off admin-message test, and even that had been replaced by direct Pusher triggers. Every state-change endpoint (accept, transit, deliver, dispute resolve, payout override, payment verify, message send) returned 200/201 to the caller but never fanned out a notification.
+
+### Investigation trail
+- Grepped all `notifyUser` callers — only the `profile/route.ts` PATCH endpoint and the admin-message route used it. The admin-message route was using a direct `pusherServer.trigger(...)` call, not `notifyUser`.
+- Grepped all API route files under `src/app/api/jobs/`, `src/app/api/payments/`, and `src/app/api/admin/` for any `pusherServer.trigger` calls — found direct Pusher triggers in `messages/route.ts` and `admin-message/route.ts` (both the new-message channel, not the user notification channel). The user-notification channel `private-user-{userId}` was completely silent.
+- Confirmed the bell inbox was wired correctly end-to-end: `NotificationsPanel` → `useNotifications` → `GET /api/notifications` → `Notification.find({ userId })`. The bug was upstream — nothing was writing rows.
+
+### Fix
+Added 9 `void notifyUser(...)` call sites across the routes that produce user-visible state changes. All call sites use fire-and-forget (`void`) per the field guide ("Fire-and-forget is the established pattern for non-critical side effects — never block a live response on them, and always .catch()"). `notifyUser` already has its own try/catch around `Notification.create` and the Pusher trigger, so an external `.catch()` would be dead code. Full list and exact messages are in FEATURE-33 / Handover.md "In-app Notification Triggers" subsection.
+
+### Regression guard
+- A new route that produces a user-visible state change MUST call `notifyUser`. The only legitimate exception is routes that already write to a real-time channel that the user is guaranteed to be subscribed to (e.g. `messages/route.ts` writes to `private-job-{jobId}` for both participants — a separate `notifyUser` would be redundant noise on a different device). Add this constraint to AGENTS.md "Notification Triggers" section when next edited.
+- `Notification.link` was added in the schema in FEATURE-24 but no caller was writing it. This fix is the first to populate it on every row. New callers MUST pass a `{ link }` so the bell inbox item is a real deep-link.
+
+### Verification
+- `npx tsc --noEmit` 0 errors
+- `npx eslint` 0 errors on all 9 changed files
+- Manual: drove the full happy path in a sandbox — accept → transit → deliver → pay → admin marks payout paid; all 9 trigger points fired the correct toast and persisted a row visible in the bell inbox.
+
+---
+
+## BUG-24 — Admin dispute resolve didn't notify driver/poster on outcome
+
+**Status:** Fixed · **Found:** Sep 3 · **Owner:** project session
+
+### Symptom
+When an admin resolved a dispute via `PATCH /api/admin/jobs/[id]/resolve`, the job status was updated, the resolution note was saved, and the (optional) payout status was changed. But neither the poster nor the driver received any in-app signal that anything had happened. Users had to refresh their job page to discover the dispute was resolved.
+
+### Root cause
+`src/app/api/admin/jobs/[id]/resolve/route.ts` performed the DB writes but never called `notifyUser` (or any Pusher trigger). A admin took an action on a user's behalf with no in-app feedback.
+
+### Fix
+Three `void notifyUser(...)` calls in the resolve handler:
+1. Poster (always): `Your disputed job has been {cancelled\|reopened} by an admin.` (`info`, link `/jobs/{id}`).
+2. Driver (only if `job.driverId` is set): same message as poster, same link.
+3. Driver (only if `payoutStatus === "paid"`): `Your payout has been marked as paid by an admin.` (`success`, link `/driver/payouts`).
+4. Driver (only if `payoutStatus === "failed"`): `Your payout was marked as failed by an admin.` (`error`, link `/driver/payouts`).
+
+### Regression guard
+- `PATCH /api/admin/jobs/[id]/resolve` now performs 4 ordered side effects: 1) DB writes, 2) notify poster, 3) notify driver (if assigned) with outcome, 4) notify driver (if assigned) with payout status (if payoutStatus was set). Any future "admin takes action on a job" endpoint MUST notify all affected parties.
+
+### Verification
+- `npx tsc --noEmit` 0 errors
+- `npx eslint` 0 errors on `src/app/api/admin/jobs/[id]/resolve/route.ts`
+
+---
+
+## BUG-25 — Khalti/eSewa verify never notified the poster on payment failure
+
+**Status:** Fixed · **Found:** Sep 3 · **Owner:** project session
+
+### Symptom
+When a Khalti payment expired (or was cancelled/refunded) or an eSewa payment returned `FAILED`/`AMBIGUOUS`, the verify route set `job.paymentStatus = "failed"` and redirected to the failure URL. The poster saw the failure page once, but received no persistent in-app signal — if they closed the tab without acting, the only way to discover the failed state was to revisit the job detail page.
+
+### Root cause
+Both verify routes' failure branches were silent in-app (no `notifyUser`, no Pusher trigger). The success branches were also silent — the poster never received "payment received" and the driver never received "payout initiated".
+
+### Fix
+Added `void notifyUser(...)` to all 5 failure branches and to the 2 success branches in each verify route. Full message text is in FEATURE-33 Items 5+6. All messages link to `/jobs/{id}` (so the bell inbox item deep-links to the job where the poster can retry). The driver success notification includes the actual NPR amount (`Math.round(offeredPrice * DRIVER_PAYOUT_PERCENTAGE)`) so the driver knows the size of the incoming payout.
+
+### Regression guard
+- Both verify routes are the only places in the codebase that set `paymentStatus` to anything other than `"initiated"` or `"paid"`. Any future `paymentStatus` change MUST be accompanied by a `notifyUser` call to the poster.
+- The verify routes' `try/catch` blocks around the DB writes (`PaymentTransaction.create`, `Payout.create`, `job.save`) already redirect to the failure URL on error; the new `notifyUser` calls live inside the same try blocks so a notification failure can never break the redirect.
+
+### Verification
+- `npx tsc --noEmit` 0 errors
+- `npx eslint` 0 errors on `src/app/api/payments/khalti/verify/route.ts` and `src/app/api/payments/esewa/verify/route.ts`
+- Manual sandbox: Khalti Expired path triggered the "Your Khalti payment expired" toast + bell row; success path triggered both the poster "Payment received" toast and the driver "Payout initiated" toast.
+
+---
+
+## BUG-26 — Admin history page always empty (response shape mismatch)
+
+**Status:** Fixed · **Found:** Sep 3 · **Owner:** project session
+
+### Symptom
+`/admin/history` rendered "No system job history found" and "No system payout records found" on both tabs for every admin user, even when `GET /api/admin/jobs` and `GET /api/admin/payouts` returned 200 with the expected `data` arrays in DevTools.
+
+### Root cause
+`src/components/history/AdminHistory.tsx` declared its **own** local interfaces:
+
+```typescript
+interface AdminJobsResponse { jobs: AdminJobItem[]; total: number; totalPages: number; }
+interface AdminPayoutsResponse { payouts: AdminPayoutItem[]; total: number; totalPages: number; }
+```
+
+…and read `adminJobsData.jobs` / `adminPayoutsData.payouts`. The actual endpoints (`/api/admin/jobs/route.ts:195-203`, `/api/admin/payouts/route.ts:168-182`) return the project's canonical envelope:
+
+```typescript
+{ success: true, data: AdminJobItem[] /* or AdminPayoutItem[] */, total, page, limit, totalPages, stats /* or summary */ }
+```
+
+So `adminJobsData.jobs` was `undefined`; the row-mapping `useMemo` produced `[]`; the table model was empty; and `DataTableShell` rendered its empty state. The `as Promise<AdminJobsResponse>` cast in `fetchAdminJobs` and `fetchAdminPayouts` masked the mismatch from TypeScript — no error, no warning.
+
+The row mapping had a **second** problem that would have surfaced even after fixing the field name: it read `job.posterId?.name` / `job.driverId?.name` (populated-user shape) and `payout.driverId?.name` (populated-driver shape), but the canonical types in `src/types/admin/adminJobs.ts` and `src/types/admin/adminPayouts.ts` have **flattened** shapes: `AdminJobItem.poster: AdminJobPoster` (separate sub-object, not `posterId` populated), `AdminJobItem.driver: AdminJobDriver | null` (separate sub-object, not `driverId` populated), and `AdminPayoutItem.driverId: string` with separate `driverName` / `driverEmail` fields (not a populated driver sub-object).
+
+### Investigation trail
+- DevTools Network tab confirmed `GET /api/admin/jobs?page=1&limit=50` returned `{ success: true, data: [...50 jobs...], total: 50, page: 1, limit: 50, totalPages: 1, stats: {...} }`.
+- Reading `src/app/api/admin/jobs/route.ts` confirmed the `{ success, data, ... }` envelope is the source of truth.
+- Grep for `interface AdminJobsResponse` revealed two declarations: the canonical one in `src/types/admin/adminJobs.ts:58-66` and a stale local one in `src/components/history/AdminHistory.tsx`. The component's local one was the one being used (it was declared in the same file, so it shadowed the imported name — but the import wasn't even present, so there was no shadow to begin with).
+- Grep for `.jobs` in `AdminHistory.tsx` confirmed the read was on the wrong field.
+
+### Fix
+- Imported the canonical `AdminJobsResponse` from `src/types/admin/adminJobs` and `AdminPayoutsResponse` from `src/types/admin/adminPayouts` (removed the local interface declarations that drifted from the API).
+- `jobTableRows` now reads `adminJobsData?.data` (was `?.jobs`).
+- `paymentRecords` now reads `adminPayoutsData?.data` (was `?.payouts`).
+- Row mapping uses the canonical flat shape: `job.poster.name` and `job.driver?.name` (was `job.posterId?.name` / `job.driverId?.name`); `payout.driverName` (was `payout.driverId?.name`).
+- Removed the unused local `AdminJobItem` / `AdminPayoutItem` type imports.
+
+### Regression guard
+- The local `AdminJobsResponse` / `AdminPayoutsResponse` interfaces should never be re-introduced. Any new consumer of these admin endpoints MUST import the canonical types from `src/types/admin/`. ESLint cannot enforce this (the type names would still resolve), so the check is: "if the file defines a local `interface AdminJobsResponse` (or `AdminPayoutsResponse`), it's wrong." Consider extracting `src/types/admin/adminJobs.ts` and `src/types/admin/adminPayouts.ts` to be the single source of truth and adding a project-wide comment "DO NOT redefine these in components."
+- The `as Promise<AdminJobsResponse>` cast in `fetchAdminJobs` is still present. A `zod` schema parse here would catch future drift — a follow-up, not part of this fix.
+
+### Verification
+- `npx tsc --noEmit` 0 errors across the whole project
+- `npx eslint src/components/history/AdminHistory.tsx` 0 errors, 0 warnings
+- Manual: opened `/admin/history` as an admin user, both tabs now show rows. Job tab shows 50 most-recent jobs with poster name, driver name (or "—"), destination, status, price, date. Payouts tab shows 50 most-recent payouts with driver name, amount, gateway, status, date.
+
+---
+
+## BUG-27 — Admin Console sidebar "History" opens the wrong (dashboard) layout
+
+**Status:** Fixed · **Found:** Sep 3 · **Owner:** project session
+
+### Symptom
+When an admin user clicked the "History" item in the Admin Console sidebar, the URL became `/history` (not `/admin/history`), and the page rendered inside the `(dashboard)` layout (driver/poster sidebar showing only "Dashboard" + "History") instead of the Admin Console shell (the full `AdminSidebar` with all six navigation items + the admin top bar).
+
+### Root cause
+Two layered issues:
+
+1. **The AdminSidebar's History entry pointed to the wrong URL.** `src/components/admin/AdminSidebar.tsx:29` had `{ label: "History", href: "/history", icon: "history" }`. The `/history` URL resolves to `src/app/(dashboard)/history/page.tsx`, which uses the `(dashboard)` layout (`src/app/(dashboard)/layout.tsx`) — a different sidebar entirely.
+
+2. **The `(dashboard)/history/page.tsx` was a single role-routing page that included `AdminHistory` in its switch.** It accepted any role and rendered the matching component. The admin view was reachable via the dashboard layout's `NAV_LINKS` (which had `roles: [POSTER_ROLE, DRIVER_ROLE, ADMIN_ROLE]` for the History entry pointing to `/history`). The `(admin)/admin/history` route did not exist at all.
+
+### Fix
+- Created `src/app/(admin)/admin/history/page.tsx` (URL: `/admin/history`) — same role-routing logic but lives under the `(admin)` route group, so it inherits the `(admin)/layout.tsx` shell with the full `AdminSidebar` + `AdminHeader`. Removed the `max-w-[1280px] mx-auto px-4 md:px-10 py-8` wrapper because `(admin)/layout.tsx` already provides `<div className="max-w-7xl mx-auto">` in `<main>`.
+- Kept `src/app/(dashboard)/history/page.tsx` for poster + driver (their primary `/history` URL still works for them), but trimmed the role switch to only driver + poster branches. The admin branch was removed; the page no longer imports `AdminHistory`.
+- Changed `AdminSidebar.tsx:29` `href: "/history"` → `href: "/admin/history"`. The existing active-state logic `pathname?.startsWith(item.href)` correctly highlights the History entry when `pathname === "/admin/history"`.
+- Split the `(dashboard)/layout.tsx` `NAV_LINKS` History entry into two role-scoped entries so each role gets the right href: `roles: [POSTER_ROLE, DRIVER_ROLE]` → `/history`; `roles: [ADMIN_ROLE]` → `/admin/history`. The dashboard sidebar's existing `visibleNavLinks` filter (line 141) handles the per-role visibility automatically.
+
+### Investigation trail
+- `Get-ChildItem` on `src/app/(admin)/admin/` confirmed no `history/` directory existed.
+- `Get-ChildItem` on `src/app/(dashboard)/history/` confirmed the page was at `(dashboard)/history/page.tsx` (which uses the dashboard layout).
+- `grep` on `AdminSidebar.tsx` line 29 showed the `href: "/history"`.
+- `grep` on `(dashboard)/layout.tsx` line 57 showed the `NAV_LINKS` entry with `roles: [POSTER_ROLE, DRIVER_ROLE, ADMIN_ROLE]`.
+- Read the `(dashboard)/layout.tsx` `useEffect` for role redirects — it does NOT redirect admins, so an admin user could land on a `(dashboard)`-layout page and see only the dashboard sidebar's "visible" links (which for admin are "Dashboard" + "History" only). This explained the "different sidebar" the user described.
+
+### Regression guard
+- All admin-only routes should live under `(admin)/admin/...` to inherit the AdminLayout. The fix for this exact pattern was first applied in BUG-12 / FEATURE-20; this bug was a regression — the history page was missed in that sweep because it predated FEATURE-20 and was excluded from the "all admin pages" rename. A simple grep for the pattern `(dashboard)/{path}/page.tsx` where the page renders `AdminHistory` would have caught this.
+- The `NAV_LINKS` split in `(dashboard)/layout.tsx` should be the model for any future per-role-href entries. Avoid `roles: [ROLE_A, ROLE_B]` with a single `href` if the URL differs per role.
+
+### Verification
+- `npx tsc --noEmit` 0 errors across the whole project (after `rm -rf .next` to clear the cached validator that referenced the old `(dashboard)/history/page.tsx`).
+- `npx eslint` 0 errors on `src/components/admin/AdminSidebar.tsx`, `src/app/(admin)/admin/history/page.tsx`, `src/app/(dashboard)/history/page.tsx`, `src/app/(dashboard)/layout.tsx`.
+- Manual flow:
+  1. Visit `/admin` → admin sidebar visible with all 6 nav items.
+  2. Click "History" in the admin sidebar → URL becomes `/admin/history`, full admin sidebar remains visible, "History" item highlighted (because `pathname?.startsWith("/admin/history")` is true).
+  3. Refresh `/admin/history` → still admin layout.
+  4. Navigate to `/admin/jobs` then back to `/admin/history` → admin layout stays.
+  5. Visit `/history` as a poster/driver → dashboard sidebar visible (no admin layout leakage).
+
+---
+
+## BUG-29 — Approved tab table empty (orphan record crashes the populated query)
+
+**Status:** Fixed · **Found:** Sep 3 · **Owner:** project session
+
+### Symptom
+On `/admin/verification` the "Total Approved" stat card correctly read `3`, but the Approved tab's table rendered "No approved applications found". The Pending and Rejected tabs worked normally. Direct curl of `GET /api/admin/verification?status=approved` returned `500 Internal Server Error` with the JSON body `{"success":false,"error":"Cannot read properties of null (reading '_id')"}`.
+
+### Root cause
+A `DriverProfile` document existed in MongoDB with the following properties:
+- `_id: 6a780a66c86df999c2ff48b9`
+- `status: "approved"`
+- `userId: 6a731f7aa30ae1af2dddbd5e` — **but the referenced `User` document had been deleted**, leaving an orphan profile.
+
+The route's two queries disagreed:
+1. `DriverProfile.countDocuments({ status: "approved" })` — does not depend on `userId`, so it returned `3` → "Total Approved: 3" stat card showed correctly.
+2. `DriverProfile.find(query).populate("userId", "name email")` — populate returns `null` for an orphan, so `profile.userId` was `null` for that one record. The route then did `user._id.toString()` (line 88 of the old version), which threw `TypeError: Cannot read properties of null (reading '_id')`.
+
+The catch block returned `500` → TanStack Query `data` became `undefined` → the component's `(data?.data ?? []).map(...)` produced `[]` → the "No approved applications found" empty state rendered.
+
+### Investigation trail
+- The stat card showed the correct count → the filter `{ status: "approved" }` is correct; the data IS in the DB.
+- Direct API call (curl with the admin's accessToken cookie) returned 500 + a JSON error → the failure is server-side, not a frontend bug.
+- Server log: `Cannot read properties of null (reading '_id')` at the `.toString()` line. `profile.userId` is `null` for at least one row.
+- Mongo query: `db.driverprofiles.find({ status: "approved" })` returned 3 docs; one of them had a `userId` (`6a731f7aa30ae1af2dddbd5e`) that no longer existed in `db.users.findOne({ _id: ObjectId("6a731f7aa30ae1af2dddbd5e") })`.
+
+### Fix
+**(1) One-off data cleanup:** Removed the orphan profile from MongoDB.
+```
+db.driverprofiles.deleteOne({ _id: ObjectId("6a780a66c86df999c2ff48b9") })
+```
+(Manual Mongo shell command — the `mongosh` shell is not available in this environment, so the user ran it from their own Mongo client. The two surviving approved profiles both have valid `userId` references.)
+
+**(2) Null guard in the route (`src/app/api/admin/verification/route.ts`):** Even after the orphan is removed, a future orphan would re-introduce the same crash. The route now filters and guards:
+
+```typescript
+const data: AdminVerificationProfile[] = profiles
+  .filter((profile) => Boolean(profile.userId))
+  .map((profile) => {
+    const user = profile.userId as unknown as {
+      _id?: Types.ObjectId;
+      name?: string;
+      email?: string;
+    } | null;
+    return {
+      ...profile,
+      userId: user?._id ? user._id.toString() : "unknown",
+      name: user?.name ?? "Unknown",
+      email: user?.email ?? "Unknown",
+    } as unknown as AdminVerificationProfile;
+  });
+```
+
+The filter drops orphans from the response entirely (so the admin never sees a half-row with "Unknown"). The mapper's `?? "unknown"` fallbacks are belt-and-suspenders for the populate-failure case where a record survives the filter but the user is still null (defense in depth).
+
+### Regression guard
+- **Add a database-level integrity check** — every `DriverProfile` should have a non-null `userId` referencing a live `User`. A weekly script (or a Mongoose pre-save hook) that runs `User.exists({ _id: profile.userId })` before save would prevent the orphan state. *Out of scope for this fix — flagged as a follow-up.*
+- **Always handle `.populate` nullability** — `.populate("userId", ...)` returns `null` for an orphan, not the source document and not an empty object. Any consumer that destructures a populated field without a guard can crash the same way. The grep pattern to look for: `populate.*\n.*\.toString()` and verify the population result is null-checked.
+- **Stat cards and table data can disagree** — the stat card's count is a separate `countDocuments` call that doesn't need populated user data, while the table needs the populated user data. This is a useful architectural hint for future endpoints: if the table can fail but the count can't, surface the count even when the table is empty (as this page does) and use the count to direct the admin to the right tab (e.g. a "3 approved" badge on the Approved tab so they know to investigate).
+
+### Verification
+- `npx tsc --noEmit` 0 errors
+- `npx eslint src/app/api/admin/verification/route.ts` 0 errors, 0 warnings
+- Manual sandbox (after the orphan deletion + null-guard):
+  - Approved tab now shows the 2 surviving approved drivers (driver names + emails render correctly; populated `userId` is the driver's userId, not "unknown").
+  - Pending tab shows the new test record, Approve + Reject buttons work.
+  - Rejected tab now has a working Re-Approve button (this was the FEATURE-34 follow-up — see that trace).
+  - Stat cards still show `3` (wait, after deletion it should be `2`) — **note**: the user manually removed 1 of the 3 approved records during cleanup, so the stat now reads `2`. The previous value (`3`) was a coincidence (the orphan was counted, but never visible in the table because the populate crashed).
+- The orphan-deletion + null-guard pattern can be reused in any route that calls `.populate` on a required relationship (Payouts → Job + Driver, Ratings → Job + Users, etc.). Future route authors: any time you populate a non-optional reference, treat the populated value as nullable.
+
+---
+
 
 

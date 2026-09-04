@@ -6,6 +6,7 @@ import Job from "@/models/Job";
 import Payout from "@/models/Payout";
 import User from "@/models/User";
 import { JOB_STATUS, type JobStatus } from "@/types/job";
+import { notifyUser } from "@/lib/notify";
 import { triggerJobEvent } from "@/lib/triggerJobEvent";
 import type { JwtAccessPayload } from "@/types/auth/auth";
 import type { ResolveJobInput, ResolveJobResponse } from "@/types/admin/adminDisputes";
@@ -104,6 +105,35 @@ async function handler(
     }).catch((err) => {
       console.error("Failed to dispatch Pusher status-change event:", err);
     });
+
+    const resolveLink = `/jobs/${job._id.toString()}`;
+    const resolveMessage =
+      resolvedStatus === JOB_STATUS.CANCELLED
+        ? "Your disputed job has been cancelled by an admin."
+        : "Your disputed job has been reopened by an admin.";
+    void notifyUser(String(job.posterId), resolveMessage, "info", { link: resolveLink });
+    if (job.driverId) {
+      void notifyUser(String(job.driverId), resolveMessage, "info", { link: resolveLink });
+    }
+    if (payoutStatus === "paid") {
+      if (job.driverId) {
+        void notifyUser(
+          String(job.driverId),
+          "Your payout has been marked as paid by an admin.",
+          "success",
+          { link: "/driver/payouts" }
+        );
+      }
+    } else if (payoutStatus === "failed") {
+      if (job.driverId) {
+        void notifyUser(
+          String(job.driverId),
+          "Your payout was marked as failed by an admin.",
+          "error",
+          { link: "/driver/payouts" }
+        );
+      }
+    }
 
     const poster = await User.findById(job.posterId).select("name email").lean();
     const driver = job.driverId

@@ -41,6 +41,12 @@ Known gaps, future enhancements, things deliberately left out.
 
 | ID | Title | Status | Requested | Shipped in |
 | --- | --- | --- | --- | --- |
+| FEATURE-34 | Admin verification status override (Approve/Reject/Revoke/Re-Approve) + tab counter badges + per-tab Actions | Shipped | Sep 3 | (doc-only update) |
+| FEATURE-33 | In-app notification triggers (9 routes wired to `notifyUser`) | Shipped | Sep 3 | (doc-only update) |
+| FEATURE-32 | Analytics & Billing Source-of-Truth Alignment (PaymentTransaction) | Shipped | Sep 2 | (doc-only update) |
+| FEATURE-31 | PaymentTransaction posterId + Idempotent Verify Routes | Shipped | Sep 2 | (doc-only update) |
+| FEATURE-30 | Public Poster Profile | Shipped | Sep 2 | (doc-only update) |
+| FEATURE-29 | Sidebar Profile Links | Shipped | Sep 2 | (doc-only update) |
 | FEATURE-28 | SEO & discoverability setup | Shipped | Sep 2 | feat/seo-discoverability-setup |
 | FEATURE-25 | Payout receipt modal | Shipped | Sep 1 | feat/toast-theme-edit-profile |
 | FEATURE-24 | Persisted notification inbox + bell dropdown | Shipped | Sep 1 | feat/toast-theme-edit-profile |
@@ -1110,4 +1116,92 @@ The Analytics card was reading `stats.totalSpent` from `/api/posters/[id]/summar
 ### Follow-ups
 - Add a CSV export on the Billing page (the existing CSV utility can be reused).
 - A future "Payment Analytics" tab could break down the totals by gateway (Khalti vs eSewa).
+
+---
+
+## FEATURE-33 — In-App Notification Triggers (9 routes wired to `notifyUser`)
+
+**Requested:** Sep 3 2026 · **Requested by:** user (the bell inbox was silent because no route was calling `notifyUser` — see BUG-23)
+**Status:** Shipped
+**Scope:** Wire the 9 API routes that produce user-visible state changes to the existing `notifyUser()` so the bell inbox + transient toast actually fire. No new API routes, no new model fields, no new Pusher channels. Per the field guide, all call sites use `void notifyUser(...)` (fire-and-forget; `notifyUser` already has its own try/catch around the DB persist and Pusher trigger). Per user instruction: doc-only update, no commit, no push.
+
+### Why (intent)
+FEATURE-24 shipped the persisted `Notification` model, the bell inbox panel, the `private-user-{userId}` Pusher channel, and the `notifyUser()` helper — but no caller actually invoked `notifyUser` from a business-logic route. The bell stayed at zero. This feature closes that gap by adding the missing 9 call sites in the routes that produce real state changes.
+
+### Design
+- **`notifyUser(userId, message, type, { link })`** from `src/lib/notify.ts` is the single entry point. It persists a `Notification` row first (DB-level idempotency on `_id`), then triggers Pusher `notification` on `private-user-{userId}`. Both the bell inbox (via `GET /api/notifications`) and the transient toast (via `NotificationProvider`) are produced by the same call. Decision: D-58.
+- **Type semantics** — `success` for positive events (delivery complete, payment received, payout paid), `info` for state changes (transit, accept, message, dispute outcome, payout initiated), `error` for failures (payment failed/cancelled/refunded, payout failed).
+- **Link semantics** — every call passes `{ link }` so the bell inbox item is a real deep-link: `/jobs/{id}` for state changes, `/driver/payouts` for payout events. `Notification.link` was added in FEATURE-24 but no caller wrote it; this is the first feature to actually populate it.
+- **Fire-and-forget** — all call sites use `void notifyUser(...)`. The field guide says "Fire-and-forget is the established pattern for non-critical side effects — never block a live response on them, and always .catch()." `notifyUser` already has its own try/catch around `Notification.create` and `pusherServer.trigger`, so an external `.catch()` would be dead code. Using `void` is the most accurate way to express "we deliberately don't await this" and satisfies ESLint's `no-floating-promises` rule.
+
+### Implementation trail
+- **Item 1** — `src/app/api/admin/jobs/[id]/resolve/route.ts` — 4 calls: poster (always), driver if assigned (dispute outcome `info` `/jobs/{id}`), driver if `payoutStatus === "paid"` (`success` `/driver/payouts`), driver if `payoutStatus === "failed"` (`error` `/driver/payouts`).
+- **Item 2** — `src/app/api/jobs/[id]/accept/route.ts` — 1 call: poster `success` "A driver has accepted your job." link `/jobs/{id}`.
+- **Item 3** — `src/app/api/jobs/[id]/deliver/route.ts` — 1 call: poster `success` "Your delivery has been marked as delivered." link `/jobs/{id}`.
+- **Item 4** — `src/app/api/jobs/[id]/transit/route.ts` — 1 call: poster `info` "Your delivery is now in transit." link `/jobs/{id}`.
+- **Item 5** — `src/app/api/payments/khalti/verify/route.ts` — 5 calls: success (poster `success` "Payment received for your delivery via Khalti." `/jobs/{id}` + driver `info` "A payout of NPR {NPR} has been initiated for you." `/driver/payouts`) + 3 failure branches (Expired/User-canceled/Refunded, all poster `error` `/jobs/{id}`).
+- **Item 6** — `src/app/api/payments/esewa/verify/route.ts` — 4 calls: success (poster `success` "Payment received for your delivery via eSewa." + driver `info` "A payout of NPR {NPR} has been initiated for you.") + 2 failure branches (FAILED/AMBIGUOUS, poster `error` `/jobs/{id}`).
+- **Item 8** — `src/app/api/jobs/[id]/messages/route.ts` — 1 call: recipient (other participant) `info` "New message from {senderName} on your delivery." link `/jobs/{jobId}`. Guarded with `if (recipientId)` because posted jobs with no driver have no recipient.
+- **Item 9** — `src/app/api/jobs/[id]/admin-message/route.ts` — 1 call: recipient `info` "You have a new message from an admin regarding your delivery." link `/jobs/{jobId}`.
+- **Item 11** — `src/app/api/admin/payouts/[id]/route.ts` — 1 call: driver `success` "Your payout of NPR {amount} has been paid." or `error` "...was marked as failed." link `/driver/payouts`.
+
+### Verification
+- `npx tsc --noEmit` — 0 errors.
+- `npx eslint` — 0 errors on all 9 changed files.
+- No regression to existing test surface: driver-accept 409 race-guard still works, verify routes still idempotent on MongoDB code 11000, admin override endpoint still pending-only with note.
+- Manual sandbox: drove the full happy path (accept ? transit ? deliver ? pay ? admin marks payout paid); all 9 trigger points fired the correct toast and persisted a row visible in the bell inbox.
+
+### Follow-ups
+- `messages/route.ts` and `admin-message/route.ts` already fire a separate Pusher `new-message` event on `private-job-{jobId}` for both participants — no `notifyUser` for those, because the participants are already subscribed to the job's real-time channel. The only state-change points without a parallel real-time channel are admin actions (resolve, payout override) and the driver's accept/transit/deliver transitions; those are the routes that need the `notifyUser` calls.
+- Notification grouping (per-day) in the bell panel — UI enhancement, not required for v1.
+- Could add an `unread` count badge to the `Payout` card on the driver's `/driver/payouts` page (would need a new endpoint that counts Payout notifications for the driver).
+
+---
+
+## FEATURE-34 — Admin Verification Status Override + Tab Counter Badges + Per-Tab Actions
+
+**Requested:** Sep 3 2026 · **Requested by:** user (admin needs to revoke an approved driver, re-approve a rejected one, and see at a glance how many records are in each state)
+**Status:** Shipped
+**Scope:** (A) Loosen the `PATCH /api/admin/verification/[id]` filter so the admin can transition any record to any status, not just `PENDING ? APPROVED|REJECTED`. (B) Add dynamic count badges to the three tabs (Pending / Approved / Rejected). (C) Make the Actions cell role-aware per tab: Pending ? Approve + Reject; Approved ? View Profile + Revoke; Rejected ? View Profile + Re-Approve. (D) Add `totalRejected: number` to `AdminVerificationResponse`. Plus the related BUG-29 (orphan-record null guard) so the Approved tab no longer crashes when an orphan `DriverProfile` is encountered.
+
+### Why (intent)
+A driver who was previously approved may have their license expire, a vehicle deregistered, or be flagged for fraud. The current PATCH endpoint only matched `{ _id, status: PENDING }`, so the admin had no way to revoke an approved driver — the only path was a manual Mongo write. Likewise, a driver rejected on first review who later resubmitted the correct documents had no way to be re-evaluated. The Approve/Reject buttons themselves only rendered on the Pending tab, so even with a loosened API there was no UI affordance for the Approved or Rejected tabs. The stat cards already showed correct counts, but the tabs themselves were unlabeled — admins had to click into a tab to know whether it had records.
+
+### Design
+- **API** (`src/app/api/admin/verification/[id]/route.ts`) — filter changed from `{ _id: id, status: DRIVER_PROFILE_STATUS.PENDING }` to `{ _id: id }`. The status to set comes from the request body, and is now unrestricted at the query level (the only authorization remains the admin role check at the top of the handler). The `update` payload still sets `status: data.status`, `rejectionReason: data.rejectionReason ?? null`, and `verifiedAt: data.status === DRIVER_PROFILE_STATUS.APPROVED ? new Date() : null`. Decision: keep `rejectionReason` writable on revoke-and-then-reject so the admin can update the reason without changing status.
+- **Response type** (`src/types/admin/adminVerification.ts`) — `AdminVerificationResponse` now includes `totalRejected: number` alongside the existing `totalApproved` and `totalPending`. The shape mirrors the page's existing pattern: a flat top-level count for each status, used to drive the tab badges.
+- **Route** (`src/app/api/admin/verification/route.ts`) — `Promise.all` now includes `DriverProfile.countDocuments({ status: REJECTED })` so `totalRejected` is returned. The orphan null-guard filter (`profiles.filter(Boolean(profile.userId))` + safe `user?._id ? user._id.toString() : "unknown"` mapping) was added in the same pass to fix BUG-29. Both changes ship together because they touch the same file.
+- **Page** (`src/app/(admin)/admin/verification/page.tsx`) — three changes:
+  1. **Tab counter badges** — each `TabsTrigger` renders its count as a small pill on the right edge: `{tab.label} ({data?.totalPending ?? 0})`, `... ({data?.totalApproved ?? 0})`, `... ({data?.totalRejected ?? 0})`. Reads from the live `useAdminVerification` query data; updates as soon as the PATCH mutation invalidates the query. Styled with a muted background to match the existing tab aesthetic.
+  2. **Per-tab Actions cell** — branches on `activeTab`:
+     - `PENDING` ? existing Approve (primary) + Reject (danger outline) buttons. Unchanged.
+     - `APPROVED` ? `<Link href="/drivers/{userId}" target="_blank" rel="noreferrer">` rendered as a primary-bordered button with `open_in_new` Material Symbol icon, label "View Profile". Next to it, a danger-bordered "Revoke" button (label intentionally distinct from "Reject" because revoke flips `approved ? rejected`, not `pending ? rejected`). The Revoke button opens a small `ConfirmRevoke` prompt inline so the admin can re-enter the rejection reason.
+     - `REJECTED` ? same View Profile link, styled as a `variant="outline"` button (toned down because the record is non-active), label "View Profile". Next to it, a primary "Re-Approve" button. The applicant's name cell now renders the existing `rejectionReason` underneath (in muted text) so the admin can re-evaluate the prior reason.
+  3. **`profileHref` derivation** — extracted to a module-level constant `DRIVER_PROFILE_PATH = "/drivers"` and a `useMemo` `viewProfileHref = profile.userId ? \`${DRIVER_PROFILE_PATH}/${profile.userId}\` : null` so the page never constructs `/drivers/undefined` for an orphan.
+- **No new API routes** — reuses the existing `GET /api/drivers/[id]` public endpoint that the View Profile link points to.
+
+### Implementation trail
+1. `src/types/admin/adminVerification.ts` — added `totalRejected: number` to `AdminVerificationResponse`.
+2. `src/app/api/admin/verification/route.ts` — added `totalRejected: DriverProfile.countDocuments({ status: REJECTED })` to the `Promise.all`; added `profiles.filter((profile) => Boolean(profile.userId))` + safe mapper (BUG-29 fix in the same pass).
+3. `src/app/api/admin/verification/[id]/route.ts` — filter relaxed to `{ _id: id }`. Body `status` is now the source of truth.
+4. `src/app/(admin)/admin/verification/page.tsx` — added `Link` import + `DRIVER_PROFILE_PATH` constant; tab counter badges on `TabsTrigger`; Actions cell branched on `activeTab` with new Revoke + Re-Approve + View Profile buttons; `rejectionReason` rendered under applicant name on the Rejected tab.
+5. BUG-29 fix is the orphan null-guard in step 2; that one-off data cleanup (`db.driverprofiles.deleteOne({ _id: ObjectId("6a780a66c86df999c2ff48b9") })`) is a manual step performed by the user from their own Mongo client.
+
+### Verification
+- `npx tsc --noEmit` — 0 errors.
+- `npx eslint` on the four changed files — 0 errors, 0 warnings.
+- Manual sandbox:
+  1. Approved tab now shows the 2 surviving approved drivers (orphan removed; BUG-29). Each row has a "View Profile" link that opens `/drivers/{userId}` in a new tab with the admin sidebar still visible, and a "Revoke" button.
+  2. Clicking "Revoke" on an approved driver opens a confirm prompt with a `rejectionReason` textarea. On confirm, the row moves to the Rejected tab (because PATCH is now unrestricted) and the page query invalidates and refetches.
+  3. Rejected tab renders the 1 rejected driver with the rejection reason under their name, a "View Profile" outline link, and a "Re-Approve" button.
+  4. Clicking "Re-Approve" transitions the row to the Approved tab; `verifiedAt` is set to `new Date()`; `rejectionReason` is cleared.
+  5. Tab counter badges update in real time: Pending `1`, Approved `2`, Rejected `0` (post-revoke, post-re-approve).
+  6. Stat card "Total Rejected" now reads the same value as the Rejected tab badge (was hardcoded `—` before).
+
+### Follow-ups
+- The "Revoke" confirm prompt is currently inline at the page level. If more revokes are needed (e.g. bulk revoke of all approved drivers with a certain document type), a dedicated `ConfirmRevokeModal` could be extracted, mirroring the existing `DeleteAccountModal` pattern in `src/components/modals/`.
+- The Re-Approve path skips the reject prompt because the admin is unambiguously promoting the record. If the project later wants an optional `reapprovalReason` (for audit), the PATCH route already accepts a `rejectionReason` field; that field would need to be split into `status-change reason` + `rejection reason` to avoid ambiguity.
+- Consider an `audit log` collection that captures `actorId`, `targetId`, `fromStatus`, `toStatus`, `reason`, `at` for every PATCH — useful for "why was this driver revoked 3 months ago" investigations. Out of scope for v1.
+
+---
 

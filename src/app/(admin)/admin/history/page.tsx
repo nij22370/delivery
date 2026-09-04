@@ -3,13 +3,14 @@
 import { useAuthGuard } from "@/hooks/useAuthGuard";
 import DriverHistory from "@/components/history/DriverHistory";
 import PosterHistory from "@/components/history/PosterHistory";
+import AdminHistory from "@/components/history/AdminHistory";
 
 export default function HistoryPage() {
   const { user, isLoading } = useAuthGuard();
 
   if (isLoading) {
     return (
-      <div className="max-w-[1280px] mx-auto px-4 md:px-10 py-8 min-h-screen">
+      <div className="px-4 md:px-10 py-8 min-h-screen">
         <div className="h-8 w-48 bg-surface-container-high rounded animate-pulse mb-6" />
         <div className="h-10 w-full bg-surface-container-high rounded-xl animate-pulse" />
       </div>
@@ -18,21 +19,14 @@ export default function HistoryPage() {
 
   if (!user) return null;
 
+  if (user.role === "admin") {
+    return <AdminHistory />;
+  }
+
   if (user.role === "driver") {
-    return (
-      <div className="max-w-[1280px] mx-auto px-4 md:px-10 py-8 min-h-screen">
-        <DriverHistory />
-      </div>
-    );
+    return <DriverHistory />;
   }
 
-  if (user.role === "poster") {
-    return (
-      <div className="max-w-[1280px] mx-auto px-4 md:px-10 py-8 min-h-screen">
-        <PosterHistory />
-      </div>
-    );
-  }
-
-  return null;
+  // Fallback to poster role view
+  return <PosterHistory />;
 }

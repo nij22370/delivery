@@ -5,6 +5,7 @@ import Job from "@/models/Job";
 import Message from "@/models/Message";
 import User from "@/models/User";
 import { withAuth } from "@/lib/auth";
+import { notifyUser } from "@/lib/notify";
 import { triggerJobEvent } from "@/lib/triggerJobEvent";
 import type { JwtAccessPayload } from "@/types/auth/auth";
 import type { Message as MessageDoc, GetMessagesResponse } from "@/types/message/message";
@@ -144,6 +145,15 @@ async function handlePostMessage(
       content: savedMessage.content,
       createdAt: savedMessage.createdAt,
     });
+
+    if (recipientId) {
+      void notifyUser(
+        recipientId,
+        `New message from ${senderName} on your delivery.`,
+        "info",
+        { link: `/jobs/${jobId}` }
+      );
+    }
 
     return NextResponse.json({ message: savedMessage }, { status: 201 });
   } catch (error: unknown) {

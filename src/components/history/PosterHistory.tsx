@@ -64,9 +64,17 @@ interface HistoryJob {
   status: string;
   offeredPrice: number;
   createdAt: string;
-  driverId: string | null;
+  driverId: string | { _id: string; name: string } | null;
   paymentStatus?: string;
   paymentGateway?: string;
+}
+
+function getDriverIdString(
+  driverId: HistoryJob["driverId"]
+): string | null {
+  if (driverId === null || driverId === undefined) return null;
+  if (typeof driverId === "string") return driverId;
+  return driverId._id;
 }
 
 interface JobsApiResponse {
@@ -376,22 +384,24 @@ text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:bor
         <span className="text-xs text-secondary">{filteredCount} record{filteredCount !== 1 ? "s" : ""}</span>
       </div>
       <div className="bg-surface-white border border-outline-variant rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full text-left text-sm border-collapse">
-          {children}
-          <tbody className="divide-y divide-outline-variant">
-            {isLoading ? (
-              <TableSkeleton cols={colCount} rows={5} />
-            ) : filteredCount === 0 ? (
-              <tr>
-                <td colSpan={colCount} className="p-10 text-center text-secondary">
-                  <span className="material-symbols-outlined text-4xl text-on-surface-variant block
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm border-collapse">
+            {children}
+            <tbody className="divide-y divide-outline-variant">
+              {isLoading ? (
+                <TableSkeleton cols={colCount} rows={5} />
+              ) : filteredCount === 0 ? (
+                <tr>
+                  <td colSpan={colCount} className="p-10 text-center text-secondary">
+                    <span className="material-symbols-outlined text-4xl text-on-surface-variant block
 mb-2">{emptyIcon}</span>
-                  {emptyMessage}
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
+                    {emptyMessage}
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
 
         {filteredCount > 0 && (
           <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-outline-variant
@@ -476,7 +486,10 @@ export default function PosterHistory() {
         jobId: job._id.slice(-6).toUpperCase(),
         fullId: job._id,
         destination: `${formatShortAddress(job.pickupAddress)} â†’ ${formatShortAddress(job.dropoffAddress)}`,
-        driver: job.driverId ? `#${job.driverId.slice(-6).toUpperCase()}` : "â€”",
+        driver: (() => {
+          const driverIdString = getDriverIdString(job.driverId);
+          return driverIdString ? `#${driverIdString.slice(-6).toUpperCase()}` : "—";
+        })(),
         status: job.status,
         price: job.offeredPrice,
         date: formatShortDate(job.createdAt),

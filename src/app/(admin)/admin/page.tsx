@@ -133,9 +133,9 @@ export default function AdminDashboardPage() {
               </span>
             </div>
 
-            <div className="h-60 w-full bg-surface-container-low rounded-lg p-4 flex items-end justify-between gap-3">
+            <div className="h-60 w-full min-w-0 overflow-hidden bg-surface-container-low rounded-lg p-4 flex items-end justify-between gap-2 sm:gap-3">
               {platformGrowth.map((point) => (
-                <div key={point.day} className="flex-1 flex flex-col items-center gap-2 h-full justify-end">
+                <div key={point.day} className="flex-1 min-w-0 flex flex-col items-center gap-1.5 sm:gap-2 h-full justify-end">
                   <div
                     className="w-full max-w-[36px] bg-primary/80 hover:bg-primary rounded-t transition-all duration-300 cursor-pointer group relative"
                     style={{ height: `${point.valuePercent}%` }}
@@ -144,7 +144,7 @@ export default function AdminDashboardPage() {
                       {point.valuePercent}%
                     </div>
                   </div>
-                  <span className="text-[11px] text-secondary font-medium truncate">
+                  <span className="text-[9px] sm:text-[11px] text-secondary font-medium truncate w-full text-center">
                     {point.day}
                   </span>
                 </div>

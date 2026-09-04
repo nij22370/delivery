@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/lib/db";
 import Job from "@/models/Job";
 import { withRole } from "@/lib/auth";
+import { notifyUser } from "@/lib/notify";
 import type { JwtAccessPayload } from "@/types/auth/auth";
 import { JOB_STATUS } from "@/types/job";
 import { triggerJobEvent } from "@/lib/triggerJobEvent";
@@ -40,6 +41,10 @@ async function handleTransitJob(
     await triggerJobEvent(id, STATUS_CHANGE_EVENT, {
       status: JOB_STATUS.IN_TRANSIT,
       timestamp: new Date().toISOString(),
+    });
+
+    void notifyUser(String(transitingJob.posterId), "Your delivery is now in transit.", "info", {
+      link: `/jobs/${id}`,
     });
 
     return NextResponse.json({ job: transitingJob }, { status: 200 });

@@ -360,21 +360,23 @@ function DataTableShell({
         <span className="text-xs text-secondary">{filteredCount} record{filteredCount !== 1 ? "s" : ""}</span>
       </div>
       <div className="bg-surface-white border border-outline-variant rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full text-left text-sm border-collapse">
-          {children}
-          <tbody className="divide-y divide-outline-variant">
-            {isLoading ? (
-              <TableSkeleton cols={colCount} rows={5} />
-            ) : filteredCount === 0 ? (
-              <tr>
-                <td colSpan={colCount} className="p-10 text-center text-secondary">
-                  <span className="material-symbols-outlined text-4xl text-on-surface-variant block mb-2">{emptyIcon}</span>
-                  {emptyMessage}
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm border-collapse">
+            {children}
+            <tbody className="divide-y divide-outline-variant">
+              {isLoading ? (
+                <TableSkeleton cols={colCount} rows={5} />
+              ) : filteredCount === 0 ? (
+                <tr>
+                  <td colSpan={colCount} className="p-10 text-center text-secondary">
+                    <span className="material-symbols-outlined text-4xl text-on-surface-variant block mb-2">{emptyIcon}</span>
+                    {emptyMessage}
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
 
         {filteredCount > 0 && (
           <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-outline-variant bg-surface-white gap-3">

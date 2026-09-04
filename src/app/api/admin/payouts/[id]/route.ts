@@ -4,6 +4,7 @@ import { withRole } from "@/lib/auth";
 import connectDB from "@/lib/db";
 import Payout from "@/models/Payout";
 import User from "@/models/User";
+import { notifyUser } from "@/lib/notify";
 import type { JwtAccessPayload } from "@/types/auth/auth";
 import type { PayoutOverrideInput, PayoutOverrideResponse, AdminPayoutItem } from "@/types/admin/adminPayouts";
 
@@ -88,6 +89,15 @@ async function handler(
       .populate<{ jobId: { _id: string } }>("jobId", "_id")
       .lean();
     const jobId = (populatedJob?.jobId as unknown as { _id?: string })?._id?.toString() ?? "unknown";
+
+    void notifyUser(
+      updatedPayout.driverId.toString(),
+      status === "paid"
+        ? `Your payout of NPR ${updatedPayout.amount} has been paid.`
+        : `Your payout of NPR ${updatedPayout.amount} was marked as failed.`,
+      status === "paid" ? "success" : "error",
+      { link: "/driver/payouts" }
+    );
 
     const payoutWithTimestamps = updatedPayout as unknown as {
       createdAt?: Date;

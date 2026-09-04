@@ -73,24 +73,24 @@ function HeaderContent({ title, onToggleMobile, onLogout }: HeaderContentProps) 
         </h1>
       </div>
 
-      <div className="flex items-center gap-2 md:gap-3">
+      <div className="flex items-center gap-1.5 md:gap-3">
         <Link
           href="/admin/settings"
-          className="flex items-center justify-center w-10 h-10 rounded-full text-secondary hover:bg-surface-container transition-colors cursor-pointer"
+          className="hidden md:flex items-center justify-center w-10 h-10 rounded-full text-secondary hover:bg-surface-container transition-colors cursor-pointer"
           aria-label="Settings"
         >
           <span className="material-symbols-outlined text-xl">settings</span>
         </Link>
         <Link
           href="/faq"
-          className="flex items-center justify-center w-10 h-10 rounded-full text-secondary hover:bg-surface-container transition-colors cursor-pointer"
+          className="hidden md:flex items-center justify-center w-10 h-10 rounded-full text-secondary hover:bg-surface-container transition-colors cursor-pointer"
           aria-label="FAQ"
         >
           <span className="material-symbols-outlined text-xl">help</span>
         </Link>
         <Link
           href="/support"
-          className="flex items-center justify-center w-10 h-10 rounded-full text-secondary hover:bg-surface-container transition-colors cursor-pointer"
+          className="hidden md:flex items-center justify-center w-10 h-10 rounded-full text-secondary hover:bg-surface-container transition-colors cursor-pointer"
           aria-label="Support"
         >
           <span className="material-symbols-outlined text-xl">support_agent</span>
@@ -115,7 +115,7 @@ function HeaderContent({ title, onToggleMobile, onLogout }: HeaderContentProps) 
         <button
           type="button"
           onClick={onLogout}
-          className="flex items-center justify-center w-10 h-10 rounded-full text-secondary hover:text-error-red hover:bg-surface-container transition-colors cursor-pointer"
+          className="hidden md:flex items-center justify-center w-10 h-10 rounded-full text-secondary hover:text-error-red hover:bg-surface-container transition-colors cursor-pointer"
           aria-label="Logout"
         >
           <span className="material-symbols-outlined text-xl">logout</span>

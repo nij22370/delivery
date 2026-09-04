@@ -4,6 +4,7 @@ import connectDB from "@/lib/db";
 import Job from "@/models/Job";
 import DriverProfile from "@/models/DriverProfile";
 import { withRole } from "@/lib/auth";
+import { notifyUser } from "@/lib/notify";
 import type { JwtAccessPayload } from "@/types/auth/auth";
 import { JOB_STATUS } from "@/types/job";
 import { DRIVER_PROFILE_STATUS } from "@/types/driverProfile/driverProfile";
@@ -79,6 +80,10 @@ async function handleAcceptJob(
     if (!acceptedJob) {
       return NextResponse.json({ message: NOT_AVAILABLE_MESSAGE }, { status: 409 });
     }
+
+    void notifyUser(String(acceptedJob.posterId), "A driver has accepted your job.", "success", {
+      link: `/jobs/${acceptedJob._id.toString()}`,
+    });
 
     return NextResponse.json({ job: acceptedJob }, { status: 200 });
   } catch (error: unknown) {

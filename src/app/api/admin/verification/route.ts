@@ -62,7 +62,7 @@ async function handler(req: NextRequest) {
       query.userId = { $in: userIds };
     }
 
-    const [profiles, total, totalApproved, totalPending] = await Promise.all([
+    const [profiles, total, totalApproved, totalPending, totalRejected] = await Promise.all([
       DriverProfile.find(query)
         .populate<{ userId: { _id: Types.ObjectId; name: string; email: string } }>(
           "userId",
@@ -75,21 +75,24 @@ async function handler(req: NextRequest) {
       DriverProfile.countDocuments(query),
       DriverProfile.countDocuments({ status: DRIVER_PROFILE_STATUS.APPROVED }),
       DriverProfile.countDocuments({ status: DRIVER_PROFILE_STATUS.PENDING }),
+      DriverProfile.countDocuments({ status: DRIVER_PROFILE_STATUS.REJECTED }),
     ]);
 
-    const data: AdminVerificationProfile[] = profiles.map((profile) => {
-      const user = profile.userId as unknown as {
-        _id: Types.ObjectId;
-        name?: string;
-        email?: string;
-      };
-      return {
-        ...profile,
-        userId: user._id.toString(),
-        name: user.name ?? "Unknown",
-        email: user.email ?? "Unknown",
-      } as unknown as AdminVerificationProfile;
-    });
+    const data: AdminVerificationProfile[] = profiles
+      .filter((profile) => Boolean(profile.userId))
+      .map((profile) => {
+        const user = profile.userId as unknown as {
+          _id?: Types.ObjectId;
+          name?: string;
+          email?: string;
+        } | null;
+        return {
+          ...profile,
+          userId: user?._id ? user._id.toString() : "unknown",
+          name: user?.name ?? "Unknown",
+          email: user?.email ?? "Unknown",
+        } as unknown as AdminVerificationProfile;
+      });
 
     const totalPages = Math.ceil(total / limit);
 
@@ -101,6 +104,7 @@ async function handler(req: NextRequest) {
       totalPages,
       totalApproved,
       totalPending,
+      totalRejected,
     });
   } catch (error: unknown) {
     console.error("Admin verification queue error:", error);

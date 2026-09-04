@@ -6,6 +6,7 @@ import Job from "@/models/Job";
 import Message, { MESSAGE_MAX_LENGTH } from "@/models/Message";
 import User from "@/models/User";
 import { withRole } from "@/lib/auth";
+import { notifyUser } from "@/lib/notify";
 import { triggerJobEvent } from "@/lib/triggerJobEvent";
 import type { JwtAccessPayload } from "@/types/auth/auth";
 import type { Message as MessageDoc, GetMessagesResponse } from "@/types/message/message";
@@ -182,6 +183,13 @@ async function handlePostAdminMessage(
       content: savedMessage.content,
       createdAt: savedMessage.createdAt,
     });
+
+    void notifyUser(
+      recipientId,
+      `You have a new message from an admin regarding your delivery.`,
+      "info",
+      { link: `/jobs/${jobId}` }
+    );
 
     return NextResponse.json({ message: savedMessage }, { status: 201 });
   } catch (error: unknown) {

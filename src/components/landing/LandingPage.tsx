@@ -29,10 +29,10 @@ export default function LandingPage() {
       {/* Role Switcher Tabs */}
       <div className="z-20 w-full max-w-7xl px-4 md:px-8 mt-10">
         <div className="flex justify-center md:justify-start">
-          <div className="bg-surface-white border border-outline-variant/60 rounded-xl p-1.5 flex gap-1 shadow-sm">
+          <div className="bg-surface-white border border-outline-variant/60 rounded-xl p-1.5 flex gap-1 shadow-sm overflow-x-auto max-w-full">
             <button
               onClick={() => setActiveRole("poster")}
-              className={`px-5 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 cursor-pointer transition-all duration-300 ${
+              className={`px-5 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 cursor-pointer transition-all duration-300 whitespace-nowrap ${
                 activeRole === "poster"
                   ? "bg-primary text-on-primary shadow-sm"
                   : "text-on-surface-variant hover:bg-surface-container-low hover:text-primary"
@@ -43,7 +43,7 @@ export default function LandingPage() {
             </button>
             <button
               onClick={() => setActiveRole("driver")}
-              className={`px-5 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 cursor-pointer transition-all duration-300 ${
+              className={`px-5 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 cursor-pointer transition-all duration-300 whitespace-nowrap ${
                 activeRole === "driver"
                   ? "bg-[var(--color-success-green)] text-white shadow-sm"
                   : "text-on-surface-variant hover:bg-surface-container-low hover:text-[var(--color-success-green)]"
@@ -54,7 +54,7 @@ export default function LandingPage() {
             </button>
             <button
               onClick={() => setActiveRole("admin")}
-              className={`px-5 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 cursor-pointer transition-all duration-300 ${
+              className={`px-5 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 cursor-pointer transition-all duration-300 whitespace-nowrap ${
                 activeRole === "admin"
                   ? "bg-[var(--color-inverse-surface)] text-[var(--color-inverse-on-surface)] shadow-sm"
                   : "text-on-surface-variant hover:bg-surface-container-low hover:text-[var(--color-on-surface)]"
