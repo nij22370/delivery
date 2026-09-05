@@ -510,7 +510,7 @@ export default function AdminJobManagementPage() {
                       key={job._id}
                       className={[
                         "hover:bg-surface-container-low/50 transition-colors",
-                        isDisputed ? "bg-[#fcfaf5] border-l-4 border-l-warning-amber" : "",
+                        isDisputed ? "bg-warning-amber/5 border-l-4 border-l-warning-amber" : "",
                       ].join(" ")}
                     >
                       {/* Job ID */}

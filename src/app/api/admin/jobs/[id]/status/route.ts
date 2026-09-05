@@ -7,6 +7,7 @@ import { JOB_STATUS, type JobStatus } from "@/types/job";
 import { triggerJobEvent } from "@/lib/triggerJobEvent";
 import type { JwtAccessPayload } from "@/types/auth/auth";
 import type { AllowedOverrideStatus, StatusOverrideResponse } from "@/types/admin/adminJobs";
+import { internalServerError } from "@/lib/apiServerError";
 
 const ALLOWED_OVERRIDES: Record<string, AllowedOverrideStatus[]> = {
   [JOB_STATUS.POSTED]: ["cancelled"],
@@ -140,9 +141,7 @@ async function handler(
 
     return NextResponse.json(response);
   } catch (error: unknown) {
-    console.error("Admin status override error:", error);
-    const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return internalServerError(error, "admin/jobs/status");
   }
 }
 

@@ -1,5 +1,5 @@
 // adminPayouts.ts - Types for the admin payout management domain
-import type { PayoutGateway, PayoutStatus } from "@/models/Payout";
+import type { PayoutGateway, PayoutStatus } from "@/types/payout/payout";
 
 export interface AdminPayoutItem {
   _id: string;

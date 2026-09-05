@@ -4,6 +4,7 @@ import connectDB from "@/lib/db";
 import Message from "@/models/Message";
 import { withAuth } from "@/lib/auth";
 import type { JwtAccessPayload } from "@/types/auth/auth";
+import { internalServerError } from "@/lib/apiServerError";
 
 type UnreadCountsByJob = Record<string, number>;
 
@@ -36,8 +37,7 @@ async function handleGetUnreadCounts(
 
     return NextResponse.json(counts);
   } catch (error: unknown) {
-    console.error("Get unread counts error:", error);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return internalServerError(error, "jobs/unread-counts");
   }
 }
 

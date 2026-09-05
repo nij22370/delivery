@@ -10,6 +10,7 @@ import { notifyUser } from "@/lib/notify";
 import { triggerJobEvent } from "@/lib/triggerJobEvent";
 import type { JwtAccessPayload } from "@/types/auth/auth";
 import type { ResolveJobInput, ResolveJobResponse } from "@/types/admin/adminDisputes";
+import { internalServerError } from "@/lib/apiServerError";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -176,9 +177,7 @@ async function handler(
 
     return NextResponse.json(response);
   } catch (error: unknown) {
-    console.error("Admin resolve dispute error:", error);
-    const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return internalServerError(error, "admin/jobs/resolve");
   }
 }
 

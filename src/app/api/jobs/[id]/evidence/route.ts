@@ -5,6 +5,7 @@ import connectDB from "@/lib/db";
 import Job from "@/models/Job";
 import { v2 as cloudinary } from "cloudinary";
 import type { JwtAccessPayload } from "@/types/auth/auth";
+import { internalServerError } from "@/lib/apiServerError";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -146,9 +147,7 @@ async function handler(
       },
     });
   } catch (error: unknown) {
-    console.error("Evidence upload error:", error);
-    const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return internalServerError(error, "jobs/evidence");
   }
 }
 

@@ -1,25 +1,5 @@
-import type { JobStatus } from "../job";
-
-export interface JobLocationInput {
-  pickupAddress: string;
-  pickupContactName: string;
-  pickupPhone: string;
-  pickupInstructions?: string;
-  dropoffAddress: string;
-  dropoffContactName: string;
-  dropoffPhone: string;
-}
-
-export interface JobVehicleInput {
-  vehicleType: string;
-}
-
-export interface JobPricingInput {
-  packageDescription?: string;
-  offeredPrice: number;
-  pickupDate: string;
-  pickupTimeWindow: string;
-}
+import type { JobStatus, JobLocationInput, JobVehicleInput, JobPricingInput } from "../job";
+export type { JobLocationInput, JobVehicleInput, JobPricingInput };
 
 export type CreateJobPayload = JobLocationInput & JobVehicleInput & JobPricingInput;
 

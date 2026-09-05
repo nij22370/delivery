@@ -7,6 +7,7 @@ import User from "@/models/User";
 import { notifyUser } from "@/lib/notify";
 import type { JwtAccessPayload } from "@/types/auth/auth";
 import type { PayoutOverrideInput, PayoutOverrideResponse, AdminPayoutItem } from "@/types/admin/adminPayouts";
+import { internalServerError } from "@/lib/apiServerError";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -138,9 +139,7 @@ async function handler(
 
     return NextResponse.json(response);
   } catch (error: unknown) {
-    console.error("Admin payout override error:", error);
-    const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return internalServerError(error, "admin/payouts/id");
   }
 }
 

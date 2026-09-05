@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose";
 import { JOB_STATUS, JOB_VEHICLE_TYPE, type JobStatus, type JobVehicleType } from "@/types/job";
+import type { PaymentGateway } from "@/types/payments/paymentHistory";
 
-export type PaymentGateway = "khalti" | "esewa";
 export type PaymentStatus = "initiated" | "paid" | "failed";
 
 export interface IJob extends Document {

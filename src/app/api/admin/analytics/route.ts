@@ -11,6 +11,7 @@ import type {
   PaymentMethodBreakdown,
   RecentActivityItem,
 } from "@/types/admin/adminAnalytics";
+import { internalServerError } from "@/lib/apiServerError";
 
 const THIRTY_DAYS = 29;
 const RECENT_ACTIVITY_LIMIT = 6;
@@ -212,9 +213,7 @@ async function handler() {
 
     return NextResponse.json(response);
   } catch (error: unknown) {
-    console.error("Admin analytics endpoint error:", error);
-    const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return internalServerError(error, "admin/analytics");
   }
 }
 

@@ -1,13 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
 import { JOB_STATUS } from "@/types/job";
 import { apiFetch } from "@/utils/apiFetch";
 
-const ACTIVE_JOB_STATUSES = [JOB_STATUS.ACCEPTED, JOB_STATUS.IN_TRANSIT];
 const MY_ACTIVE_IDS_ENDPOINT = "/api/jobs/my-active-ids";
 const JOBS_ENDPOINT = "/api/jobs";
 const QUERY_KEY_ACTIVE_JOBS = "active-jobs";

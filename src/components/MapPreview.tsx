@@ -8,13 +8,13 @@ import { DEFAULT_MARKER_ICON } from "@/utils/mapIcons";
 import { geocodeAddress } from "@/utils/geocode";
 
 // ── Constants ────────────────────────────────────────────────────────────────────
-const DEFAULT_CENTER: [number, number] = [37.0902, -95.7129]; // USA
+const DEFAULT_CENTER: [number, number] = [27.7172, 85.3240]; // Kathmandu, Nepal
 const DEBOUNCE_MS = 500;
 
 const PAUSE_PADDING: [number, number] = [50, 50];
 const PAUSE_DURATION = 1;
-const MAP_ZOOM_CLOSED = 12;
-const MAP_ZOOM_DEFAULT = 3;
+const MAP_ZOOM_CLOSED = 13;
+const MAP_ZOOM_DEFAULT = 12;
 
 const ROUTE_PATH_OPTIONS = {
   color: "#0066FF",
@@ -53,7 +53,11 @@ async function fetchRoute(start: Coords, end: Coords): Promise<[number, number][
   } catch (err: unknown) {
     console.error("Routing error:", err);
   }
-  return null;
+  // Fallback straight line between pickup and dropoff if OSRM is unreachable
+  return [
+    [start.lat, start.lng],
+    [end.lat, end.lng],
+  ];
 }
 
 function buildPosition(coords: Coords | null): [number, number] | undefined {

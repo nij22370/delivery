@@ -45,12 +45,11 @@ function buildRoleScopedFilter(
       // A driver cannot see other drivers' accepted jobs — the status filter
       // is bounded to "posted" unless the driver is scoping to their own jobs.
       filter.status = JOB_STATUS.POSTED;
+      // Drivers see only open jobs that match their verified vehicle type.
+      // If they have no DriverProfile yet, return zero jobs (an impossible
+      // vehicleType value guarantees an empty result set).
+      filter.vehicleType = driverVehicleType ?? NO_MATCH_VEHICLE_TYPE;
     }
-
-    // Drivers see only jobs that match their verified vehicle type.
-    // If they have no DriverProfile yet, return zero jobs (an impossible
-    // vehicleType value guarantees an empty result set).
-    filter.vehicleType = driverVehicleType ?? NO_MATCH_VEHICLE_TYPE;
   }
   // Admin: no baseline scoping; sees all jobs.
 

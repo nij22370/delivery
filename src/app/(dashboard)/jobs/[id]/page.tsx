@@ -203,10 +203,6 @@ export default function JobDetailPage({
     },
   });
 
-  const handleOpenDispute = useCallback(() => {
-    setIsDisputeModalOpen(true);
-  }, []);
-
   const handleCloseDispute = useCallback(() => {
     setIsDisputeModalOpen(false);
     setDisputeReason("");
@@ -233,7 +229,8 @@ export default function JobDetailPage({
 
   const isContactRevealed = job?.status !== JOB_STATUS.POSTED;
 
-  const backHref = isPoster ? DASHBOARD_PATH : "/jobs/browse";
+  const backHref = isAdmin ? "/admin/jobs" : isPoster ? DASHBOARD_PATH : "/jobs/browse";
+  const backLabel = isAdmin ? "Admin Jobs" : isPoster ? "Dashboard" : "Browse";
 
   // ── Loading ──────────────────────────────────────────────────────────────
   if (isAuthLoading) {
@@ -280,7 +277,7 @@ export default function JobDetailPage({
             href={backHref}
             className="text-sm font-semibold text-primary hover:underline"
           >
-            ← Back to {isPoster ? "Dashboard" : "Browse"}
+            ← Back to {backLabel}
           </Link>
         </div>
       </div>
@@ -301,7 +298,7 @@ export default function JobDetailPage({
           className="inline-flex items-center gap-1 text-sm text-on-surface-variant hover:text-primary transition-colors mb-6 cursor-pointer"
         >
           <span className="material-symbols-outlined text-base">arrow_back</span>
-          Back to {isPoster ? "Dashboard" : "Browse"}
+          Back to {backLabel}
         </Link>
 
         {/* Page Header */}

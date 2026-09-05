@@ -5,9 +5,8 @@ import PaymentTransaction from "@/models/PaymentTransaction";
 import Payout from "@/models/Payout";
 import { verifyKhaltiPayment, getPaymentFailureUrl } from "@/lib/payments/khalti";
 import { notifyUser } from "@/lib/notify";
+import { DRIVER_PAYOUT_RATE, PLATFORM_FEE_RATE } from "@/lib/constants";
 
-const DRIVER_PAYOUT_PERCENTAGE = 0.9;
-const PLATFORM_FEE_PERCENTAGE = 0.1;
 const DUPLICATE_KEY_ERROR_CODE = 11000;
 
 function redirectToSuccess(req: NextRequest, job: { _id: unknown; offeredPrice: number }): NextResponse {
@@ -86,8 +85,8 @@ export async function GET(req: NextRequest) {
 
       // Step 2 — Payout.create() second.
       try {
-        const amount = job.offeredPrice * DRIVER_PAYOUT_PERCENTAGE;
-        const platformFee = job.offeredPrice * PLATFORM_FEE_PERCENTAGE;
+        const amount = job.offeredPrice * DRIVER_PAYOUT_RATE;
+        const platformFee = job.offeredPrice * PLATFORM_FEE_RATE;
         await Payout.create({
           driverId: job.driverId,
           jobId: job._id,
@@ -119,7 +118,7 @@ export async function GET(req: NextRequest) {
         { link: `/jobs/${jobIdString}` }
       );
       if (job.driverId) {
-        const driverPayoutAmount = Math.round(job.offeredPrice * DRIVER_PAYOUT_PERCENTAGE);
+        const driverPayoutAmount = Math.round(job.offeredPrice * DRIVER_PAYOUT_RATE);
         void notifyUser(
           String(job.driverId),
           `A payout of NPR ${driverPayoutAmount} has been initiated for you.`,
@@ -187,9 +186,7 @@ export async function GET(req: NextRequest) {
     console.error(`Unknown Khalti payment status: ${status}`);
     return redirectToFailure(req, jobIdForFailure, "unknown");
   } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Failed to verify payment";
-    console.error("Khalti verify fatal error:", message);
+    console.error("Khalti verify fatal error:", error);
     return redirectToFailure(req, jobIdForFailure, "server_error");
   }
 }

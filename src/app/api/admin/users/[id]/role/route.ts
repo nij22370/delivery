@@ -5,6 +5,7 @@ import connectDB from "@/lib/db";
 import User from "@/models/User";
 import type { JwtAccessPayload } from "@/types/auth/auth";
 import type { ChangeUserRoleResponse, AdminUserRole } from "@/types/admin/adminUsers";
+import { internalServerError } from "@/lib/apiServerError";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -97,9 +98,7 @@ async function handler(
 
     return NextResponse.json(response);
   } catch (error: unknown) {
-    console.error("Admin change role error:", error);
-    const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return internalServerError(error, "admin/users/role");
   }
 }
 

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { JOB_STATUS } from "@/types/job";
 
 interface JobDetail {
   _id: string;

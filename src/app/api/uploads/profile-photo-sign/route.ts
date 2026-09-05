@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { v2 as cloudinary } from "cloudinary";
 import { withAuth } from "@/lib/auth";
 import type { JwtAccessPayload } from "@/types/auth/auth";
+import { internalServerError } from "@/lib/apiServerError";
 
 const PROFILE_PHOTO_FOLDER = "profile-photos";
-const INTERNAL_SERVER_ERROR_MESSAGE = "Internal server error";
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -38,10 +38,7 @@ async function handler(req: NextRequest, user: JwtAccessPayload) {
       folder,
     });
   } catch (error: unknown) {
-    console.error("Profile photo sign error:", error);
-    const message =
-      error instanceof Error ? error.message : INTERNAL_SERVER_ERROR_MESSAGE;
-    return NextResponse.json({ message }, { status: 500 });
+    return internalServerError(error, "uploads/profile-photo-sign");
   }
 }
 

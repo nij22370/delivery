@@ -5,6 +5,7 @@ import Job from "@/models/Job";
 import { JOB_STATUS } from "@/types/job";
 import type { JwtAccessPayload } from "@/types/auth/auth";
 import type { PosterSummaryResponse } from "@/types/poster/posterDashboard";
+import { internalServerError } from "@/lib/apiServerError";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -94,9 +95,7 @@ async function handler(req: NextRequest, user: JwtAccessPayload, context: RouteC
 
     return NextResponse.json(response);
   } catch (error: unknown) {
-    console.error("Poster summary endpoint error:", error);
-    const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return internalServerError(error, "posters/summary");
   }
 }
 
