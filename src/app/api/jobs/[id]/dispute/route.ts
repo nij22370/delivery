@@ -6,6 +6,7 @@ import Job from "@/models/Job";
 import { JOB_STATUS, type JobStatus } from "@/types/job";
 import { triggerJobEvent } from "@/lib/triggerJobEvent";
 import type { JwtAccessPayload } from "@/types/auth/auth";
+import { internalServerError } from "@/lib/apiServerError";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -99,9 +100,7 @@ async function handler(
       },
     });
   } catch (error: unknown) {
-    console.error("Dispute flag error:", error);
-    const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return internalServerError(error, "jobs/dispute");
   }
 }
 

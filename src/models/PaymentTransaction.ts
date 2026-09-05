@@ -1,7 +1,5 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose";
-
-export type PaymentGateway = "khalti" | "esewa";
-export type TransactionStatus = "Completed" | "Pending" | "Failed" | "Expired" | "User canceled" | "Refunded";
+import type { PaymentGateway, TransactionStatus } from "@/types/payments/paymentHistory";
 
 export interface IPaymentTransaction extends Document {
   jobId: Types.ObjectId;

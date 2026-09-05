@@ -6,10 +6,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { jobVehicleSchema, JOB_VEHICLE_TYPE } from "@/types/job";
 import type { JobVehicleInput, JobVehicleType } from "@/types/job";
 import VehicleCard from "@/components/post-job/VehicleCard";
-import FormFieldError from "@/components/post-job/FormFieldError";
-
-const INPUT_CLASS =
-  "w-full h-12 px-4 rounded-lg border border-outline-variant text-base focus:outline-none focus:border-2 focus:border-primary placeholder:text-on-surface-variant/50 transition-all bg-surface-white";
 
 interface StepVehicleProps {
   onNext: (data: JobVehicleInput) => void;

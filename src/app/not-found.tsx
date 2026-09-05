@@ -24,10 +24,12 @@ const QUICK_DESTINATIONS = [
   { href: "/driver/earnings", icon: "description", label: "Billing History" },
 ] as const;
 
+import { STATUS_PAGE_URL } from "@/lib/constants";
+
 const FOOTER_LINKS = [
   { href: "/privacy", label: "Privacy Policy" },
   { href: "/terms", label: "Terms of Service" },
-  { href: "https://status.swiftship.com", label: "System Status" },
+  { href: STATUS_PAGE_URL, label: "System Status" },
 ] as const;
 
 export default function NotFound() {

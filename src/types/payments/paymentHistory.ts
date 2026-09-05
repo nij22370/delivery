@@ -1,3 +1,12 @@
+export type PaymentGateway = "khalti" | "esewa";
+export type TransactionStatus =
+  | "Completed"
+  | "Pending"
+  | "Failed"
+  | "Expired"
+  | "User canceled"
+  | "Refunded";
+
 export interface PopulatedJobOnTransaction {
   _id: string;
   pickupAddress: string;
@@ -11,16 +20,10 @@ export interface PaymentTransactionItem {
   _id: string;
   jobId: string | PopulatedJobOnTransaction;
   posterId?: string | null;
-  gateway: "khalti" | "esewa";
+  gateway: PaymentGateway;
   transactionId: string;
   amount: number;
-  status:
-    | "Completed"
-    | "Pending"
-    | "Failed"
-    | "Expired"
-    | "User canceled"
-    | "Refunded";
+  status: TransactionStatus;
   processedAt: string;
   createdAt?: string;
   updatedAt?: string;

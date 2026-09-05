@@ -13,6 +13,8 @@ import NotificationsPanel, {
   UnreadBadge,
   useNotificationsBellState,
 } from "@/components/ui/NotificationsPanel";
+import AdminSidebar from "@/components/admin/AdminSidebar";
+import AdminHeader from "@/components/admin/AdminHeader";
 
 const POSTER_ROLE = "poster";
 const DRIVER_ROLE = "driver";
@@ -187,6 +189,25 @@ export default function DashboardLayout({
   const handleCloseMobileMenu = useCallback(() => {
     setIsMobileMenuOpen(false);
   }, []);
+
+  if (!isAuthLoading && userRole === ADMIN_ROLE) {
+    return (
+      <NotificationProvider>
+        <div className="min-h-screen bg-[var(--color-background)] text-on-surface flex flex-col">
+          <AdminSidebar
+            isMobileOpen={isMobileMenuOpen}
+            onCloseMobile={handleCloseMobileMenu}
+          />
+          <div className="flex-1 md:ml-64 flex flex-col min-h-screen">
+            <AdminHeader onToggleMobile={handleToggleMobileMenu} />
+            <main className="flex-1 mt-16 p-4 pb-20 md:p-8 md:pb-8 overflow-y-auto">
+              <div className="max-w-7xl mx-auto">{children}</div>
+            </main>
+          </div>
+        </div>
+      </NotificationProvider>
+    );
+  }
 
   return (
     <NotificationProvider>

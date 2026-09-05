@@ -11,6 +11,7 @@ import type {
   AdminJobItem,
   AdminJobStats,
 } from "@/types/admin/adminJobs";
+import { internalServerError } from "@/lib/apiServerError";
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 10;
@@ -204,9 +205,7 @@ async function handler(req: NextRequest) {
 
     return NextResponse.json(response);
   } catch (error: unknown) {
-    console.error("Admin jobs endpoint error:", error);
-    const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return internalServerError(error, "admin/jobs");
   }
 }
 

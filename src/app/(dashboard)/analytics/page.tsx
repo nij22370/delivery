@@ -18,11 +18,11 @@ import {
   Area,
 } from "recharts";
 
-const CHART_PRIMARY_COLOR = "#276ef1";
-const CHART_HOVER_COLOR = "#1a56c4";
-const CHART_GRID_COLOR = "#e8e8f0";
-const AREA_STROKE_COLOR = "#276ef1";
-const AREA_FILL_COLOR = "#276ef1";
+const CHART_PRIMARY_COLOR = "var(--color-primary-container)";
+const CHART_HOVER_COLOR = "var(--color-primary)";
+const CHART_GRID_COLOR = "var(--color-surface-container-high)";
+const AREA_STROKE_COLOR = "var(--color-primary-container)";
+const AREA_FILL_COLOR = "var(--color-primary-container)";
 
 const WEEK_LABELS = ["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8"];
 

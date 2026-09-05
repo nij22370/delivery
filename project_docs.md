@@ -8,6 +8,12 @@
 - **Validation:** Zod
 - **Authentication:** NextAuth.js (v4), bcryptjs
 
+## Documentation Index
+- **`docs\USER_GUIDE.md`** — How SwiftShip works for posters, drivers, and admins (no technical knowledge required). Includes a step-by-step flow, the full test-path with seeded credentials, troubleshooting, and a glossary.
+- **`docs\ai-collaboration\Audit-Changes.md`** — Technical summary of every code change in the `feat/production-readiness-audit` branch (not yet committed). Covers the Mongoose `maxTimeMS` projection bug, rate limiting, security headers, Nepal geocoder, type deduplication, and 57 defensive null-safety guards.
+- **`docs\ai-collaboration\Handover.md`** — Live session state; read first, update last.
+- **`docs\ai-collaboration\{Architecture,Constraints,Flow,TestChecklist,Bug,Feature,Decisions,Rollback}.md`** — AI collaboration habits.
+
 ## Phase 1 Implementation Summary
 ### Database Layer
 - Created `User` schema at `src/models/User.ts`.

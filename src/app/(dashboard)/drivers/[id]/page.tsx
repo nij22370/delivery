@@ -169,11 +169,6 @@ export default function DriverProfilePage({
 
   const shortId = useMemo(() => `DRV-${id.slice(-SHORT_ID_CHARS).toUpperCase()}`, [id]);
 
-  const ratingAvgDisplay = useMemo(() => {
-    const ratingAvg = profileData?.profile?.ratingAvg ?? 0;
-    return ratingAvg > 0 ? ratingAvg.toFixed(1) : "N/A";
-  }, [profileData?.profile?.ratingAvg]);
-
   const reviewItems = useMemo(() => {
     const reviews = reviewsData?.reviews ?? [];
     return reviews.map((review, index) => (

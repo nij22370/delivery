@@ -2,40 +2,64 @@
 
 import { useEffect, useRef, useState } from "react";
 
+interface ThreeNode {
+  position: {
+    x: number;
+    y: number;
+    z: number;
+    set: (x: number, y: number, z: number) => void;
+    distanceTo: (v: { x: number; y: number; z: number }) => number;
+  };
+}
+
+interface ThreeWheel {
+  rotation: { x: number; y: number; z: number };
+  position: { x: number; y: number; z: number };
+}
+
 export default function ThreeCanvas({ type }: { type: "network" | "truck" | "parcel" }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isThreeLoaded, setIsThreeLoaded] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const scriptLoadListenerRef = useRef<(() => void) | null>(null);
+    const [isReady, setIsReady] = useState(() =>
+      typeof window !== "undefined" &&
+      !!(window as unknown as Record<string, unknown>).THREE
+    );
 
-  useEffect(() => {
-    // Check if script is already present
-    const existingScript = document.querySelector('script[src*="three.min.js"]');
-    if (existingScript) {
-      if ((window as any).THREE) {
-        setIsThreeLoaded(true);
-      } else {
-        const handleScriptLoad = () => setIsThreeLoaded(true);
-        existingScript.addEventListener("load", handleScriptLoad);
-        return () => {
-          existingScript.removeEventListener("load", handleScriptLoad);
-        };
+    useEffect(() => {
+      if (scriptLoadListenerRef.current) {
+        scriptLoadListenerRef.current();
       }
-      return;
-    }
+      scriptLoadListenerRef.current = null;
 
-    const script = document.createElement("script");
-    script.src = "https://ajax.googleapis.com/ajax/libs/threejs/r125/three.min.js";
-    script.async = true;
-    script.onload = () => setIsThreeLoaded(true);
-    document.body.appendChild(script);
+      const handleReady = () => setIsReady(true);
 
-    return () => {
-      // Keep script loaded so subsequent switches don't re-download it
-    };
-  }, []);
+      const existingScript = document.querySelector('script[src*="three.min.js"]');
+      if (existingScript) {
+        if ((window as unknown as Record<string, unknown>).THREE) {
+          handleReady();
+          return;
+        }
+        existingScript.addEventListener("load", handleReady);
+        scriptLoadListenerRef.current = () => {
+          existingScript.removeEventListener("load", handleReady);
+        };
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.src = "https://ajax.googleapis.com/ajax/libs/threejs/r125/three.min.js";
+      script.async = true;
+      script.onload = handleReady;
+      document.body.appendChild(script);
+      scriptLoadListenerRef.current = () => {
+        // Keep script loaded so subsequent switches don't re-download it
+      };
+    }, [type]);
 
   useEffect(() => {
-    if (!isThreeLoaded || !containerRef.current) return;
-    const THREE = (window as any).THREE;
+    if (!isReady || !containerRef.current) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const THREE = (window as unknown as { THREE?: any }).THREE;
     if (!THREE) return;
 
     const container = containerRef.current;
@@ -57,7 +81,7 @@ export default function ThreeCanvas({ type }: { type: "network" | "truck" | "par
 
       const nodeGroup = new THREE.Group();
       const nodeCount = 24;
-      const nodes: any[] = [];
+      const nodes: ThreeNode[] = [];
       const sphereGeom = new THREE.SphereGeometry(0.12, 16, 16);
       const sphereMat = new THREE.MeshBasicMaterial({ color: 0x276ef1 });
 
@@ -124,7 +148,7 @@ export default function ThreeCanvas({ type }: { type: "network" | "truck" | "par
 
       const wheelGeom = new THREE.CylinderGeometry(0.28, 0.28, 1.25, 32);
       const wheelMat = new THREE.MeshPhongMaterial({ color: 0x444444 });
-      const wheels: any[] = [];
+      const wheels: ThreeWheel[] = [];
 
       for (let i = 0; i < 4; i++) {
         const wheel = new THREE.Mesh(wheelGeom, wheelMat);
@@ -207,7 +231,7 @@ export default function ThreeCanvas({ type }: { type: "network" | "truck" | "par
       renderer.dispose();
       scene.clear();
     };
-  }, [isThreeLoaded, type]);
+  }, [isReady, type]);
 
   return (
     <div

@@ -5,7 +5,6 @@ const ESEWA_FORM_URL = "https://rc-epay.esewa.com.np/api/epay/main/v2/form";
 
 const ERROR_MSG_MISSING_SECRET = "ESEWA_SECRET_KEY is not defined in environment variables";
 const ERROR_MSG_MISSING_MERCHANT_CODE = "ESEWA_MERCHANT_CODE is not defined in environment variables";
-const ERROR_MSG_MISSING_SUCCESS_URL = "PAYMENT_SUCCESS_URL is not defined in environment variables";
 
 interface EsewaInitResult {
   method: "form";

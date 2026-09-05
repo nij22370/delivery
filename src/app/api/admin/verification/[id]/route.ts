@@ -6,6 +6,7 @@ import connectDB from "@/lib/db";
 import DriverProfile from "@/models/DriverProfile";
 import { DRIVER_PROFILE_STATUS } from "@/types/driverProfile/driverProfile";
 import type { AdminVerificationProfile } from "@/types/admin/adminVerification";
+import { internalServerError } from "@/lib/apiServerError";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -69,10 +70,7 @@ async function handleReview(
       data: updatedProfile as unknown as AdminVerificationProfile,
     });
   } catch (error: unknown) {
-    console.error("Admin verification review error:", error);
-    const message =
-      error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return internalServerError(error, "admin/verification/id");
   }
 }
 

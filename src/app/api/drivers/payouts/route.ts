@@ -3,6 +3,7 @@ import { withAuth } from "@/lib/auth";
 import connectDB from "@/lib/db";
 import Payout from "@/models/Payout";
 import type { JwtAccessPayload } from "@/types/auth/auth";
+import { internalServerError } from "@/lib/apiServerError";
 
 async function getDriverPayoutsHandler(
   _req: NextRequest,
@@ -30,9 +31,7 @@ async function getDriverPayoutsHandler(
       pendingPayout,
     });
   } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Failed to fetch driver payouts";
-    return NextResponse.json({ message }, { status: 500 });
+    return internalServerError(error, "drivers/payouts");
   }
 }
 

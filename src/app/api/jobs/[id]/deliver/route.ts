@@ -9,10 +9,10 @@ import { notifyUser } from "@/lib/notify";
 import type { JwtAccessPayload } from "@/types/auth/auth";
 import { JOB_STATUS } from "@/types/job";
 import { triggerJobEvent } from "@/lib/triggerJobEvent";
+import { DRIVER_PAYOUT_RATE, PLATFORM_FEE_RATE } from "@/lib/constants";
+import { internalServerError } from "@/lib/apiServerError";
 
 const STATUS_CHANGE_EVENT = "status-change";
-const DRIVER_PAYOUT_PERCENTAGE = 0.9;
-const PLATFORM_FEE_PERCENTAGE = 0.1;
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -60,8 +60,8 @@ async function handleDeliverJob(
       }).lean();
 
       if (!existingPayout && deliveredJob.driverId) {
-        const amount = deliveredJob.offeredPrice * DRIVER_PAYOUT_PERCENTAGE;
-        const platformFee = deliveredJob.offeredPrice * PLATFORM_FEE_PERCENTAGE;
+        const amount = deliveredJob.offeredPrice * DRIVER_PAYOUT_RATE;
+        const platformFee = deliveredJob.offeredPrice * PLATFORM_FEE_RATE;
 
         await Payout.create({
           driverId: new Types.ObjectId(deliveredJob.driverId),
@@ -77,8 +77,7 @@ async function handleDeliverJob(
 
     return NextResponse.json({ job: deliveredJob }, { status: 200 });
   } catch (error: unknown) {
-    console.error("Deliver job error:", error);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return internalServerError(error, "jobs/deliver");
   }
 }
 

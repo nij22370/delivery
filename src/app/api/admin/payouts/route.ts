@@ -7,6 +7,7 @@ import Job from "@/models/Job";
 import User from "@/models/User";
 import { JOB_STATUS } from "@/types/job";
 import type { AdminPayoutItem, AdminPayoutsResponse } from "@/types/admin/adminPayouts";
+import { internalServerError } from "@/lib/apiServerError";
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 10;
@@ -183,9 +184,7 @@ async function handler(req: NextRequest) {
 
     return NextResponse.json(response);
   } catch (error: unknown) {
-    console.error("Admin payouts endpoint error:", error);
-    const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return internalServerError(error, "admin/payouts");
   }
 }
 

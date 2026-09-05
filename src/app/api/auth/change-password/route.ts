@@ -5,6 +5,7 @@ import connectDB from "@/lib/db";
 import User from "@/models/User";
 import { withAuth } from "@/lib/auth";
 import type { JwtAccessPayload } from "@/types/auth/auth";
+import { internalServerError } from "@/lib/apiServerError";
 
 const BCRYPT_SALT_ROUNDS = 10;
 const MIN_NEW_PASSWORD_LENGTH = 8;
@@ -74,9 +75,6 @@ export const POST = withAuth(async (req: NextRequest, payload: JwtAccessPayload)
       { status: 200 }
     );
   } catch (error: unknown) {
-    console.error("Change password error:", error);
-    const message =
-      error instanceof Error ? error.message : INTERNAL_SERVER_ERROR_MESSAGE;
-    return NextResponse.json({ message }, { status: 500 });
+    return internalServerError(error, "auth/change-password");
   }
 });

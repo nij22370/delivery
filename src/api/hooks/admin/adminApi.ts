@@ -21,6 +21,8 @@ export function useVerificationQueue(query: AdminVerificationQuery) {
   });
 }
 
+import { DRIVER_PROFILE_STATUS } from "@/types/driverProfile/driverProfile";
+
 export function useApproveRejectDriver() {
   const queryClient = useQueryClient();
 
@@ -32,7 +34,7 @@ export function useApproveRejectDriver() {
     mutationFn: ({ id, data }) => approveRejectDriver(id, data),
     onSuccess: (_result, variables) => {
       queryClient.invalidateQueries({ queryKey: [ADMIN_VERIFICATION_QUERY_KEY] });
-      if (variables.data.status === "approved") {
+      if (variables.data.status === DRIVER_PROFILE_STATUS.APPROVED) {
         toast.success("Driver approved successfully");
       } else {
         toast.error("Driver rejected");

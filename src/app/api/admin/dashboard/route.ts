@@ -3,7 +3,6 @@ import { withRole } from "@/lib/auth";
 import connectDB from "@/lib/db";
 import Job from "@/models/Job";
 import DriverProfile from "@/models/DriverProfile";
-import User from "@/models/User";
 import { JOB_STATUS } from "@/types/job";
 import { DRIVER_PROFILE_STATUS } from "@/types/driverProfile/driverProfile";
 import type {
@@ -11,6 +10,7 @@ import type {
   AdminRecentActivityItem,
   AdminPlatformGrowthPoint,
 } from "@/types/admin/adminDashboard";
+import { internalServerError } from "@/lib/apiServerError";
 
 const DEFAULT_GROWTH_POINTS: AdminPlatformGrowthPoint[] = [
   { day: "Day 1", valuePercent: 30 },
@@ -146,9 +146,7 @@ async function handler(_req: NextRequest) {
 
     return NextResponse.json(responseBody);
   } catch (error: unknown) {
-    console.error("Admin dashboard endpoint error:", error);
-    const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return internalServerError(error, "admin/dashboard");
   }
 }
 

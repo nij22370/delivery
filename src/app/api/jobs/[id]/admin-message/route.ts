@@ -10,6 +10,7 @@ import { notifyUser } from "@/lib/notify";
 import { triggerJobEvent } from "@/lib/triggerJobEvent";
 import type { JwtAccessPayload } from "@/types/auth/auth";
 import type { Message as MessageDoc, GetMessagesResponse } from "@/types/message/message";
+import { internalServerError } from "@/lib/apiServerError";
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 50;
@@ -193,10 +194,7 @@ async function handlePostAdminMessage(
 
     return NextResponse.json({ message: savedMessage }, { status: 201 });
   } catch (error: unknown) {
-    console.error("Admin message POST error:", error);
-    const message =
-      error instanceof Error ? error.message : INTERNAL_SERVER_ERROR_MESSAGE;
-    return NextResponse.json({ message }, { status: 500 });
+    return internalServerError(error, "jobs/admin-message");
   }
 }
 

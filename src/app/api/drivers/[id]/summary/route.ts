@@ -7,6 +7,7 @@ import { JOB_STATUS } from "@/types/job";
 import { DRIVER_PROFILE_STATUS } from "@/types/driverProfile/driverProfile";
 import type { JwtAccessPayload } from "@/types/auth/auth";
 import type { DriverSummaryResponse } from "@/types/drivers/driverDashboard";
+import { internalServerError } from "@/lib/apiServerError";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -97,9 +98,7 @@ async function handler(
 
     return NextResponse.json(responseData);
   } catch (error: unknown) {
-    console.error("Driver summary route error:", error);
-    const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return internalServerError(error, "drivers/summary");
   }
 }
 

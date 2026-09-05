@@ -1,7 +1,5 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose";
-
-export type PayoutGateway = "khalti" | "esewa";
-export type PayoutStatus = "pending" | "paid" | "failed";
+import type { PayoutGateway, PayoutStatus } from "@/types/payout/payout";
 
 export interface IPayout extends Document {
   driverId: Types.ObjectId;

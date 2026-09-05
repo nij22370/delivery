@@ -144,8 +144,6 @@ function PaymentPageInner() {
   const [selectedGateway, setSelectedGateway] = useState<GatewayId | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const isPoster = !isAuthLoading && user?.role === POSTER_ROLE;
-
   const { data: job, isLoading, isError, error } = useQuery({
     queryKey: [PAYMENT_PAGE_QUERY_KEY, jobId],
     queryFn: () => fetchJob(jobId),

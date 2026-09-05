@@ -7,6 +7,7 @@ import User from "@/models/User";
 import { DRIVER_PROFILE_STATUS } from "@/types/driverProfile/driverProfile";
 import type { DriverProfileStatus } from "@/types/driverProfile/driverProfile";
 import type { AdminVerificationProfile } from "@/types/admin/adminVerification";
+import { internalServerError } from "@/lib/apiServerError";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const DEFAULT_PAGE = 1;
@@ -107,10 +108,7 @@ async function handler(req: NextRequest) {
       totalRejected,
     });
   } catch (error: unknown) {
-    console.error("Admin verification queue error:", error);
-    const message =
-      error instanceof Error ? error.message : ERROR_MSG_INTERNAL;
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return internalServerError(error, "admin/verification");
   }
 }
 

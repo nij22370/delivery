@@ -3,7 +3,8 @@ import type { IUser } from "@/models/User";
 import { initiateKhalti } from "./khalti";
 import { initiateEsewa } from "./esewa";
 
-export type PaymentGateway = "khalti" | "esewa";
+import type { PaymentGateway } from "@/types/payments/paymentHistory";
+export type { PaymentGateway };
 
 export type PaymentInitResult =
   | { method: "redirect"; url: string; pidx?: string }

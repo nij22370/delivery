@@ -6,6 +6,7 @@ import User from "@/models/User";
 import { withRole } from "@/lib/auth";
 import { initiatePayment } from "@/lib/payments";
 import type { JwtAccessPayload } from "@/types/auth/auth";
+import { internalServerError } from "@/lib/apiServerError";
 
 const initiatePaymentSchema = z.object({
   jobId: z.string().min(1, "Job ID is required"),
@@ -72,9 +73,7 @@ async function handleInitiatePayment(
 
     return NextResponse.json(result);
   } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Failed to initiate payment";
-    return NextResponse.json({ message }, { status: 500 });
+    return internalServerError(error, "payments/initiate");
   }
 }
 

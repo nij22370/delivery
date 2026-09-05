@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withRole } from "@/lib/auth";
 import { v2 as cloudinary } from "cloudinary";
 import type { JwtAccessPayload } from "@/types/auth/auth";
+import { internalServerError } from "@/lib/apiServerError";
 
 const ALLOWED_DOCUMENT_TYPES = ["licence", "insurance", "government_id"] as const;
 type DocumentType = (typeof ALLOWED_DOCUMENT_TYPES)[number];
@@ -41,8 +42,7 @@ async function handler(req: NextRequest, user: JwtAccessPayload) {
       folder,
     });
   } catch (error: unknown) {
-    console.error("Upload sign error:", error);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return internalServerError(error, "uploads/sign");
   }
 }
 

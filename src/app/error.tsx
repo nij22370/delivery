@@ -7,12 +7,14 @@ import { getInitials } from "@/utils/format";
 
 const BRAND_NAME = "SwiftShip";
 const ERROR_TITLE = "Oops! Something went wrong";
+import { STATUS_PAGE_URL } from "@/lib/constants";
+
 const ERROR_DESCRIPTION =
   "We're having some trouble loading this page right now. It might be a temporary connection issue or a small hiccup in our system. Don't worry, your shipments are safe!";
 const DEFAULT_ERROR_CODE = "ERR_SWIFT_502_X";
 
 const SUPPORT_HREF = "mailto:support@swiftship.com";
-const STATUS_PAGE_HREF = "https://status.swiftship.com";
+const STATUS_PAGE_HREF = STATUS_PAGE_URL;
 const HELP_CENTER_HREF = "/support";
 const COPYRIGHT_TEXT = "© 2024 SwiftShip Logistics Solutions. All rights reserved.";
 

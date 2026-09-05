@@ -3,11 +3,10 @@ import type { IUser } from "@/models/User";
 
 const KHALTI_INITIATE_URL = "https://a.khalti.com/api/v2/epayment/initiate/";
 const KHALTI_LOOKUP_URL = "https://a.khalti.com/api/v2/epayment/lookup/";
-const WEBSITE_URL = "http://localhost:3000";
+const WEBSITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 const PAISA_MULTIPLIER = 100;
 
 const ERROR_MSG_MISSING_SECRET = "KHALTI_SECRET_KEY is not defined in environment variables";
-const ERROR_MSG_MISSING_SUCCESS_URL = "PAYMENT_SUCCESS_URL is not defined in environment variables";
 
 interface KhaltiInitiateResponse {
   pidx: string;

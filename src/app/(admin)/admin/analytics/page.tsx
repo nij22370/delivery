@@ -14,17 +14,18 @@ import {
 } from "recharts";
 import { useAdminAnalytics } from "@/api/hooks/admin/adminAnalyticsApi";
 import { formatNpr } from "@/utils/format";
+import { PLATFORM_FEE_RATE } from "@/lib/constants";
 import type { RecentActivityItem, PaymentMethodBreakdown } from "@/types/admin/adminAnalytics";
 
 const CARD_STYLES =
   "bg-surface-white border border-outline-variant rounded-xl p-6 shadow-sm";
 
-const CHART_GRID_COLOR = "#eeeeee";
-const CHART_TEXT_COLOR = "#737786";
-const CHART_GMV_COLOR = "#b1c5ff";
-const CHART_REVENUE_COLOR = "#0055cd";
-const TAKE_RATE = 0.15;
-const TAKE_RATE_DISPLAY = "15.0%";
+const CHART_GRID_COLOR = "var(--color-surface-container)";
+const CHART_TEXT_COLOR = "var(--color-outline)";
+const CHART_GMV_COLOR = "var(--color-primary-fixed-dim)";
+const CHART_REVENUE_COLOR = "var(--color-primary)";
+const TAKE_RATE = PLATFORM_FEE_RATE;
+const TAKE_RATE_DISPLAY = `${(PLATFORM_FEE_RATE * 100).toFixed(1)}%`;
 
 const GATEWAY_DISPLAY_NAMES: Record<string, string> = {
   esewa: "eSewa",

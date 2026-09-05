@@ -105,7 +105,7 @@ export default function RegisterPage() {
               Empowering the<br />Future of Logistics
             </h2>
             <p className="text-lg text-on-surface-variant mb-10 leading-relaxed">
-              Whether you're sending across the city or driving across the state,
+              Whether you&apos;re sending across the city or driving across the state,
               SwiftShip provides the platform for precision and reliability.
             </p>
             <div className="w-full aspect-video rounded-xl bg-surface-white border border-outline-variant shadow-sm overflow-hidden relative">
@@ -150,7 +150,7 @@ export default function RegisterPage() {
 
                   <label className="relative block cursor-pointer group">
                     <input {...register("role")} type="radio" value="poster" className="peer sr-only" />
-                    <div className="p-3 md:p-4 border border-outline-variant rounded-xl flex flex-col items-center gap-2 transition-all duration-200 peer-checked:border-primary peer-checked:bg-[#dae2ff]/30 group-hover:bg-surface-container-low">
+                    <div className="p-3 md:p-4 border border-outline-variant rounded-xl flex flex-col items-center gap-2 transition-all duration-200 peer-checked:border-primary peer-checked:bg-primary/10 group-hover:bg-surface-container-low">
                       <span className="material-symbols-outlined text-primary text-2xl">package_2</span>
                       <span className="text-sm font-bold text-on-surface">Poster</span>
                       <span className="text-xs text-on-surface-variant text-center leading-tight">I want to send items</span>
@@ -164,7 +164,7 @@ export default function RegisterPage() {
 
                   <label className="relative block cursor-pointer group">
                     <input {...register("role")} type="radio" value="driver" className="peer sr-only" />
-                    <div className="p-3 md:p-4 border border-outline-variant rounded-xl flex flex-col items-center gap-2 transition-all duration-200 peer-checked:border-primary peer-checked:bg-[#dae2ff]/30 group-hover:bg-surface-container-low">
+                    <div className="p-3 md:p-4 border border-outline-variant rounded-xl flex flex-col items-center gap-2 transition-all duration-200 peer-checked:border-primary peer-checked:bg-primary/10 group-hover:bg-surface-container-low">
                       <span className="material-symbols-outlined text-primary text-2xl">local_shipping</span>
                       <span className="text-sm font-bold text-on-surface">Driver</span>
                       <span className="text-xs text-on-surface-variant text-center leading-tight">I want to deliver items</span>
@@ -256,7 +256,7 @@ export default function RegisterPage() {
               </div>
 
               <p className="text-xs text-on-surface-variant text-center opacity-70 pb-4">
-                By signing up, you agree to SwiftShip's{" "}
+                By signing up, you agree to SwiftShip&apos;s{" "}
                 <Link href="#" className="underline">Terms</Link> and{" "}
                 <Link href="#" className="underline">Privacy Policy</Link>.
               </p>

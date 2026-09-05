@@ -216,13 +216,13 @@ function PosterDashboardContent({ posterId, posterName }: PosterDashboardContent
                           STATUS_BADGE[job.status] ?? "bg-surface-container text-on-surface-variant"
                         }`}
                       >
-                        {job.status === "in_transit"
+                        {job.status === JOB_STATUS.IN_TRANSIT
                           ? "In Transit"
-                          : job.status === "posted"
+                          : job.status === JOB_STATUS.POSTED
                           ? "Posted"
-                          : job.status === "accepted"
+                          : job.status === JOB_STATUS.ACCEPTED
                           ? "Accepted"
-                          : job.status === "delivered"
+                          : job.status === JOB_STATUS.DELIVERED
                           ? "Delivered"
                           : job.status}
                       </span>
